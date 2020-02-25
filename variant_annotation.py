@@ -121,3 +121,61 @@ def annotate_variants(mt):
                                            ).default([""]))
 
     return mt
+
+
+def annotate_cadd(mt, input_dir='.', cadd_filestem='dbNSFP4.0b2a_hg19CADD.chr'):
+    '''
+    Takes a matrix table keyed by locus/alleles (GrCH37/hg19) and annotates it with CADD information.
+
+    :param mt: matrix table keyed by locus/alleles
+    :param cadd_filestem: string referring to filestem for chrom-separated dbnsfp CADD info
+    :param input_dir: string referring to input directory for dbnsfp data.
+    :return: returns annotated matrix table with new row fields 'CADD_raw', 'CADD_raw_rankscore', and 'CADD_phred'
+    '''
+
+    # Run first for X chrom
+    dbnsfp = hl.read_table(input_dir + cadd_filestem + 'X.ht')
+    print('Annotating CADD for chr X')
+    mt = mt.annotate_rows(CADD_raw=dbnsfp[mt.locus, mt.alleles].CADD_raw,
+                          CADD_raw_rankscore=dbnsfp[mt.locus, mt.alleles].CADD_raw_rankscore,
+                          CADD_phred=dbnsfp[mt.locus, mt.alleles].CADD_phred)
+
+    # Run for the rest of the contigs
+    iterators = [str(i).zfill(1) for i in range(1, 23)]
+    iterators.extend(['Y', 'M'])
+
+    for chrom in iterators:
+        dbnsfp = hl.read_table(input_dir + cadd_filestem + str(chrom) + '.ht')
+        print('Annotating CADD for chr ' + str(chrom))
+        # If annotation is missing, input dbnsfp value
+        mt = mt.annotate_rows(CADD_raw=hl.or_else(mt.CADD_raw, dbnsfp[mt.locus, mt.alleles].CADD_raw),
+                              CADD_raw_rankscore=hl.or_else(mt.CADD_raw_rankscore,
+                                                            dbnsfp[mt.locus, mt.alleles].CADD_raw_rankscore),
+                              CADD_phred=hl.or_else(mt.CADD_phred, dbnsfp[mt.locus, mt.alleles].CADD_phred))
+
+    mt = mt.annotate_globals(CADD_filestem=cadd_filestem)
+
+    return mt
+
+
+def annotate_mpc(mt, mpc):
+    """
+    Annotates an mt (keyed by locus/alleles) with missense badness- POLYPHEN2 - constraint (MPC) score.
+
+    :param mt: matrix table, keyed by locus and alleles.
+    :param mpc: hail table of mpc values for loci in the genome
+    :return: returns annotated matrix table.
+    """
+
+    mt = mt.annotate_rows(MPC=mpc[mt.locus, mt.alleles].MPC,
+                          mpc_ENST=mpc[mt.locus, mt.alleles].ENST,
+                          mpc_ENSG=mpc[mt.locus, mt.alleles].ENSG,
+                          mpc_gene_name=mpc[mt.locus, mt.alleles].gene_name,
+                          mpc_consequence=mpc[mt.locus, mt.alleles].Consequence,
+                          mpc_SIFT=mpc[mt.locus, mt.alleles].SIFT,
+                          mpc_context=mpc[mt.locus, mt.alleles].context,
+                          mpc_PolyPhen=mpc[mt.locus, mt.alleles].PolyPhen,
+                          mpc_mis_badness=mpc[mt.locus, mt.alleles].mis_badness,
+                          mpc_obs_exp=mpc[mt.locus, mt.alleles].obs_exp)
+
+    return mt
