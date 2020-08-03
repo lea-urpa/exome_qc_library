@@ -5,6 +5,8 @@ Created by Lea Urpa in 2019, some from Mitja's original code.
 """
 
 import hail as hl
+import pandas as pd
+import logging
 
 
 def annotate_variants(mt):
@@ -179,3 +181,115 @@ def annotate_mpc(mt, mpc):
                           mpc_obs_exp=mpc[mt.locus, mt.alleles].obs_exp)
 
     return mt
+
+
+def sex_aware_variant_annotations(mt, sex_col='sex', male_tag='Male', female_tag='Female'):
+    '''
+    Creates sex-aware variant annotations for call rate, allele count, and allele number.
+
+    :param mt: matrix table to annotate
+    :param sex_col: string referring to column in the matrix table giving sex information
+    :param male_tag: string or boolean in the column referring to males
+    :param female_tag: string or boolean in the column referring to females
+    :return: Returns matrix table with new row annotations male_hets, male_homvars, male_calls, female_hets,
+    female_homvars, female_calls, sexaware_call_rate, sexaware_ac and sexaware_an.
+    '''
+    num_males = mt.aggregate_cols(hl.agg.count_where(mt[sex_col] == male_tag))
+    num_females = mt.aggregate_cols(hl.agg.count_where(mt[sex_col] == female_tag))
+
+    mt = mt.annotate_rows(male_hets=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & (mt[sex_col] == male_tag)),
+                          male_homvars=hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & (mt[sex_col] == male_tag)),
+                          male_calls=hl.agg.count_where(hl.is_defined(mt.GT) & (mt[sex_col] == male_tag)),
+                          female_hets=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & (mt[sex_col] == female_tag)),
+                          female_homvars=hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & (mt[sex_col] == female_tag)),
+                          female_calls=hl.agg.count_where(hl.is_defined(mt.GT) & (mt[sex_col] == female_tag)))
+
+    mt = mt.annotate_rows(sexaware_call_rate=(hl.case()
+                                              .when(mt.locus.in_y_nonpar(), (mt.male_calls / num_males))
+                                              .when(mt.locus.in_x_nonpar(),
+                                                    (mt.male_calls + 2*mt.female_calls) / (num_males + 2*num_females))
+                                              .default((mt.male_calls + mt.female_calls) / (num_males + num_females))),
+                          sexaware_AC=(hl.case()  # MINOR allele count
+                                       .when(mt.locus.in_y_nonpar(), mt.male_homvars)
+                                       .when(mt.locus.in_x_nonpar(), mt.male_homvars + mt.female_hets + 2*mt.female_homvars)
+                                       .default(mt.male_hets + 2*mt.male_homvars + mt.female_hets + 2*mt.female_homvars)),
+                          sexaware_AN=(hl.case()
+                                       .when(mt.locus.in_y_nonpar(), mt.male_calls)
+                                       .when(mt.locus.in_x_nonpar(), mt.male_calls + 2*mt.female_calls)
+                                       .default(2*mt.male_calls + 2*mt.female_calls)))
+    logging.info('Completed sex-aware variant annotations.')
+
+    return mt
+
+
+def annotate_vars_gnomad_mismatch(mt, gnomad_filters_file):
+    '''
+    This function annotates the matrix table based on Elizabeth Atkins' list of variants
+    with significantly different allele frequencies in Gnomad exomes and genomes
+    within a population (NFE) which indicates that these variants are not sequenced well.
+
+    :param mt: the matrix table to annotate
+    :param gnomad_filters_file: a string containing the (google bucket, gs://) location of the
+    tsv containing the chrom:pos:ref:alt variant, pvalue, odds ratio, genomes and exomes AFs.
+    :return: Returns the annotated matrix table, with new row annotations gnomad_mismatch_pvalue,
+    gnomad_mismatch_odds_ratio, gnomad_mismatch_genomes_AF_NFE and gnomad_mismatch_exomes_AF_NFE.
+    '''
+
+    # Load data
+    gnomad_mismatch = hl.import_table(gnomad_filters_file, impute=True)
+
+    # Convert to pandas to parse chrom:pos:ref:alt
+    gnomad_mm_pd = gnomad_mismatch.to_pandas()
+    loci = gnomad_mm_pd.V.str.split(pat=":", expand=True)
+    loci['alleles'] = loci[[2, 3]].values.tolist()
+    gnomad_mm_pd_loci = pd.concat([gnomad_mm_pd, loci], axis=1)
+
+    # Convert back to hail table and create locus column, key table by these
+    gnomad_mismatch_loci = hl.Table.from_pandas(gnomad_mm_pd_loci)
+    gnomad_mismatch_loci = gnomad_mismatch_loci.annotate(
+                            locus=hl.locus(gnomad_mismatch_loci['0'],
+                                    hl.int(gnomad_mismatch_loci['1'])))
+    gnomad_mismatch_loci = gnomad_mismatch_loci.key_by('locus','alleles')
+
+    # Annotate
+    mt = mt.annotate_rows(gnomad_mismatch_pvalue=gnomad_mismatch_loci[mt.locus, mt.alleles].p_value,
+                          gnomad_mismatch_odds_ratio=gnomad_mismatch_loci[mt.locus, mt.alleles].odds_ratio,
+                          gnomad_mismatch_genomes_AF_NFE=gnomad_mismatch_loci[mt.locus, mt.alleles].genomes_AF_NFE,
+                          gnomad_mismatch_exomes_AF_NFE=gnomad_mismatch_loci[mt.locus, mt.alleles].exomes_AF_NFE)
+
+    mt = mt.annotate_globals(gnomad_mismatch_file=gnomad_filters_file)
+
+    return mt
+
+
+def annotate_variants_gnomad(mt, gnomad_ht_file):
+    '''
+    Annotates variants based on gnomad information, including random forest filter values
+    and population allele frequencies.
+
+    :param mt: matrix table to annotate
+    :param gnomad_ht_file: a string containing the (google bucket, gs://) location of the
+    hail table to read.
+    :return: returns the annotated matrix table, with new row annotations for gnomad_rf values,
+    gnomad filter allele frequency (faf), rsid, population allele frequencies, and popmax.
+    '''
+    gnomad_sites = hl.read_table(gnomad_ht_file)
+
+    # Annotate our data with Gnomad info
+    mt = mt.annotate_rows(gnomad_filters=gnomad_sites[mt.locus, mt.alleles].filters,  # this is the one we want
+                          gnomad_faf=gnomad_sites[mt.locus, mt.alleles].faf,
+                          gnomad_rsid=gnomad_sites[mt.locus, mt.alleles].rsid,
+                          # gnomad_afs=gnomad_sites[mt.locus, mt.alleles].vep.colocated_variants,
+                          gnomad_popmax=gnomad_sites[mt.locus, mt.alleles].popmax,
+                          gnomad_freqs=gnomad_sites[mt.locus, mt.alleles].freq)
+
+    # Hard filtering was for Gnomad's QC measures (what I call analytical variant qc)
+    mt = mt.annotate_rows(gnomad_fail_hard_filters=gnomad_sites[mt.locus, mt.alleles].fail_hard_filters)
+
+    mt = mt.annotate_globals(gnomad_file=gnomad_ht_file,
+                             gnomad_freq_index_dict=gnomad_sites.index_globals().freq_index_dict,
+                             gnomad_popmax_index_dict=gnomad_sites.index_globals().popmax_index_dict,
+                             gnomad_faf_index_dict=gnomad_sites.index_globals().faf_index_dict)
+
+    return mt
+
