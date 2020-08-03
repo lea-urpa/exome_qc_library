@@ -92,7 +92,7 @@ if __name__ == "__main__":
     mt_vep = hl.vep(mt_split, args.vep_location)
 
     if args.out_file is None:
-        out_name = vcf
+        out_name = vcf_files[0]
     else:
         out_name = args.out_file
 
