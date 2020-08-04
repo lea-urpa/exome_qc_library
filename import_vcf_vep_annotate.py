@@ -108,10 +108,10 @@ if __name__ == "__main__":
 
         if args.test:
             logging.info('Test flag given, filtering to on chrom 22.')
-            if args.reference_genome == "GRCh37":
-                chrom_code = "22"
-            elif args.reference_genome == "GRCh38":
+            if args.reference_genome == "GRCh38":
                 chrom_code = "chr22"
+            else:
+                chrom_code = "22"
 
             mt = mt.filter_rows(mt.locus.contig == chrom_code)
 
