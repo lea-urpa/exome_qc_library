@@ -123,7 +123,7 @@ if __name__ == "__main__":
         hl.spark_context().addPyFile(args.scripts_dir + script)
 
     import helper_scripts as h
-    import pipeline_functions as p
+    import qc_pipeline_functions as qc
 
     ####################
     # Configure logger #
@@ -151,61 +151,61 @@ if __name__ == "__main__":
 
     try:
         # Load in data according to parameters given
-        mt = p.load_data(args)
+        mt = qc.load_data(args)
 
         # Annotate samples
-        mt = p.annotate_samples(mt, args)
+        mt = qc.annotate_samples(mt, args)
 
         # Low-pass variant QC
-        mt = p.low_pass_var_qc(mt, args)
+        mt = qc.low_pass_var_qc(mt, args)
 
         # Phenotype Samples QC
-        mt = p.phenotype_samples_qc(mt, args)
+        mt = qc.phenotype_samples_qc(mt, args)
 
         # MAF pruning dataset
-        mt, mt_mafpruned = p.maf_prune_relatedness(mt, args)
+        mt, mt_mafpruned = qc.maf_prune_relatedness(mt, args)
 
         # Export data to find related individuals in King, if necessary
-        mt, mt_mafpruned = p.find_related_individuals(mt, mt_mafpruned, args)
+        mt, mt_mafpruned = qc.find_related_individuals(mt, mt_mafpruned, args)
 
         # LD prune MAF pruned dataset
         # This uses MAF 0.01 (1%) cutoff since that's what we exported to King before. Should be fine.
-        mt, mt_ldpruned = p.ld_prune_popoutliers(mt, mt_mafpruned, args)
+        mt, mt_ldpruned = qc.ld_prune_popoutliers(mt, mt_mafpruned, args)
 
         # Find population outliers (excludes relatives)
         # (Excluding related individuals from analysis, but keeping them in the dataset)
-        mt = p.find_pop_outliers(mt, mt_ldpruned, args)
+        mt = qc.find_pop_outliers(mt, mt_ldpruned, args)
 
         # Analytical samples QC (samples QC hard filters)
         # (Excluding population outliers from analysis, but keeping them in the dataset)
-        mt = p.analytical_samples_qc(mt, args)
+        mt = qc.analytical_samples_qc(mt, args)
 
         # MAF prune dataset for sex imputation
         # This uses the default 0.05 (5%) MAF cutoff for common variants.
-        mt, mt_mafpruned = p.maf_prune_sex_imputation(mt, args)
+        mt, mt_mafpruned = qc.maf_prune_sex_imputation(mt, args)
 
         # Impute sex
         # (Excluding analytical failing samples from analysis, but keeping them in the dataset)
-        mt = p.impute_sex(mt, mt_mafpruned, args)
+        mt = qc.impute_sex(mt, mt_mafpruned, args)
 
         # Variant QC filtering
         # (Excluding population outliers + analytical samples fails, but keeping them in the dataset)
-        mt = p.variant_qc(mt, args)
+        mt = qc.variant_qc(mt, args)
 
         # Annotate gnomad + CADD
-        mt = p.annotate_gnomad_cadd(mt, args)
+        mt = qc.annotate_gnomad_cadd(mt, args)
 
         # Filter variants missing by pheno
         # (Excluding population outliers + analytical sample fails, but keeping them in the dataset)
-        mt = p.filter_missing_by_pheno(mt, args)
+        mt = qc.filter_missing_by_pheno(mt, args)
 
         # Calculate final PCS
         # (Excluding population outliers + analytical sample fails + relatives but projecting them back into the PCS)
-        mt = p.calculate_final_pcs(mt, args)
+        mt = qc.calculate_final_pcs(mt, args)
 
         # Get final case-control counts
         # (Excluding population outliers + analytical sample fails)
-        mt = p.case_control_genotype_counts(mt,  args)
+        mt = qc.case_control_genotype_counts(mt,  args)
 
         # Export matrix table columns for optmatch
         mt = mt.filter_cols((mt.non_finns_to_remove == False) & (mt.fail_analytical == 0))
