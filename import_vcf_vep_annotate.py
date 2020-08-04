@@ -127,7 +127,7 @@ if __name__ == "__main__":
         logging.info('Joining matrix tables.')
 
         for i in range(len(matrix_tables)):
-            if i != len(matrix_tables):  # otherwise indexing error for last MT
+            if i != len(matrix_tables)-1:  # otherwise indexing error for last MT
                 mt1 = matrix_tables[i]
                 next_mt = matrix_tables[i+1]
 
