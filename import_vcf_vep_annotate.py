@@ -69,6 +69,8 @@ if __name__ == "__main__":
             logging.info('Test flag given, filtering to on chrom 22.')
             mt = mt.filter_rows(mt.locus.contig == "22")
 
+        mt = mt.annotate_cols(input_file=vcf)
+
         logging.info('%s imported count: %s' % (vcf, mt.count()))
         matrix_tables.append(mt)
 
