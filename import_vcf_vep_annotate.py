@@ -5,7 +5,7 @@ Author: Lea Urpa, August 2020
 """
 import os
 import argparse
-
+import sys
 
 if __name__ == "__main__":
     print('Beginning import pipeline')
@@ -53,6 +53,14 @@ if __name__ == "__main__":
     datestr, timestr, log_file = h.configure_logging(logstem=logstem)
 
     log_dir = os.path.join(args.log_dir, logstem + datestr)
+
+    # Configure logger
+    root = logging.getLogger()
+    log_formatter = '%(asctime)s - %(levelname)s - %(message)s'
+    logging.basicConfig(filename=log_file, format=log_formatter, level=logging.INFO)
+
+    handler = logging.StreamHandler(sys.stdout)
+    root.addHandler(handler)
 
     ####################
     # Import VCF files #
