@@ -8,7 +8,6 @@ import argparse
 if __name__ == "__main__":
     print('Beginning import pipeline')
     import hail as hl
-    import hail.expr.aggregators as agg
     import logging
 
     ##################################

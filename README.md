@@ -2,6 +2,11 @@
 This library is a collection of tools to analyze and run quality control on exome sequecing data with Hail. The scripts 
 are explained in the order I usually run them.
 
+## Prerequisites
+[Install Hail on your computer](https://hail.is/docs/0.2/getting_started.html),
+ even if you are running in the cloud. This will also install the `hailctl` library 
+as well.
+
 ## Import VCF and VEP annotate
 `import_vcf_vep_annotate.py` takes one or more VCF files, imports them to Hail matrix table format, combines them, and 
 then runs Variant Effect Predictor (VEP) annotation on the files. **Note**: this assumes your VCF files are 
