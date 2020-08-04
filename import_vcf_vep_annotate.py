@@ -3,14 +3,16 @@ Script to import VCF file to Hail format, VEP annotate the dataset, and then sav
 
 Author: Lea Urpa, August 2020
 """
-import os
-import argparse
-import sys
+
 
 if __name__ == "__main__":
     print('Beginning import pipeline')
-    import hail as hl
+    import os
+    import argparse
+    import sys
+    import subprocess
     import logging
+    import hail as hl
 
     ##################################
     # Parse arguments for imput data #
@@ -78,7 +80,7 @@ if __name__ == "__main__":
         vcf_name = os.path.join(args.data_dir, vcf)
         vcf_stem = vcf.replace(".vcf", "")
         vcf_stem = vcf_stem.replace(".gz", "")
-        vcf_stem = vcf_stem.replace(".bgz", "")
+        vcf_stem = vcf_stem.replace(".bgz", "") + ".mt"
         mt_name = os.path.join(args.data_dir, vcf_stem)
 
         # Deal with import if 37 and chroms have chr prefix, or 38 and no prefix.
@@ -90,13 +92,17 @@ if __name__ == "__main__":
         else:
             recode = None
 
-        if recode is None:
-            hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields,
-                          reference_genome=args.reference_genome).write(mt_name, overwrite=True)
-        else:
-            hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields,
-                          reference_genome=args.reference_genome, contig_recoding=recode
-                          ).write(mt_name, overwrite=True)
+        # If MT does not already exist, load in VCF and then write it to disk
+        exists = subprocess.call(['gsutil', '-q', 'stat', mt_name])
+
+        if exists == 1:  # stat returns 1 if file/folder does not exist, 0 if it exists
+            if recode is None:
+                hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields,
+                              reference_genome=args.reference_genome).write(mt_name, overwrite=True)
+            else:
+                hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields,
+                              reference_genome=args.reference_genome, contig_recoding=recode
+                              ).write(mt_name, overwrite=True)
 
         mt = hl.read_matrix_table(mt_name)
 

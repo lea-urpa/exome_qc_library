@@ -37,7 +37,7 @@ def parse_arguments(arguments):
     inputs.add_argument("--bam_metadata", type=str, help="File containing bam metadata information.")
     inputs.add_argument("--samples_annotation_files", type=str,
                         help="Files to annotate the samples with, comma separated.")
-    inputs.add_argument("--cadd_")
+    inputs.add_argument("--cadd_folder")
 
 
 
