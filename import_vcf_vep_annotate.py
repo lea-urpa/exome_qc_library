@@ -1,5 +1,7 @@
 """
 Script to import VCF file to Hail format, VEP annotate the dataset, and then save it as a Hail matrix table.
+
+Author: Lea Urpa, August 2020
 """
 import os
 import argparse
@@ -52,7 +54,7 @@ if __name__ == "__main__":
     ####################
     # Import VCF files #
     ####################
-    vcf_files = args.vcf.split(",")
+    vcf_files = args.vcf.strip().split(",")
     if (len(vcf_files) > 1) and (args.out_file is None):
         logging.error("Error! Must give matrix table file name with --out_file if importing more than one VCF.")
         exit(1)
