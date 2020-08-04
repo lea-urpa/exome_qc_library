@@ -30,7 +30,7 @@ def parse_arguments(arguments):
 
     # Pipeline inputs #
     inputs = parser.add_argument_group("Pipeline inputs and information.")
-    inputs.add_argument("-file", type=str, help="Name of matrix table to run QC pipeline on.")
+    inputs.add_argument("-mt", type=str, help="Name of matrix table to run QC pipeline on.")
     inputs.add_argument("--out_name", type=str, help="Output name ")
     inputs.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
     inputs.add_argument("--out_dir", type=str, help="Directory to write output data to.")
@@ -141,10 +141,15 @@ if __name__ == "__main__":
     handler = logging.StreamHandler(sys.stdout)
     root.addHandler(handler)
 
+    ##################################################
+    # Pre-define checkpoint names to load data later #
+    ##################################################
+    args.sample_annotation = {'prefix': '1', 'suffix': '_after_sample_annotations'}
+
     ################
     # Run pipeline #
     ################
-    args.checkpoint = 0
+    args.cpcounter = 0
     args.output_stem = os.path.join(args.out_dir, args.out_name)
     args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
     args.plot_folder = os.path.join(args.out_dir, "plots")
