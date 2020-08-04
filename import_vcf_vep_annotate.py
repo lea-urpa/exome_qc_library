@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, required=True, help="Bucket and folder where VCFs to import exist.")
     parser.add_argument("--vep_config", default="gs://hail-us-vep/vep85-loftee-gcloud.json",
                         help="Location of Hail VEP configuration json file. Default for cluster started with --vep")
-    parser.add_argumnet("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
+    parser.add_argument("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
                         help="Reference genome build.")
     parser.add_argument("--chr_prefix", action='store_true', help="Chromosomes are of form 'chr1', NOT '1' etc.")
     parser.add_argument("--force_bgz", action='store_true', help="Force blog gzip import? Default true.")
