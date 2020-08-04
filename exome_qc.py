@@ -123,7 +123,6 @@ if __name__ == "__main__":
         hl.spark_context().addPyFile(args.scripts_dir + script)
 
     import helper_scripts as h
-    import v9_exome_qc_parameters as param
     import pipeline_functions as p
 
     ####################
@@ -146,74 +145,78 @@ if __name__ == "__main__":
     # Run pipeline #
     ################
     args.checkpoint = 0
+    args.output_stem = os.path.join(args.out_dir, args.out_name)
+    args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
+    args.plot_folder = os.path.join(args.out_dir, "plots")
+
     try:
         # Load in data according to parameters given
-        mt = p.load_data(param, args)
+        mt = p.load_data(args)
 
         # Annotate samples
-        mt = p.annotate_samples(mt, param, args)
+        mt = p.annotate_samples(mt, args)
 
         # Low-pass variant QC
-        mt = p.low_pass_var_qc(mt, param, args)
+        mt = p.low_pass_var_qc(mt, args)
 
         # Phenotype Samples QC
-        mt = p.phenotype_samples_qc(mt, param, args)
+        mt = p.phenotype_samples_qc(mt, args)
 
         # MAF pruning dataset
-        mt, mt_mafpruned = p.maf_prune_relatedness(mt, param, args)
+        mt, mt_mafpruned = p.maf_prune_relatedness(mt, args)
 
         # Export data to find related individuals in King, if necessary
-        mt, mt_mafpruned = p.find_related_individuals(mt, mt_mafpruned, param, args)
+        mt, mt_mafpruned = p.find_related_individuals(mt, mt_mafpruned, args)
 
         # LD prune MAF pruned dataset
         # This uses MAF 0.01 (1%) cutoff since that's what we exported to King before. Should be fine.
-        mt, mt_ldpruned = p.ld_prune_popoutliers(mt, mt_mafpruned, param, args)
+        mt, mt_ldpruned = p.ld_prune_popoutliers(mt, mt_mafpruned, args)
 
         # Find population outliers (excludes relatives)
         # (Excluding related individuals from analysis, but keeping them in the dataset)
-        mt = p.find_pop_outliers(mt, mt_ldpruned, param, args)
+        mt = p.find_pop_outliers(mt, mt_ldpruned, args)
 
         # Analytical samples QC (samples QC hard filters)
         # (Excluding population outliers from analysis, but keeping them in the dataset)
-        mt = p.analytical_samples_qc(mt, param, args)
+        mt = p.analytical_samples_qc(mt, args)
 
         # MAF prune dataset for sex imputation
         # This uses the default 0.05 (5%) MAF cutoff for common variants.
-        mt, mt_mafpruned = p.maf_prune_sex_imputation(mt, param, args)
+        mt, mt_mafpruned = p.maf_prune_sex_imputation(mt, args)
 
         # Impute sex
         # (Excluding analytical failing samples from analysis, but keeping them in the dataset)
-        mt = p.impute_sex(mt, mt_mafpruned, param, args)
+        mt = p.impute_sex(mt, mt_mafpruned, args)
 
         # Variant QC filtering
         # (Excluding population outliers + analytical samples fails, but keeping them in the dataset)
-        mt = p.variant_qc(mt, param, args)
+        mt = p.variant_qc(mt, args)
 
         # Annotate gnomad + CADD
-        mt = p.annotate_gnomad_cadd(mt, param, args)
+        mt = p.annotate_gnomad_cadd(mt, args)
 
         # Filter variants missing by pheno
         # (Excluding population outliers + analytical sample fails, but keeping them in the dataset)
-        mt = p.filter_missing_by_pheno(mt, param, args)
+        mt = p.filter_missing_by_pheno(mt, args)
 
         # Calculate final PCS
         # (Excluding population outliers + analytical sample fails + relatives but projecting them back into the PCS)
-        mt = p.calculate_final_pcs(mt, param, args)
+        mt = p.calculate_final_pcs(mt, args)
 
         # Get final case-control counts
         # (Excluding population outliers + analytical sample fails)
-        mt = p.case_control_genotype_counts(mt, param, args)
+        mt = p.case_control_genotype_counts(mt,  args)
 
         # Export matrix table columns for optmatch
         mt = mt.filter_cols((mt.non_finns_to_remove == False) & (mt.fail_analytical == 0))
         mtcols = mt.cols()
-        mtcols.export(param.outputstem + 'final_dataset_cols_passingQC.tsv')
+        mtcols.export(args.output_stem + '_final_dataset_cols_passingQC.tsv')
 
         # Send logs and finish-up notice
         logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
-        h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, out_dir=param.checkpoint_folder + 'plots/')
+        h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, plot_dir=args.plot_folder)
 
     except Exception as e:
         logging.error('Something went wrong! Copying logs and shutting down cluster in 10 minutes.')
         logging.error(e)
-        h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, out_dir=param.checkpoint_folder + 'plots/')
+        h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, plot_dir=args.plot_folder)

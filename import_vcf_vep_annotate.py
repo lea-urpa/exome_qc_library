@@ -157,4 +157,4 @@ if __name__ == "__main__":
     mt_vep.write(os.path.join(args.data_dir, out_name))
 
     logging.info('Successfully completed import and VEP annotation. Copying logs to bucket and shutting down in 10 min.')
-    h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, out_dir=args.data_dir)
+    h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, plot_dir=args.data_dir)
