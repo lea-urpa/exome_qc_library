@@ -26,6 +26,7 @@ if __name__ == "__main__":
                         help="Location of Hail VEP scripts in the cloud")
     parser.add_argument("--force_bgz", default=True, help="Force blog gzip import? Default true.")
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
+    parser.add_argument("--test", action='store_true', help="Filters data to just chr 22 for testing purposes.")
 
     args = parser.parse_args()
 
@@ -63,6 +64,10 @@ if __name__ == "__main__":
     for vcf in vcf_files:
         mt = hl.import_vcf(os.path.join(args.data_dir, vcf), force_bgz=args.force_bgz, call_fields=args.call_fields)
 
+        if args.test:
+            logging.info('Test flag given, filtering to on chrom 22.')
+            mt = mt.filter_rows(mt.locus.contig == "22")
+
         logging.info('%s imported count: %s' % (vcf, mt.count()))
         matrix_tables.append(mt)
 
@@ -95,6 +100,9 @@ if __name__ == "__main__":
         out_name = vcf_files[0]
     else:
         out_name = args.out_file
+
+    if args.test:
+        out_name = out_name + "_test"
 
     logging.info('Writing matrix table to bucket.')
     mt_vep.write(os.path.join(args.data_dir, out_name))
