@@ -116,7 +116,7 @@ def annotate_samples(mt, args):
     annotation_files = args.samples_annotation_files.strip().split(",")
 
     for file in annotation_files:
-        mt = sa.annotate_sample(mt, file)
+        mt = sa.annotate_cols_from_file(mt, file, args)
 
     '''
     mt = sa.annotate_bam(mt, param.bam_metadata_file)

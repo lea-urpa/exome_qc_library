@@ -39,6 +39,12 @@ def parse_arguments(arguments):
     inputs.add_argument("--bam_metadata", type=str, help="File containing bam metadata information.")
     inputs.add_argument("--samples_annotation_files", type=str,
                         help="Files to annotate the samples with, comma separated.")
+    inputs.add_argument("--samples_col", type=str,
+                        help="Name of samples column in sample annotation files. Must be the same in all files.")
+    inputs.add_argument("--samples_delim", type=str,
+                        help="Delimiter in sample annotation files. Must be the same in all files.")
+    inputs.add_argument("--samples_miss", type=str,
+                        help="String for missing values in annotation files, e.g. NA. Must be the same in all files.")
 
     # Variant QC thresholds #
     var_thresh = parser.add_argument_group("Variant QC thresholds. If not indicated 'final' or 'low pass' in name, "
