@@ -63,7 +63,14 @@ if __name__ == "__main__":
     matrix_tables = []
 
     for vcf in vcf_files:
-        mt = hl.import_vcf(os.path.join(args.data_dir, vcf), force_bgz=args.force_bgz, call_fields=args.call_fields)
+        vcf_name = os.path.join(args.data_dir, vcf)
+        vcf_stem = vcf.replace(".vcf", "")
+        vcf_stem = vcf_stem.replace(".gz", "")
+        vcf_stem = vcf_stem.replace(".bgz", "")
+        mt_name = os.path.join(args.data_dir, vcf_stem)
+
+        hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields).write(mt_name, overwrite=True)
+        mt = hl.read_matrix_table(mt_name)  # faster to write naive mt and then upload again
 
         if args.test:
             logging.info('Test flag given, filtering to on chrom 22.')
