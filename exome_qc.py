@@ -5,6 +5,7 @@ Author: Lea Urpa, August 2020
 """
 import argparse
 
+
 def parse_arguments(arguments):
     """
     Takes arguments from the command line, runs argparse, and returns args object.
@@ -34,14 +35,10 @@ def parse_arguments(arguments):
     inputs.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
     inputs.add_argument("--out_dir", type=str, help="Directory to write output data to.")
     inputs.add_argument("--log_dir", type=str, help="Directory to write logs to.")
+    inputs.add_argument("--scripts_dir", type=str, help="Directory containing python scripts.")
     inputs.add_argument("--bam_metadata", type=str, help="File containing bam metadata information.")
     inputs.add_argument("--samples_annotation_files", type=str,
                         help="Files to annotate the samples with, comma separated.")
-    inputs.add_argument("--cadd_folder")
-
-
-
-
 
     # Variant QC thresholds #
     var_thresh = parser.add_argument_group("Variant QC thresholds. If not indicated 'final' or 'low pass' in name, "
@@ -63,11 +60,11 @@ def parse_arguments(arguments):
     geno_thresh.add_argument("--min_hom_ref_ref_reads", default=0.9, help="min % reference reads for a ref GT call")
     geno_thresh.add_argument("--max_hom_alt_ref_reads", default=0.1, help="max % reference reads for an alt GT call")
     geno_thresh.add_argument("--low_pass_ab_allowed_dev_het", default=0.7,
-                            help="% of het GT calls for a variant allowed to be out of allelic balance (% ref or alt "
-                                 "reads out of range for het GT call), low pass genotype QC")
+                             help="% of het GT calls for a variant allowed to be out of allelic balance (% ref or alt "
+                                  "reads out of range for het GT call), low pass genotype QC")
     geno_thresh.add_argument("--final_ab_allowed_dev_het", default=0.8,
-                            help="% of het GT calls for a variant allowed to be out of allelic balance (% ref or alt "
-                                 "reads out of range for het GT call), final genotype QC")
+                             help="% of het GT calls for a variant allowed to be out of allelic balance (% ref or alt "
+                                  "reads out of range for het GT call), final genotype QC")
 
     # LD pruning thresholds #
     ld_thresh = parser.add_argument_group("Thresholds for LD pruning.")
@@ -103,11 +100,120 @@ def parse_arguments(arguments):
     pheno_thresh.add_argument("--pheno_call_rate", default=0.95,
                               help="Min call rate for variant, in cases + controls separately.")
 
-    args = parser.parse_args()
+    parsed_args = parser.parse_args(arguments)
 
-
-    return args
+    return parsed_args
 
 
 if __name__ == "__main__":
-    pass
+    ######################################
+    # Initialize Hail and import scripts #
+    ######################################
+    import sys
+    import os
+    import logging
+    import hail as hl
+    hl.init()
+
+    args = parse_arguments(sys.argv[1:])
+
+    # Import python scripts to access helper functions #
+    scripts = ["helper_scripts.py", "v9_exome_qc_parameters.py", "pipeline_functions.py"]
+    for script in scripts:
+        hl.spark_context().addPyFile(args.scripts_dir + script)
+
+    import helper_scripts as h
+    import v9_exome_qc_parameters as param
+    import pipeline_functions as p
+
+    ####################
+    # Configure logger #
+    ####################
+    logstem = 'import_vep_annotate-'
+    datestr, timestr, log_file = h.configure_logging(logstem=logstem)
+
+    log_dir = os.path.join(args.log_dir, logstem + datestr)
+
+    # Configure logger
+    root = logging.getLogger()
+    log_formatter = '%(asctime)s - %(levelname)s - %(message)s'
+    logging.basicConfig(filename=log_file, format=log_formatter, level=logging.INFO)
+
+    handler = logging.StreamHandler(sys.stdout)
+    root.addHandler(handler)
+
+    ################
+    # Run pipeline #
+    ################
+    args.checkpoint = 0
+    try:
+        # Load in data according to parameters given
+        mt = p.load_data(param, args)
+
+        # Annotate samples
+        mt = p.annotate_samples(mt, param, args)
+
+        # Low-pass variant QC
+        mt = p.low_pass_var_qc(mt, param, args)
+
+        # Phenotype Samples QC
+        mt = p.phenotype_samples_qc(mt, param, args)
+
+        # MAF pruning dataset
+        mt, mt_mafpruned = p.maf_prune_relatedness(mt, param, args)
+
+        # Export data to find related individuals in King, if necessary
+        mt, mt_mafpruned = p.find_related_individuals(mt, mt_mafpruned, param, args)
+
+        # LD prune MAF pruned dataset
+        # This uses MAF 0.01 (1%) cutoff since that's what we exported to King before. Should be fine.
+        mt, mt_ldpruned = p.ld_prune_popoutliers(mt, mt_mafpruned, param, args)
+
+        # Find population outliers (excludes relatives)
+        # (Excluding related individuals from analysis, but keeping them in the dataset)
+        mt = p.find_pop_outliers(mt, mt_ldpruned, param, args)
+
+        # Analytical samples QC (samples QC hard filters)
+        # (Excluding population outliers from analysis, but keeping them in the dataset)
+        mt = p.analytical_samples_qc(mt, param, args)
+
+        # MAF prune dataset for sex imputation
+        # This uses the default 0.05 (5%) MAF cutoff for common variants.
+        mt, mt_mafpruned = p.maf_prune_sex_imputation(mt, param, args)
+
+        # Impute sex
+        # (Excluding analytical failing samples from analysis, but keeping them in the dataset)
+        mt = p.impute_sex(mt, mt_mafpruned, param, args)
+
+        # Variant QC filtering
+        # (Excluding population outliers + analytical samples fails, but keeping them in the dataset)
+        mt = p.variant_qc(mt, param, args)
+
+        # Annotate gnomad + CADD
+        mt = p.annotate_gnomad_cadd(mt, param, args)
+
+        # Filter variants missing by pheno
+        # (Excluding population outliers + analytical sample fails, but keeping them in the dataset)
+        mt = p.filter_missing_by_pheno(mt, param, args)
+
+        # Calculate final PCS
+        # (Excluding population outliers + analytical sample fails + relatives but projecting them back into the PCS)
+        mt = p.calculate_final_pcs(mt, param, args)
+
+        # Get final case-control counts
+        # (Excluding population outliers + analytical sample fails)
+        mt = p.case_control_genotype_counts(mt, param, args)
+
+        # Export matrix table columns for optmatch
+        mt = mt.filter_cols((mt.non_finns_to_remove == False) & (mt.fail_analytical == 0))
+        mtcols = mt.cols()
+        mtcols.export(param.outputstem + 'final_dataset_cols_passingQC.tsv')
+
+        # Send logs and finish-up notice
+        logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
+        h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, out_dir=param.checkpoint_folder + 'plots/')
+
+    except Exception as e:
+        logging.error('Something went wrong! Copying logs and shutting down cluster in 10 minutes.')
+        logging.error(e)
+        h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, out_dir=param.checkpoint_folder + 'plots/')
