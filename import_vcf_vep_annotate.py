@@ -25,6 +25,9 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, required=True, help="Bucket and folder where VCFs to import exist.")
     parser.add_argument("--vep_config", default="gs://hail-us-vep/vep85-loftee-gcloud.json",
                         help="Location of Hail VEP configuration json file. Default for cluster started with --vep")
+    parser.add_argumnet("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
+                        help="Reference genome build.")
+    parser.add_argument("--chr_prefix", action='store_true', help="Chromosomes are of form 'chr1', NOT '1' etc.")
     parser.add_argument("--force_bgz", action='store_true', help="Force blog gzip import? Default true.")
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
     parser.add_argument("--test", action='store_true', help="Filters data to just chr 22 for testing purposes.")
@@ -63,14 +66,31 @@ if __name__ == "__main__":
     matrix_tables = []
 
     for vcf in vcf_files:
+        # Write MT first, then read it from disk #
         vcf_name = os.path.join(args.data_dir, vcf)
         vcf_stem = vcf.replace(".vcf", "")
         vcf_stem = vcf_stem.replace(".gz", "")
         vcf_stem = vcf_stem.replace(".bgz", "")
         mt_name = os.path.join(args.data_dir, vcf_stem)
 
-        hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields).write(mt_name, overwrite=True)
-        mt = hl.read_matrix_table(mt_name)  # faster to write naive mt and then upload again
+        # Deal with import if 37 and chroms have chr prefix, or 38 and no prefix.
+        if (args.chr_prefix is True) and (args.reference_genome == "GRCh37"):
+            recode = {f"chr{i}": f"{i}" for i in (list(range(1, 23)) + ['X', 'Y'])}
+
+        elif (args.chr_prefix is False) and (args.reference_genome == "GRCh38"):
+            recode = {f"{i}": f"chr{i}" for i in (list(range(1, 23)) + ['X', 'Y'])}
+        else:
+            recode = None
+
+        if recode is None:
+            hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields,
+                          reference_genome=args.reference_genome).write(mt_name, overwrite=True)
+        else:
+            hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields,
+                          reference_genome=args.reference_genome, contig_recoding=recode
+                          ).write(mt_name, overwrite=True)
+
+        mt = hl.read_matrix_table(mt_name)
 
         if args.test:
             logging.info('Test flag given, filtering to on chrom 22.')
