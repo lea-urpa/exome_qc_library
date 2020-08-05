@@ -9,6 +9,7 @@ import logging
 import shlex
 import hail as hl
 
+
 def configure_logging(logstem):
     '''
     Configures logging for pipelines submitted via `cluster submit mycluster myscript.py`
@@ -50,3 +51,17 @@ def add_preemptibles(cluster_name, num_preemptibles, region='europe-west1'):
 
     subprocess.call(cmd)
 
+
+def remove_preemptibles(cluster_name, region='europe-west1'):
+    """
+    Removes all preemptible nodes from a cluster.
+    :param cluster_name: cluster name
+    :param region: region, default 'europe-west1'
+    :return:
+    """
+    logging.info('Removing preemptible nodes.')
+
+    cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
+                      f"--num-preemptible-workers 0")
+
+    subprocess.call(cmd)
