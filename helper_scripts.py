@@ -3,10 +3,11 @@ Helper scripts for running Hail pipelines.
 
 Author: Lea Urpa, August 2020
 """
-import hail as hl
 import time
 import subprocess
-
+import logging
+import shlex
+import hail as hl
 
 def configure_logging(logstem):
     '''
@@ -33,4 +34,19 @@ def copy_logs_output(log_dir, timestr, log_file, plot_dir):
     cmd = ['gsutil', 'cp', '*.pdf', plot_dir]
     subprocess.call(cmd)
 
+
+def add_preemptibles(cluster_name, num_preemptibles, region='europe-west1'):
+    """
+    Add preemptible nodes on the cluster for applicable (non-shuffle) steps.
+    :param cluster_name: Name of the cluster
+    :param num_preemptibles: Number of preemptibles
+    :param region: region (default europe-west1)
+    :return:
+    """
+    logging.info(f"Adding {str(num_preemptibles)} preemptiple nodes to cluster {cluster_name}")
+
+    cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
+                      f"--num-preemptible-workers {str(num_preemptibles)}")
+
+    subprocess.call(cmd)
 
