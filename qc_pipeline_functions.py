@@ -17,6 +17,7 @@ for script in scripts:
 
 import samples_annotation as sa
 import helper_scripts as h
+import variant_qc as vq
 
 
 def load_data(args):
@@ -127,9 +128,13 @@ def annotate_samples(mt, args):
 
 
 def low_pass_var_qc(mt, args):
-    '''
+    """
     Performs low pass variant QC on a matrix table (for before samples QC)
-    '''
+    :param mt: matrix table to filter
+    :param args: arguments with threshold information
+    :return: returns matrix table with bad variants filtered out.
+    """
+
     if args.checkpoint > args.cpcounter:
         args.cpcounter += 1
         return mt
@@ -140,19 +145,23 @@ def low_pass_var_qc(mt, args):
     if args.checkpoint == args.cpcounter:
         mt = load_checkpoint(args.checkpoint, 'samples_annotation', args)
 
+    # Add preemtible nodes
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
+    # Run Hail variant and samples QC to get metrics
     logging.info('Running variant and samples QC.')
     mt = hl.variant_qc(mt, name='prefilter_variant_qc')
     mt = hl.sample_qc(mt, name='prefilter_sample_qc')
 
-    logging.info("Running low-pass variant QC before samples QC.")
+    # Filter out bad variants and genotypes
+    logging.info("Running low-pass variant QC and genotype QC before samples QC.")
+    mt_filt = vq.lowpass_filter_variants(mt, args)
 
-
+    # Remove the preemptible nodes
     h.remove_preemptibles(args.cluster_name)
 
     if args.overwrite_checkpoints:
-        mt = save_checkpoint(mt, step, args)
+        mt_filt = save_checkpoint(mt_filt, step, args)
 
     args.cpcounter += 1
-    return mt
+    return mt_filt

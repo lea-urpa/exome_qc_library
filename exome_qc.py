@@ -61,6 +61,7 @@ def parse_arguments(arguments):
     # Genotype QC thresholds #
     geno_thresh = parser.add_argument_group("Genotype QC thresholds. If not indicated 'final' or 'low pass' in name,"
                                             "thresholds are used for both low pass and final genotype filtering.")
+    geno_thresh.add_argument("--min_gq", default=20, help="min genotype quality for all GT calls.")
     geno_thresh.add_argument("--min_het_ref_reads", default=0.2, help="min % reference reads for a het GT call")
     geno_thresh.add_argument("--max_het_ref_reads", default=0.8, help="max % reference reads for a het GT call")
     geno_thresh.add_argument("--min_hom_ref_ref_reads", default=0.9, help="min % reference reads for a ref GT call")
