@@ -124,3 +124,35 @@ def annotate_samples(mt, args):
 
     args.cpcounter += 1
     return mt
+
+
+def low_pass_var_qc(mt, args):
+    '''
+    Performs low pass variant QC on a matrix table (for before samples QC)
+    '''
+    if args.checkpoint > args.cpcounter:
+        args.cpcounter += 1
+        return mt
+
+    step = "low_pass_variant_qc"
+
+    # Load data from after sample annotation, if we are starting at this checkpoint, else pass from prev step
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'samples_annotation', args)
+
+    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
+
+    logging.info('Running variant and samples QC.')
+    mt = hl.variant_qc(mt, name='prefilter_variant_qc')
+    mt = hl.sample_qc(mt, name='prefilter_sample_qc')
+
+    logging.info("Running low-pass variant QC before samples QC.")
+
+
+    h.remove_preemptibles(args.cluster_name)
+
+    if args.overwrite_checkpoints:
+        mt = save_checkpoint(mt, step, args)
+
+    args.cpcounter += 1
+    return mt

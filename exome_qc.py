@@ -151,6 +151,7 @@ if __name__ == "__main__":
     # Pre-define checkpoint names to load data later #
     ##################################################
     args.sample_annotation = {'prefix': '1', 'suffix': '_after_sample_annotations'}
+    args.low_pass_variant_qc = {'prefix': '2', 'suffix': '_after_low_pass_variant_qc'}
 
     ################
     # Run pipeline #
