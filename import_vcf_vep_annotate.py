@@ -93,7 +93,7 @@ if __name__ == "__main__":
             recode = None
 
         # If MT does not already exist, load in VCF and then write it to disk
-        stat_cmd = ['gsutil', '-q', 'stat', mt_name + "/"]
+        stat_cmd = ['gsutil', '-q', 'stat', mt_name + "/metadata.json.gz"]
         exists = subprocess.call(stat_cmd)
 
         if exists == 1:  # stat returns 1 if file/folder does not exist, 0 if it exists
