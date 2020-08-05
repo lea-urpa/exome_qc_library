@@ -96,6 +96,7 @@ if __name__ == "__main__":
         exists = subprocess.call(['gsutil', '-q', 'stat', mt_name])
 
         if exists == 1:  # stat returns 1 if file/folder does not exist, 0 if it exists
+            logging.info(f'Detected mt of input vcf {vcf} does not exist, importing vcf.')
             if recode is None:
                 hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields,
                               reference_genome=args.reference_genome).write(mt_name, overwrite=True)
@@ -103,6 +104,8 @@ if __name__ == "__main__":
                 hl.import_vcf(vcf_name, force_bgz=args.force_bgz, call_fields=args.call_fields,
                               reference_genome=args.reference_genome, contig_recoding=recode
                               ).write(mt_name, overwrite=True)
+        else:
+            logging.info(f"Detected mt of input vcf {vcf} already exists, reading mt directly.")
 
         mt = hl.read_matrix_table(mt_name)
 
