@@ -147,7 +147,7 @@ if __name__ == "__main__":
     logging.info('Split count: ' + str(mt_split.count()))
 
     logging.info('VEP annotating dataset.')
-    mt_vep = hl.vep(mt_split, args.vep_location)
+    mt_vep = hl.vep(mt_split, args.vep_config)
 
     if args.out_file is None:
         out_name = vcf_files[0]
