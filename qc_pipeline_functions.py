@@ -16,6 +16,7 @@ for script in scripts:
     hl.spark_context().addPyFile(scripts_dir + script)
 
 import samples_annotation as sa
+import helper_scripts as h
 
 
 def load_data(args):
@@ -88,7 +89,7 @@ def load_checkpoint(checkpoint, step, args):
     if args.test:
         checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}_test.mt"
     else:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}_.mt"
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}.mt"
 
     mt = hl.read_matrix_table(os.path.join(args.out_dir, checkpoint_name))
     logging.info(f"Starting at checkpoint {str(checkpoint)}. Loading data from after {step}.")
@@ -117,18 +118,6 @@ def annotate_samples(mt, args):
 
     for file in annotation_files:
         mt = sa.annotate_cols_from_file(mt, file, args)
-
-    '''
-    mt = sa.annotate_bam(mt, param.bam_metadata_file)
-    # MUST do cohorts first, if including batches (to fix FINRISK center)
-    mt = sa.annotate_cohorts(mt, param.manifest_files)
-    mt = sa.annotate_batch(mt, param.batch_file)
-    mt = sa.annotate_case_phenos(mt, param.case_pheno_file, phenotype_updates=args.phenotype_updates,
-                                 pheno_update_file=param.pheno_update_file)
-    mt = sa.annotate_ctrl_phenos(mt, param.ctrl_pheno_file)
-    mt = sa.annotate_families(mt, param.participants_file)
-    
-    '''
 
     if args.force:
         mt = save_checkpoint(mt, step, args)

@@ -4,9 +4,7 @@ Helper scripts for running Hail pipelines.
 Author: Lea Urpa, August 2020
 """
 import hail as hl
-import logging
 import time
-import sys
 import subprocess
 
 
@@ -34,3 +32,5 @@ def copy_logs_output(log_dir, timestr, log_file, plot_dir):
     subprocess.call(cmd)
     cmd = ['gsutil', 'cp', '*.pdf', plot_dir]
     subprocess.call(cmd)
+
+
