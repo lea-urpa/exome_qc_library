@@ -158,81 +158,116 @@ def annotate_variant_het_ab(mt, args, prefix="", filter_bad_samples=False):
      QC?
     :return: returns annotated matrix table
     """
-    #########################################################
-    # Filter out population outliers and samples failing QC #
-    #########################################################
-    if filter_bad_samples:
-        mt_orig = mt
-        mt = mt.filter_cols((mt.pop_outlier_samples == True) | (mt.failing_qc_samples > 0), keep=False)
+    ##########################################
+    # Check dataset for expected annotations #
+    ##########################################
+    logging.info("Annotating variants with fraction of het genotypes in allelic balance, after filtering out "
+                 "population outliers and samples failing samples QC (if run already)")
+    het_gt_cnt = prefix + 'het_gt_count'
+    het_ab = prefix + 'frac_het_gts_in_ab'
+
+    # Check that genotype filter annotations have been added
+    try:
+        hl.is_defined(mt.failing_ab)
+        hl.is_defined(mt.failing_depth_quality)
+    except Exception as e:
+        logging.error("Error! find_failing_genotypes_ab() and find_failing_genotypes_depth_quality() should be run "
+                      "before annotating variant's % of hets in allelic balance, to filter out bad genotypes.")
+        logging.error(e)
+        exit()
+
+    # Check if samples QC has been run yet, if not add empty annotations
+    try:
+        hl.is_defined(mt.pop_outlier_sample)
+    except Exception as e:
+        logging.info("Detected samples QC not run, adding False pop_outlier_sample annotation to columns.")
+        logging.info(e)
+        mt = mt.annotate_cols(pop_outlier_sample=False)
+
+    try:
+        hl.is_defined(mt.failing_samples_qc)
+    except Exception as e:
+        logging.info("Detected samples QC not run, adding empty array failing_samples_qc annotation to columns.")
+        logging.info(e)
+        mt = mt.annotate_cols(failing_samples_qc=hl.empty_array(hl.tstr))
 
     ################################################################
     # Annotate rows with het GT count, then het GT allelic balance #
     ################################################################
-    het_gt_cnt = prefix + 'het_gt_count'
-    het_ab = prefix + 'het_ab_all'
+    # Get count of het genotypes per variant
+    case_filter = (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0)
+    het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt.failing_depth_quality) == 0)
 
-    mt = mt.annotate_rows(**{het_gt_cnt: hl.float(hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT)))})
+    mt = mt.annotate_rows(**{het_gt_cnt: hl.agg.filter(case_filter, hl.float(hl.agg.count_where(het_gt_filters)))})
 
-    mt = mt.annotate_rows(**{het_ab: hl.cond(mt[het_gt_cnt] > 0,  # skips variants where there are no het GTs > error
-                          hl.float(hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) &
-                                   ((mt.AD[0] / hl.sum(mt.AD) > args.min_het_ref_reads) &
-                                    (mt.AD[0] / hl.sum(mt.AD) < args.max_het_ref_reads)))) /
-                          mt[het_gt_cnt],
-                          hl.null(hl.tfloat))})
+    # Get percent of het gts in AB if het gt count != 0
+    case_filter = (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0)
+    passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt.failing_depth_quality) == 0) & \
+                      ~(mt.failing_ab.contains("failing_het_ab"))
+
+    # Counting het GTs skips variants where there are no het GTs (which leads to div by 0 error)
+    mt = mt.annotate_rows(**{het_ab:
+             hl.agg.filter(case_filter,
+                           hl.cond(mt[het_gt_cnt] > 0,
+                                   hl.float(hl.agg.count_where(passing_het_gts)) / mt[het_gt_cnt],
+                                   hl.null(hl.tfloat)))})
 
     ################################################################################
     # Annotate het GT and het GT allelic balance for cases and controls separately #
     ################################################################################
     if args.pheno_col is not None:
         case_het_gt_count = prefix + 'case_het_gt_count'
-        case_het_gt_ab = prefix + 'case_het_ab'
+        case_het_gt_ab = prefix + 'case_frac_het_gts_in_ab'
         cont_het_gt_count = prefix + 'control_het_gt_count'
-        cont_het_gt_ab = prefix + 'control_het_ab'
+        cont_het_gt_ab = prefix + 'control_frac_het_gts_in_ab'
 
-        mt = mt.annotate_rows(**{case_het_gt_count: hl.agg.filter(mt[args.pheno_col] == True,
-                                     hl.float(hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT))))})
+        # Count case het GTs
+        case_filter = (mt[args.pheno_col] == True) & (mt.pop_outlier_sample == False) & \
+                      (hl.len(mt.failing_samples_qc) == 0)
+        het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt.failing_depth_quality) == 0)
+        mt = mt.annotate_rows(**{case_het_gt_count: hl.agg.filter(case_filter,
+                                                                  hl.agg.count_where(het_gt_filters))})
 
-        mt = mt.annotate_rows(**{case_het_gt_ab:
-                              hl.agg.filter(mt[args.pheno_col] == True,
-                                            hl.cond(mt[case_het_gt_count] > 0,
-                                    hl.float(hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) &
-                                                                ((mt.AD[0] / hl.sum(mt.AD) > args.min_het_ref_reads) &
-                                                                 (mt.AD[0] / hl.sum(mt.AD) < args.max_het_ref_reads)))) /
-                                    mt[case_het_gt_count],
-                                    hl.null(hl.tfloat)))})
+        # Get case het GT fraction in allelic balance
+        passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt.failing_depth_quality) == 0) & \
+                          ~(mt.failing_ab.contains("failing_het_ab"))
 
-        mt = mt.annotate_rows(**{cont_het_gt_count: hl.agg.filter(mt[args.pheno_col] == False,
-                                    hl.float(hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT))))})
+        case_filter = (mt[args.pheno_col] == True) & (mt.pop_outlier_sample == False) & \
+                      (hl.len(mt.failing_samples_qc > 0))
 
-        mt = mt.annotate_rows(**{cont_het_gt_ab:
-                              hl.agg.filter(mt[args.pheno_col] == False,
-                                            hl.cond(mt[cont_het_gt_count] > 0,
-                                   hl.float(hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) &
-                                                               ((mt.AD[0] / hl.sum(mt.AD) > args.min_het_ref_reads) &
-                                                                (mt.AD[0] / hl.sum(mt.AD) < args.max_het_ref_reads)))) /
-                                   mt[cont_het_gt_count],
-                                   hl.null(hl.tbool)))})
+        mt = mt.annotate_rows(**{
+            case_het_gt_ab: hl.agg.filter(case_filter,
+                                          hl.cond(mt[case_het_gt_count] > 0,
+                                                  hl.float(hl.agg.count_where(passing_het_gts)) / mt[case_het_gt_count],
+                                                  hl.null(hl.tfloat)))})
 
-    ###################################################################################
-    # Annotate original mt with row annotations and return, or return original matrix #
-    ###################################################################################
-    if filter_bad_samples:
-        mt_orig = mt_orig.annotate_rows(final_het_gt_count=mt.index_rows(mt_orig.row_key).final_het_gt_count,
-                                        final_het_ab_all=mt.index_rows(mt_orig.row_key).final_het_ab_all,
-                                        final_het_gt_count_cases=mt.index_rows(mt_orig.row_key).final_het_gt_count_cases,
-                                        final_het_ab_cases=mt.index_rows(mt_orig.row_key).final_het_ab_cases,
-                                        final_het_gt_count_cont=mt.index_rows(mt_orig.row_key).final_het_gt_count_cont,
-                                        final_het_ab_cont=mt.index_rows(mt_orig.row_key).final_het_ab_cont)
-        return mt_orig
-    else:
-        return mt
+        # Get control het GT count
+        cont_filter = (mt[args.pheno_col] == False) & (mt.pop_outlier_sample == False) & \
+                      (hl.len(mt.failing_samples_qc) == 0)
+        het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt.failing_depth_quality) == 0)
+
+        mt = mt.annotate_rows(**{cont_het_gt_count: hl.agg.filter(cont_filter,
+                                                                  hl.float(hl.agg.count_where(het_gt_filters)))})
+
+        # Get control het GT fraction in allelic balance
+        cont_filter = (mt[args.pheno_col] == False) & (mt.pop_outlier_sample == False) & \
+                      (hl.len(mt.failing_samples_qc) == 0)
+        passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt.failing_depth_quality) == 0) & \
+                          ~(mt.failing_ab.contains("failing_het_ab"))
+
+        mt = mt.annotate_rows(**{
+            cont_het_gt_ab: hl.agg.filter(cont_filter,
+                                          hl.cond(mt[cont_het_gt_count] > 0,
+                                                  hl.float(hl.agg.count_where(passing_het_gts)) / mt[cont_het_gt_count],
+                                                  hl.null(hl.tbool)))})
+
+    return mt
 
 
 def find_failing_variants(mt, args, mode):
     """
-    Low pass filter variants function, to run before samples QC to get rid of the 'worst' variants. Filters out GTs
-    with low depth and bad quality, variants on call rate less than 80% (without correction for sex), snp and indel
-    quality by depth, and variants whose fraction of het genotypes that are out of allelic balance is greater than 70%.
+    Function to find variants failing on QC measures, which can be run in 'low_pass' or 'final' mode, with varying
+    filters given by args depending on the mode.
 
     :param mt: matrix table to filter
     :param args: arguments object with thresholds
