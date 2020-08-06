@@ -66,12 +66,9 @@ def parse_arguments(arguments):
     geno_thresh.add_argument("--max_het_ref_reads", default=0.8, help="max % reference reads for a het GT call")
     geno_thresh.add_argument("--min_hom_ref_ref_reads", default=0.9, help="min % reference reads for a ref GT call")
     geno_thresh.add_argument("--max_hom_alt_ref_reads", default=0.1, help="max % reference reads for an alt GT call")
-    geno_thresh.add_argument("--low_pass_ab_allowed_dev_het", default=0.7,
+    geno_thresh.add_argument("--ab_allowed_dev_het", default=0.8,
                              help="% of het GT calls for a variant allowed to be out of allelic balance (% ref or alt "
-                                  "reads out of range for het GT call), low pass genotype QC")
-    geno_thresh.add_argument("--final_ab_allowed_dev_het", default=0.8,
-                             help="% of het GT calls for a variant allowed to be out of allelic balance (% ref or alt "
-                                  "reads out of range for het GT call), final genotype QC")
+                                  "reads out of range for het GT call)")
 
     # LD pruning thresholds #
     ld_thresh = parser.add_argument_group("Thresholds for LD pruning.")
@@ -158,6 +155,8 @@ if __name__ == "__main__":
     # Run pipeline #
     ################
     args.cpcounter = 0
+    args.lowpass_fail_name = 'failing_lowpass_varqc'
+    args.final_fail_name = 'failing_final_varqc'
     args.output_stem = os.path.join(args.out_dir, args.out_name)
     args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
     args.plot_folder = os.path.join(args.out_dir, "plots")
@@ -201,6 +200,7 @@ if __name__ == "__main__":
         # (Excluding analytical failing samples from analysis, but keeping them in the dataset)
         mt = qc.impute_sex(mt, mt_mafpruned, args)
 
+        # TODO make sure sex_aware_variant_annotations run before this step, or within this step before var qc
         # Variant QC filtering
         # (Excluding population outliers + analytical samples fails, but keeping them in the dataset)
         mt = qc.variant_qc(mt, args)

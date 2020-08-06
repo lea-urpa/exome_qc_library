@@ -148,14 +148,9 @@ def low_pass_var_qc(mt, args):
     # Add preemtible nodes
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
-    # Run Hail variant and samples QC to get metrics
-    logging.info('Running variant and samples QC.')
-    mt = hl.variant_qc(mt, name='prefilter_variant_qc')
-    mt = hl.sample_qc(mt, name='prefilter_sample_qc')
-
     # Filter out bad variants and genotypes
     logging.info("Running low-pass variant QC and genotype QC before samples QC.")
-    mt_filt = vq.lowpass_filter_variants(mt, args)
+    mt_filt = vq.find_failing_variants(mt, args)
 
     # Remove the preemptible nodes
     h.remove_preemptibles(args.cluster_name)
