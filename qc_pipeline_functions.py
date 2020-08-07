@@ -18,6 +18,7 @@ for script in scripts:
 import samples_annotation as sa
 import helper_scripts as h
 import variant_qc as vq
+import samples_qc as sq
 
 
 def load_data(args):
@@ -139,7 +140,7 @@ def remove_samples(mt, args):
         args.cpcounter += 1
         return mt
 
-    step = "pheno_samples_qc"
+    step = "sample_removal"
     # Load data from after sample annotation, if we are starting at this checkpoint, else pass from prev step
     if args.checkpoint == args.cpcounter:
         mt = hl.load_checkpoint(args.checkpoint, 'samples_annotation', args)
@@ -188,7 +189,7 @@ def low_pass_var_qc(mt, args):
 
     # Load data from after sample removal, if we are starting at this checkpoint, else pass from prev step
     if args.checkpoint == args.cpcounter:
-        mt = load_checkpoint(args.checkpoint, 'low_pass_variant_qc', args)
+        mt = load_checkpoint(args.checkpoint, 'sample_removal', args)
 
     # Add preemtible nodes
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
@@ -205,3 +206,35 @@ def low_pass_var_qc(mt, args):
 
     args.cpcounter += 1
     return mt
+
+
+def maf_prune_relatedness(mt, args):
+    """
+    MAF prunes dataset for relatedness calculations in King.
+
+    :param mt: matrix table to prune
+    :param args:
+    :return:
+    """
+    if args.checkpoint > args.cpcounter:
+        args.cpcounter += 1
+        mt_mafpruned = None
+        return mt, mt_mafpruned
+
+    step = "maf_prune_relatedness"
+
+    # Load data from after phenotype samples QC, if we are starting at this checkpoint, else pass from prev step
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'low_pass_variant_qc', args)
+
+    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
+
+    mt_mafpruned = sq.maf_prune(mt, args, varqc_name=args.lowpass_fail_name, filter_after_pruning=True,
+                                unfilter_entries=True)
+
+    h.remove_preemptibles(args.cluster_name)
+
+    if args.overwrite_checkpoints:
+        mt_mafpruned = save_checkpoint(mt_mafpruned, step, args)
+    args.cpcounter += 1
+    return mt, mt_mafpruned

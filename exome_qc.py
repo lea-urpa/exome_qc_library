@@ -181,7 +181,7 @@ if __name__ == "__main__":
         mt = qc.annotate_samples(mt, args)
 
         # Phenotype Samples QC
-        mt = qc.phenotype_samples_qc(mt, args)
+        mt = qc.remove_samples(mt, args)
 
         # Low-pass variant QC
         mt = qc.low_pass_var_qc(mt, args)
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
         # Analytical samples QC (samples QC hard filters)
         # (Excluding population outliers from analysis, but keeping them in the dataset)
-        mt = qc.analytical_samples_qc(mt, args)
+        mt = qc.samples_qc(mt, args)
 
         # MAF prune dataset for sex imputation
         # This uses the default 0.05 (5%) MAF cutoff for common variants.
