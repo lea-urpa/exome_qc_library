@@ -18,6 +18,8 @@ def parse_arguments(arguments):
     # Pipeline parameters #
     params = parser.add_argument_group("Pipeline parameters")
     params.add_argument("--checkpoint", type=int, help="Checkpoint to start pipeline at.")
+    params.add_argument("--reference_genome", type=str, help="Reference_genome", choices=["GRCh37", "GRCh38"],
+                        default="GRCh38")
     params.add_argument("--test", action='store_true', help="run test with just chrom 22?")
     params.add_argument('--force', type=bool, default=True, help='Overwrite previous pipeline checkpoints?')
     params.add_argument('--skip_ab_filter', action='store_true', help='Skip allelic balance filtering?')
@@ -45,6 +47,9 @@ def parse_arguments(arguments):
                         help="Delimiter in sample annotation files. Must be the same in all files.")
     inputs.add_argument("--samples_miss", type=str,
                         help="String for missing values in annotation files, e.g. NA. Must be the same in all files.")
+    inputs.add_argument("--fam_id", type=str, help="column name corresponding to sample's family ID. Used in kinship.")
+    inputs.add_argument("--pat_id", type=str, help="column name corresponding to sample's paternal ID. Used in kinship.")
+    inputs.add_argument("--mat_id", type=str, help="column name corresponding to sample's maternal ID. Used in kinship.")
 
     # Variant QC thresholds #
     var_thresh = parser.add_argument_group("Variant QC thresholds. If not indicated 'final' or 'low pass' in name, "
@@ -82,6 +87,8 @@ def parse_arguments(arguments):
     kin_thresh.add_argument("--use_case_info", default=True,
                             help="Use case info to minimize case removal when finding unrelated set of individuals.")
     kin_thresh.add_argument("--plot_kin", default=True, help="Plot kinship values for visual inspection.")
+    kin_thresh.add_argument("--relatives_file", type=str, help="File containing kinship information from King.")
+    #TODO run check at beginning to see that relatives file is given if run_king is False
 
     # Samples removal options #
     samples_removal = parser.add_argument_group("Arbitrary sample removal options.")
@@ -186,11 +193,8 @@ if __name__ == "__main__":
         # Low-pass variant QC
         mt = qc.low_pass_var_qc(mt, args)
 
-        # MAF pruning dataset
-        mt, mt_mafpruned = qc.maf_prune_relatedness(mt, args)
-
         # Export data to find related individuals in King, if necessary
-        mt, mt_mafpruned = qc.find_related_individuals(mt, mt_mafpruned, args)
+        mt, mt_mafpruned = qc.find_related_individuals(mt, args)
 
         # LD prune MAF pruned dataset
         # This uses MAF 0.01 (1%) cutoff since that's what we exported to King before. Should be fine.

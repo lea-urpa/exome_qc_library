@@ -44,7 +44,7 @@ def load_data(args):
         else:
             chrom_codes = ["22", "X"]
 
-        mt = mt.filter_rows(mt.locus.contig in chrom_codes)
+        mt = mt.filter_rows(mt.locus.contig.contains(chrom_codes))
 
         checkpoint_name = args.mt.replace(".mt", "") + "_test.mt"
         mt = mt.checkpoint(checkpoint_name, overwrite=True)
@@ -52,7 +52,7 @@ def load_data(args):
     return mt
 
 
-def save_checkpoint(mt, step, args):
+def save_checkpoint(mt, step, args, pruned=False):
     '''
     Saves a matrix table at a checkpoint with custom global annotation and file ending.
     :param mt: matrix table to checkpoint
@@ -62,10 +62,16 @@ def save_checkpoint(mt, step, args):
     '''
     datestr = time.strftime("%Y.%m.%d")
     step_info = getattr(args, step)
-    if args.test:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}_test.mt"
+
+    if pruned:
+        prune_str = "_filtered_pruned"
     else:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}_.mt"
+        prune_str = ""
+
+    if args.test:
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}_test.mt"
+    else:
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}_.mt"
 
     logging.info(f"Writing checkpoint after {args.cpcounter}: {step}")
 
@@ -208,7 +214,7 @@ def low_pass_var_qc(mt, args):
     return mt
 
 
-def maf_prune_relatedness(mt, args):
+def maf_LDprune_relatedness(mt, args):
     """
     MAF prunes dataset for relatedness calculations in King.
 
@@ -227,14 +233,90 @@ def maf_prune_relatedness(mt, args):
     if args.checkpoint == args.cpcounter:
         mt = load_checkpoint(args.checkpoint, 'low_pass_variant_qc', args)
 
+    # Filter out failing samples, variants, and genotypes
+    mt_filtered = sq.filter_failing(mt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
+
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
-    mt_mafpruned = sq.maf_prune(mt, args, varqc_name=args.lowpass_fail_name, filter_after_pruning=True,
-                                unfilter_entries=True)
+    # Filter out low MAF variants
+    mt_maffilt = sq.maf_filter(mt_filtered, args,  filter_ac0_after_pruning=True)
+
+    # LD prune if there are more than 80k variants
+    if not mt_maffilt.row_count() < 80000:
+        mt_ldpruned = sq.ld_prune(mt_maffilt, args)
+    else:
+        logging.info("Detected MAF filtered dataset already has less than 80 000 variants, skipping LD pruning for King"
+                     "relatedness calculations.")
+        mt_ldpruned = mt_maffilt
 
     h.remove_preemptibles(args.cluster_name)
 
     if args.overwrite_checkpoints:
-        mt_mafpruned = save_checkpoint(mt_mafpruned, step, args)
+        mt_ldpruned = save_checkpoint(mt_ldpruned, step, args, pruned=True)
     args.cpcounter += 1
-    return mt, mt_mafpruned
+    return mt, mt_ldpruned
+
+
+def find_related_individuals(mt, mt_mafpruned, args):
+    """
+    Either exports genotype data as Plink files for King relatedness calculation, or annotates the mt based on
+    previously calculated relatedness exclusions, depending on param.run_king.
+
+    :param mt: matrix table to annotate with relatedness exclusion info
+    :param mt_mafpruned: matrix table to export to Plink to run King
+    :return: returns mt, mt_mafpruned
+    """
+
+    if args.checkpoint > args.cpcounter:
+        args.cpcounter += 1
+        return mt, mt_mafpruned
+
+    step = "find_related_individuals"
+
+    # Load data from after maf pruning, if we are starting at this checkpoint, else pass from prev step
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'low_pass_variant_qc', args)
+        mt_mafpruned = load_checkpoint(args.checkpoint, 'maf_prune_relatedness', args)
+
+    if args.run_king is True:
+        logging.info("Exporting MAF filtered and LD pruned dataset to Plink, for running King.")
+        king_dir = os.path.join(args.out_dir, "king")
+
+        outputs = {'ind_id': mt_mafpruned.s}
+        if args.pheno_col is not None:
+            outputs['pheno'] = mt_mafpruned[args.pheno_col]
+        if args.fam_id is not None:
+            outputs['fam_id'] = mt_mafpruned[args.fam_id]
+        if args.pat_id is not None:
+            outputs['pat_id'] = mt_mafpruned[args.pat_id]
+        if args.mat_id is not None:
+            outputs['mat_id'] = mt_mafpruned[args.mat_id]
+
+        hl.export_plink(mt_mafpruned,  os.path.join(king_dir, args.out_name), **outputs)
+
+        logging.info(f"Plink dataset exported, time to run King now and come back. Start agian at checkpoint:"
+                     f"{args.checkpoint}")
+
+        args.cpcounter += 1
+        return mt, mt_mafpruned
+
+    else:
+        try:  # Try annotating relateds, if it fails exit
+            logging.info('Uploading King relatedness information + annotating matrix table.')
+            mt = sa.annotate_relateds(mt, args.relatives_file)
+            mt_mafpruned = sa.annotate_relateds(mt_mafpruned, args.relatives_file)
+            if args.overwrite_checkpoints:
+                mt = save_checkpoint(mt, step, args)
+                mt_mafpruned = save_checkpoint(mt_mafpruned, step, args, pruned=True)
+
+            args.cpcounter += 1
+            return mt, mt_mafpruned
+
+        except Exception as e:
+            logging.error('Annotating related individuals failed. Have you run King? Exiting now.')
+            logging.info(e)
+
+            args.run_king = True
+
+            args.cpcounter += 1
+            return mt, mt_mafpruned
