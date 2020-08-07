@@ -200,7 +200,9 @@ def low_pass_var_qc(mt, args):
     # Add preemtible nodes
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
-    # Annotate variants and genotypes for those failing QC
+    ########################################################
+    # Annotate variants and genotypes for those failing QC #
+    ########################################################
     logging.info("Running low-pass variant QC and genotype QC before samples QC.")
     mt = vq.find_failing_variants(mt, args, mode='low_pass')
 
@@ -233,15 +235,21 @@ def maf_LDprune_relatedness(mt, args):
     if args.checkpoint == args.cpcounter:
         mt = load_checkpoint(args.checkpoint, 'low_pass_variant_qc', args)
 
-    # Filter out failing samples, variants, and genotypes
+    #######################################################
+    # Filter out failing samples, variants, and genotypes #
+    #######################################################
     mt_filtered = sq.filter_failing(mt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
 
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
-    # Filter out low MAF variants
+    ###############################
+    # Filter out low MAF variants #
+    ###############################
     mt_maffilt = sq.maf_filter(mt_filtered, args,  filter_ac0_after_pruning=True)
 
-    # LD prune if there are more than 80k variants
+    ################################################
+    # LD prune if there are more than 80k variants #
+    ################################################
     if not mt_maffilt.row_count() < 80000:
         mt_ldpruned = sq.ld_prune(mt_maffilt, args)
     else:
@@ -278,6 +286,9 @@ def find_related_individuals(mt, mt_mafpruned, args):
         mt = load_checkpoint(args.checkpoint, 'low_pass_variant_qc', args)
         mt_mafpruned = load_checkpoint(args.checkpoint, 'maf_prune_relatedness', args)
 
+    ####################################
+    # Export data as Plink to run King #
+    ####################################
     if args.run_king is True:
         logging.info("Exporting MAF filtered and LD pruned dataset to Plink, for running King.")
         king_dir = os.path.join(args.out_dir, "king")
@@ -300,6 +311,9 @@ def find_related_individuals(mt, mt_mafpruned, args):
         args.cpcounter += 1
         return mt, mt_mafpruned
 
+    ######################################
+    # Or load in relatedness information #
+    ######################################
     else:
         try:  # Try annotating relateds, if it fails exit
             logging.info('Uploading King relatedness information + annotating matrix table.')
