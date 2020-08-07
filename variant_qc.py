@@ -7,7 +7,7 @@ import logging
 import hail as hl
 
 
-def find_failing_genotypes_depth_quality(mt, args):
+def find_failing_genotypes_depth_quality(mt, args, prefix):
     """
     Annotates genotypes for initial low-pass variant QC in pipeline. Finds genotypes with low depth and GQ values.
     :param mt: matrix table to filter
@@ -15,26 +15,28 @@ def find_failing_genotypes_depth_quality(mt, args):
     """
     # Log thresholds + report
     logging.info(f"Finding genotypes with min_dp < {args.min_dp}, or min GQ < {args.min_gq}")
-    mt = mt.annotate_globals(genotype_qc_thresh_dp_gq={'min_dp': args.min_dp, 'min_gq': args.min_gq})
+    globals_annot_name = prefix + "_genotype_qc_thresh_dp_gq"
+    failing_name = prefix + "_failing_depth_quality"
+    mt = mt.annotate_globals(**{globals_annot_name: {'min_dp': args.min_dp, 'min_gq': args.min_gq}})
 
     # Get starting genotypes count, instantiate genotype annotation
     gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
-    mt = mt.annotate_entries(failing_depth_quality=hl.empty_array(hl.tstr))
+    mt = mt.annotate_entries(**{failing_name: hl.empty_array(hl.tstr)})
 
     # Filter entries for depth
     depth_cond = hl.cond(mt.DP < args.min_dp, mt.failing_depth_quality.append("failing_DP"), mt.failing_depth_quality)
-    mt = mt.annotate_entries(failing_depth_quality=depth_cond)
+    mt = mt.annotate_entries(**{failing_name: depth_cond})
     failing_depth = mt.aggregate_entries(hl.agg.count_where(mt.failing_depth_quality.contains("failing_DP")))
     failing_depth_perc = round(failing_depth / gt_total*100, 2)
 
     # Filter GQ or PL for different genotypes
     gq_cond = hl.cond((mt.GT.is_het() | mt.GT.is_hom_var()) & (mt.PL[0] < args.min_gq),
                       mt.failing_depth_quality.append("failing_PL"), mt.failing_depth_quality)
-    mt = mt.annotate_entries(failing_depth_quality=gq_cond)
+    mt = mt.annotate_entries(**{failing_name: gq_cond})
 
     pl_cond = hl.cond(mt.GT.is_hom_ref() & (mt.GQ < args.min_gq), mt.failing_depth_quality.append("failing_GQ"),
                       mt.failing_depth_quality)
-    mt = mt.annotate_entries(failing_depth_quality=pl_cond)
+    mt = mt.annotate_entries(**{failing_name: pl_cond})
 
     failing_gq = mt.aggregate_entries(hl.agg.count_where(mt.failing_depth_quality.contains("failing_PL") |
                                                          mt.failing_depth_quality.contains("failing_GQ")))
@@ -48,13 +50,13 @@ def find_failing_genotypes_depth_quality(mt, args):
 
     logging.info(f"Number of passing genotypes: {passing_gts} ({passing_gts_perc}%)")
 
-    mt = mt.annotate_globals(genotype_qc_failing_quality_depth={'depth_excluded': failing_depth,
-                                                                'quality_excluded': failing_gq})
+    globals_fail_annot = prefix + "_genotype_qc_failing_quality_depth"
+    mt = mt.annotate_globals(**{globals_fail_annot: {'depth_excluded': failing_depth, 'quality_excluded': failing_gq}})
 
     return mt
 
 
-def find_failing_genotypes_ab(mt, args):
+def find_failing_genotypes_ab(mt, args, prefix):
     """
     Finds genotypes failing allelic balance, defined as the percentage of ref reads that should correspond to that
     called genotype. For hets, percent of ref reads should be between 20-80%, for hom ref they should be at least 90%,
@@ -147,15 +149,13 @@ def find_failing_genotypes_ab(mt, args):
     return mt
 
 
-def annotate_variant_het_ab(mt, args, prefix="", filter_bad_samples=False):
+def annotate_variant_het_ab(mt, args, prefix=""):
     """
      Annotate percentage of het genotypes per variant that are in  allelic balance. That means that the genotype has ref
     reads within the 20-80% range of all reads.
 
     :param mt: matrix table to annotate
     :param prefix: prefix to add to variant annotation
-    :param filter_bad_samples: If running in final allelic balance calculation, remove 'bad' samples not passing samples
-     QC?
     :return: returns annotated matrix table
     """
     ##########################################
@@ -285,6 +285,7 @@ def find_failing_variants(mt, args, mode):
             logging.info(e)
             return
 
+        # Define variables
         p_hwe = args.low_pass_p_hwe
         call_rate = args.low_pass_min_call_rate
         annotation_name = "variant_qc_thresholds_lowpass"
@@ -295,12 +296,13 @@ def find_failing_variants(mt, args, mode):
     elif mode == "final":
         # Check that samples QC has been run
         try:
-            tet = hl.is_defined(mt.failing_qc_samples)
+            test = hl.is_defined(mt.failing_qc_samples)
             test = hl.is_defined(mt.pop_outlier_samples)
         except Exception as e:
             logging.info('failing_qc_samples and pop_outlier_samples not defined! Run samples QC before invoking this.')
             logging.info(e)
 
+        # Define variables
         p_hwe = args.final_p_hwe
         call_rate = args.final_min_call_rate
         annotation_name = "variant_qc_thresholds_final"
@@ -329,55 +331,63 @@ def find_failing_variants(mt, args, mode):
 
     mt = mt.annotate_globals(**{annotation_name: threshold_dict})
 
+    ############################################################
+    # Find failing genotypes and do allelic balance annotation #
+    ############################################################
+    # Find genotypes failing on depth, quality, and allelic balance
+    mt = find_failing_genotypes_depth_quality(mt, args, mode)
+    mt = find_failing_genotypes_ab(mt, args, mode)
+
+    # Define het allelic balance value (percentage of GT calls for that variant *in balance*)
+    mt = annotate_variant_het_ab(mt, args, prefix=mode)
+    mt = mt.checkpoint(args.output_stem + mode + '_filtervartemp1_deleteme.mt', overwrite=True)
+
     ###########################################################
-    # Do genotype QC filtering and allelic balance annotation #
+    # Filter matrix table to only passing genotypes + samples #
     ###########################################################
-    if mode == "low_pass":
-        # Filter genotypes on depth and quality
-        mt = find_failing_genotypes_depth_quality(mt, args)
+    # We have to actually filter out failing genotypes and samples because hl.variant_qc has no filter option
+    # Filter out failing genotypes for calculating variant QC statistics
+    logging.info("Filtering out genotypes failing on depth, quality, and allelic balance metrics for initial QC "
+                 "metric calculation.")
+    gtcount = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
+    mt_filt = mt.filter_entries(hl.len(mt.failing_depth_quality) == 0, keep=True)
+    mt_filt = mt_filt.filter_entries(hl.len(mt.failing_ab) == 0, keep=True)
 
-        # Define het allelic balance value (percentage of GT calls for that variant *in balance*)
-        mt = annotate_variant_het_ab(mt, args, prefix='lowpass_', filter_bad_samples=False)
+    mt_filt = mt_filt.checkpoint(args.output_stem + mode + "filter1_deleteme.mt")
+    filt_gt_count = mt_filt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
+    logging.info(f"Number of genotypes on which initial variant QC measures calculated: {filt_gt_count}")
+    logging.info(f"({100 - round(gtcount - filt_gt_count, 2)}% of all genotypes)")
 
-        # Run Hail variant qc to get statistics, after filtering out genotypes
-        mt = hl.variant_qc(mt, name='prefilter_variant_qc')
-    
-    else:  # else final
-        # Define het allelic balance value (percentage of GT calls for that variant *in balance*)
-        mt = annotate_variant_het_ab(mt, args, prefix='final_', filter_bad_samples=True)
+    # Filter out samples failing QC for calculating variant QC statistics (empty if lowpass)
+    logging.info("Filtering out samples failing samples QC. Annotations are empty if samples QC not run yet.")
+    samples_count = mt.count_cols()
+    mt_filt = mt_filt.filter_cols((mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0))
+    mt_filt = mt_filt.checkpoint(args.output_stem + mode + "filter2_deleteme.mt")
+    filt_s_count = mt_filt.count_cols()
+    logging.info(f"Initial samples count {samples_count}. Sample count after filtering: {filt_s_count}")
 
-        mt = mt.checkpoint(args.output_stem + '_filtervartemp1_deleteme.mt', overwrite=True)
+    # Run variant QC on filtered matrix table
+    mt_filt = hl.variant_qc(mt_filt, name=varqc_name)
 
-        # Filter out het genotypes that are out of allelic balance
-        mt = find_failing_genotypes_ab(mt, args)
-
-        #############################################################################
-        # Filter out samples not passing samples QC, copy original mt for later use #
-        #############################################################################
-        mt_orig = mt
-        mt = mt.filter_cols((mt.non_finns_to_remove == True) | (mt.fail_analytical > 0), keep=False)
-        logging.info("Excluding samples failing qc. Number of samples on which variant QC is calculated: " +
-                     str(mt.count_cols()))
-
-        mt = mt.checkpoint(args.output_stem + '_filtervartemp2_deleteme.mt', overwrite=True)
-
-        # Run variant QC after filtering out 'bad' samples, calculate call rate in hets
-        logging.info('Running Hail variant QC function.')
-        mt = hl.variant_qc(mt, name=varqc_name)
-        mt = mt.annotate_rows(final_het_callrate=hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_het()) /
-                                                 mt.final_het_gt_count)
+    if mode == 'final':
+        gt_filters = hl.is_defined(mt_filt.GT) & mt_filt.GT.is_het()
+        mt_filt = mt_filt.annotate_rows(final_het_callrate=hl.agg.count_where(gt_filters) / mt_filt.final_het_gt_count)
 
         # Sanity check: is the het callrate ever higher than het allelic balance?
         logging.info('Any variants where het callrate is higher than het allelic balance? Should be zero.')
-        logging.info(mt.aggregate_rows(hl.agg.count_where(mt.final_het_callrate > mt.final_het_ab_all)))
+        logging.info(mt_filt.aggregate_rows(hl.agg.count_where(
+            mt_filt.final_het_callrate > mt_filt.final_frac_het_gts_in_ab)))
 
     ######################################################
     # Set HWE calculation in either all or only controls #
     ######################################################
+    #TODO continue adapting the code below to mt_filt instead of mt, collecting the annotations that need to be added
+    # back at the end. Also, how the case filters in the rest of the code deal with missing pheno col data.
+
     if args.pheno_col is not None:
-        mt = mt.annotate_rows(
-            hwe_ctrls_only=hl.agg.filter(((mt[args.pheno_col] == False) | hl.is_missing(mt.col[args.pheno_col])),
-                                         hl.agg.hardy_weinberg_test(mt.GT)))
+        case_filters = (mt_filt[args.pheno_col] == False) | hl.is_missing(mt_filt.col[args.pheno_col])
+        mt_filt = mt_filt.annotate_rows(
+            hwe_ctrls_only=hl.agg.filter(case_filters, hl.agg.hardy_weinberg_test(mt_filt.GT)))
         logging.info('Annotated with hwe_ctrls_only successfully')
     else:
         logging.info('Phenotype column name not provided, calculating HWE for variants using all samples.')
@@ -464,6 +474,15 @@ def find_failing_variants(mt, args, mode):
     failing_any = mt.aggregate_rows(hl.agg.count_where(hl.len(mt[failing_name]) != 0))
 
     logging.info(f"Variants failing QC: {failing_any}, {round(failing_any / total_variants * 100, 2)}%")
+
+    # Add annotations back to main matrix table (not filtered), return that
+    mt = mt.annotate_rows(**{varqc_name: mt_filt.index_rows(mt.row_key)[varqc_name]})
+
+    if mode == 'final':
+        mt = mt.annotate_rows(final_het_callrate=mt_filt.index_rows(mt.row_key).final_het_callrate)
+
+
+
 
     if mode == "low_pass":
         mt = mt.annotate_globals(variant_qc_fails_lowpass=filter_dict)
