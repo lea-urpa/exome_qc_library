@@ -73,10 +73,11 @@ def find_failing_genotypes_ab(mt, args, prefix):
                  f"\nor failing hom ref genotypes with ref reads < {args.min_hom_ref_ref_reads}"
                  f"\nor failing hom alt genotypes with ref reads > {args.max_hom_alt_ref_reads}")
 
-    mt = mt.annotate_globals(genotype_qc_thresholds_ab={'max_het_ref_reads': args.max_het_ref_reads,
-                                                        'min_het_ref_reads': args.min_het_ref_reads,
-                                                        'min_hom_ref_ref_reads': args.min_hom_ref_ref_reads,
-                                                        'max_hom_alt_ref_reads': args.max_hom_alt_ref_reads})
+    globals_annot_name = prefix + "_genotype_qc_thresholds_ab"
+    mt = mt.annotate_globals(**{globals_annot_name: {'max_het_ref_reads': args.max_het_ref_reads,
+                                                     'min_het_ref_reads': args.min_het_ref_reads,
+                                                     'min_hom_ref_ref_reads': args.min_hom_ref_ref_reads,
+                                                     'max_hom_alt_ref_reads': args.max_hom_alt_ref_reads}})
 
     ##################################################################
     # Check that depth and gq filters have been applied, then filter #
@@ -92,7 +93,8 @@ def find_failing_genotypes_ab(mt, args, prefix):
     ################################
     # Get starting genotypes count #
     ################################
-    mt = mt.annotate_entries(failing_ab=hl.empty_array(hl.tstr))
+    failing_name = prefix + "_failing_ab"
+    mt = mt.annotate_entries(**{failing_name: hl.empty_array(hl.tstr)})
     gthet = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_het()))
     gthomvar = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_var()))
     gthomref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
@@ -105,7 +107,7 @@ def find_failing_genotypes_ab(mt, args, prefix):
     ab_cond_het = hl.cond(mt.GT.is_het() & (hl.len(mt.failing_depth_quality) == 0) & het_ab_cond,
                           mt.failing_ab.append("failing_het_ab"), mt.failing_ab)
 
-    mt = mt.annotate_entries(failing_ab=ab_cond_het)
+    mt = mt.annotate_entries(**{failing_name: ab_cond_het})
 
     hets_failing_ab = mt.aggregate_entries(hl.agg.count_where(mt.failing_ab.contains("failing_het_ab")))
     het_failing_ab_perc = round(hets_failing_ab / gthet * 100, 2)
@@ -116,7 +118,7 @@ def find_failing_genotypes_ab(mt, args, prefix):
     hom_ab_cond = (mt.AD[0] / hl.sum(mt.AD)) < args.min_hom_ref_ref_reads
     ab_cond_homref = hl.cond(mt.GT.is_hom_ref() & hom_ab_cond, mt.failing_ab.append("failing_homref_ab"), mt.failing_ab)
 
-    mt = mt.annotate_entries(failing_ab=ab_cond_homref)
+    mt = mt.annotate_entries(**{failing_name: ab_cond_homref})
 
     homref_failing_ab = mt.aggregate_entries(hl.agg.count_where(mt.failing_ab.contains("failing_homref_ab")))
     homref_failing_ab_perc = round(homref_failing_ab / gthomref * 100, 2)
@@ -128,7 +130,7 @@ def find_failing_genotypes_ab(mt, args, prefix):
     ab_cond_homalt = hl.cond(mt.GT.is_hom_var() & homalt_ab_cond, mt.failing_ab.append("failing_homalt_ab"),
                              mt.failing_ab)
 
-    mt = mt.annotate_entries(failing_ab=ab_cond_homalt)
+    mt = mt.annotate_entries(**{failing_name: ab_cond_homalt})
 
     homalt_failing_ab = mt.aggregate_entries(hl.agg.count_where(mt.failing_ab.contains("failing_homalt_ab")))
     homalt_failing_ab_perc = round(homalt_failing_ab / gthomvar * 100, 2)
@@ -141,10 +143,11 @@ def find_failing_genotypes_ab(mt, args, prefix):
     logging.info(f"Number of hom ref GTs excluded: {homref_failing_ab} ({homref_failing_ab_perc}%)")
     logging.info(f"Number of hom alt GTs excluded: {homalt_failing_ab} ({homalt_failing_ab_perc})")
 
-    mt = mt.annotate_globals(genotype_qc_exclusions=
-                             {'het_excluded_ct_percent': [hets_failing_ab, het_failing_ab_perc],
-                              'hom_ref_excluded_ct_percent': [homref_failing_ab, homref_failing_ab_perc],
-                              'hom_var_excluded_ct_percent': [homalt_failing_ab, homalt_failing_ab_perc]})
+    global_fail_annot = prefix + "_genotype_qc_failing_ab"
+    mt = mt.annotate_globals(**{global_fail_annot:
+                               {'het_excluded_ct_percent': [hets_failing_ab, het_failing_ab_perc],
+                                'hom_ref_excluded_ct_percent': [homref_failing_ab, homref_failing_ab_perc],
+                                'hom_var_excluded_ct_percent': [homalt_failing_ab, homalt_failing_ab_perc]}})
 
     return mt
 
