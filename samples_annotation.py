@@ -22,10 +22,6 @@ def annotate_cols_from_file(mt, file, args):
     else:
         ht = hl.read_table(file)
 
-    cols = list(dict(ht.row).keys())
-    cols.remove(args.samples_col)
-
-    for colname in cols:
-        mt = mt.annotate_cols(**{colname: ht[mt.s][colname]})
+    mt = mt.annotate_cols(**ht[mt.s])
 
     return mt
