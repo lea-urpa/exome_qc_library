@@ -127,6 +127,51 @@ def annotate_samples(mt, args):
     return mt
 
 
+def remove_samples(mt, args):
+    """
+    Removes samples based on arbitrary lists and key words.
+
+    :param mt:
+    :param args:
+    :return:
+    """
+    if args.checkpoint > args.cpcounter:
+        args.cpcounter += 1
+        return mt
+
+    step = "pheno_samples_qc"
+    # Load data from after sample annotation, if we are starting at this checkpoint, else pass from prev step
+    if args.checkpoint == args.cpcounter:
+        mt = hl.load_checkpoint(args.checkpoint, 'samples_annotation', args)
+
+    if (args.sample_removal_strings is not None) or (args.sample_removal_list is not None):
+        samples_start = mt.count_cols()
+        logging.info(f"Initial sample count: {samples_start}")
+
+    # Filter out samples from arbitrary list uploaded with args
+    if args.sample_removal_list is not None:
+        rm_list = hl.import_table(args.sample_removal_list, no_header=True)
+        rm_list = rm_list.annotate(s=rm_list.f0)
+        rm_list = rm_list.key_by("s")
+        mt = mt.anti_join_cols(rm_list)
+        list_filtered = mt.count_cols()
+        logging.info(f"Sample count after filtering by input list: {list_filtered}")
+
+    # Filter out samples that have sample names containing a particular string
+    if args.sample_removal_strings is not None:
+        removal_strings = args.sample_removal_strings.strip().split(",")
+        for key_string in removal_strings:
+            mt = mt.filter_cols(mt.s.contains(key_string), keep=False)
+        string_filtered = mt.count_cols()
+        logging.info(f"Sample count after filtering by strings: {string_filtered}")
+
+    if args.overwrite_checkpoints:
+        mt = save_checkpoint(mt, step, args)
+
+    args.cpcounter += 1
+    return mt
+
+
 def low_pass_var_qc(mt, args):
     """
     Performs low pass variant QC on a matrix table (for before samples QC)
@@ -141,22 +186,22 @@ def low_pass_var_qc(mt, args):
 
     step = "low_pass_variant_qc"
 
-    # Load data from after sample annotation, if we are starting at this checkpoint, else pass from prev step
+    # Load data from after sample removal, if we are starting at this checkpoint, else pass from prev step
     if args.checkpoint == args.cpcounter:
-        mt = load_checkpoint(args.checkpoint, 'samples_annotation', args)
+        mt = load_checkpoint(args.checkpoint, 'low_pass_variant_qc', args)
 
     # Add preemtible nodes
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
-    # Filter out bad variants and genotypes
+    # Annotate variants and genotypes for those failing QC
     logging.info("Running low-pass variant QC and genotype QC before samples QC.")
-    mt_filt = vq.find_failing_variants(mt, args)
+    mt = vq.find_failing_variants(mt, args, mode='low_pass')
 
     # Remove the preemptible nodes
     h.remove_preemptibles(args.cluster_name)
 
     if args.overwrite_checkpoints:
-        mt_filt = save_checkpoint(mt_filt, step, args)
+        mt = save_checkpoint(mt, step, args)
 
     args.cpcounter += 1
-    return mt_filt
+    return mt

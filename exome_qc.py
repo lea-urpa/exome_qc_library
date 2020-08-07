@@ -83,6 +83,14 @@ def parse_arguments(arguments):
                             help="Use case info to minimize case removal when finding unrelated set of individuals.")
     kin_thresh.add_argument("--plot_kin", default=True, help="Plot kinship values for visual inspection.")
 
+    # Samples removal options #
+    samples_removal = parser.add_argument_group("Arbitrary sample removal options.")
+    samples_removal.add_argument("--sample_removal_strings", type=str,
+                                 help="string or strings that indicate a sample should be filtered out of the dataset."
+                                      "If more than one, comma separated.")
+    samples_removal.add_argument("--sample_removal_list", type=str,
+                                 help="File containing one sample ID per line that should be removed from the dataset.")
+
     # Samples QC thresholds #
     samples_thresh = parser.add_argument_group("Samples QC thresholds.")
     samples_thresh.add_argument("--batches", action='store_true', help="Stratify samples QC by batch/cohort?")
@@ -105,6 +113,8 @@ def parse_arguments(arguments):
                                    "phenotype information are ignored in many cases.")
     pheno_thresh.add_argument("--pheno_call_rate", default=0.95,
                               help="Min call rate for variant, in cases + controls separately.")
+
+    # TODO add check to make sure all input files exist before running pipeline
 
     parsed_args = parser.parse_args(arguments)
 
@@ -170,11 +180,11 @@ if __name__ == "__main__":
         # Annotate samples
         mt = qc.annotate_samples(mt, args)
 
-        # Low-pass variant QC
-        mt = qc.low_pass_var_qc(mt, args)
-
         # Phenotype Samples QC
         mt = qc.phenotype_samples_qc(mt, args)
+
+        # Low-pass variant QC
+        mt = qc.low_pass_var_qc(mt, args)
 
         # MAF pruning dataset
         mt, mt_mafpruned = qc.maf_prune_relatedness(mt, args)
