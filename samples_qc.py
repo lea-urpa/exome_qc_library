@@ -44,7 +44,7 @@ def maf_filter(mt, args, filter_ac0_after_pruning=False):
     table, and returns the matrix table
 
     :param mt: matrix table to prune (should be LD pruned and have x chrom removed).
-    :param filter_ac0after_pruning: filter variants no longer in the data, e.g. sum(AC) = 0?
+    :param filter_ac0_after_pruning: filter variants no longer in the data, e.g. sum(AC) = 0?
     :return: returns maf filtered matrix table.
     """
     # Run hl.variant_qc() to get AFs
@@ -64,13 +64,14 @@ def maf_filter(mt, args, filter_ac0_after_pruning=False):
 
 
 def ld_prune(mt, args, rm_chr_x=False):
-    '''
-    LD prune and remove chromosome X from a matrix table, for calculating kinship and principal components
+    """
+     LD prune and remove chromosome X from a matrix table, for calculating kinship and principal components
 
     :param mt: matrix table to annotate, should already have related individuals removed.
+    :param args: namespace object with threshold arguments
+    :param rm_chr_x: remove chromosome x?
     :return: returns the ld pruned matrix table
-    '''
-
+    """
     # LD prune
     pruned_variant_table = hl.ld_prune(mt.GT, r2=args.r2, bp_window_size=args.bp_window_size)
     mt_ldpruned = mt.filter_rows(hl.is_defined(pruned_variant_table[mt.row_key]))
