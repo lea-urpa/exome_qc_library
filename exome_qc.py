@@ -100,7 +100,9 @@ def parse_arguments(arguments):
 
     # Filter by phenotype thresholds #
     pheno_thresh = parser.add_argument_group("Thresholds for filtering by phenotype.")
-    pheno_thresh.add_argument("--pheno_col", type=str, help="Samples annotation giving phenotype boolean annotation.")
+    pheno_thresh.add_argument("--pheno_col", type=str,
+                              help="Samples annotation giving phenotype boolean annotation. Note: samples missing"
+                                   "phenotype information are ignored in many cases.")
     pheno_thresh.add_argument("--pheno_call_rate", default=0.95,
                               help="Min call rate for variant, in cases + controls separately.")
 

@@ -273,7 +273,7 @@ def find_failing_variants(mt, args, mode):
 
     :param mt: matrix table to filter
     :param args: arguments object with thresholds
-    :return: returns matrix table with variants filtered out.
+    :return: returns matrix table with entries and variants annotated with info on whether they fail QC metrics.
     """
     ###########################################################
     # Define specific things for low pass vs final variant QC #
@@ -349,22 +349,21 @@ def find_failing_variants(mt, args, mode):
     ###########################################################
     # We have to actually filter out failing genotypes and samples because hl.variant_qc has no filter option
     # Filter out failing genotypes for calculating variant QC statistics
-    logging.info("Filtering out genotypes failing on depth, quality, and allelic balance metrics for initial QC "
-                 "metric calculation.")
+    logging.info("Filtering out genotypes failing on depth, quality, and allelic balance metrics for QC "
+                 "metric calculation. Variant-level % het GTs in allelic balance has already been annotated,"
+                 "after removing genotypes failing on depth and quality, so those variant annotations remain.")
     gtcount = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
-    mt_filt = mt.filter_entries(hl.len(mt.failing_depth_quality) == 0, keep=True)
-    mt_filt = mt_filt.filter_entries(hl.len(mt.failing_ab) == 0, keep=True)
-
-    mt_filt = mt_filt.checkpoint(args.output_stem + mode + "filter1_deleteme.mt")
-    filt_gt_count = mt_filt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
-    logging.info(f"Number of genotypes on which initial variant QC measures calculated: {filt_gt_count}")
-    logging.info(f"({100 - round(gtcount - filt_gt_count, 2)}% of all genotypes)")
+    mt_filt = mt.filter_entries((hl.len(mt.failing_depth_quality) == 0) & (hl.len(mt.failing_ab) == 0), keep=True)
+    mt_filt = mt_filt.checkpoint(args.output_stem + mode + "filter1_deleteme.mt", overwrite=True)
+    filt_gt_count = mt_filt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt_filt.GT)))
+    logging.info(f"Number of genotypes on which variant QC measures calculated: {filt_gt_count}")
+    logging.info(f"({100 - round((gtcount - filt_gt_count) / gtcount, 2)}% of all genotypes)")
 
     # Filter out samples failing QC for calculating variant QC statistics (empty if lowpass)
-    logging.info("Filtering out samples failing samples QC. Annotations are empty if samples QC not run yet.")
+    logging.info("Filtering out samples failing samples QC. All samples kept if samples QC not run yet.")
     samples_count = mt.count_cols()
-    mt_filt = mt_filt.filter_cols((mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0))
-    mt_filt = mt_filt.checkpoint(args.output_stem + mode + "filter2_deleteme.mt")
+    mt_filt = mt_filt.filter_cols((mt_filt.pop_outlier_sample == False) & (hl.len(mt_filt.failing_samples_qc) == 0))
+    mt_filt = mt_filt.checkpoint(args.output_stem + mode + "filter2_deleteme.mt", overwrite=True)
     filt_s_count = mt_filt.count_cols()
     logging.info(f"Initial samples count {samples_count}. Sample count after filtering: {filt_s_count}")
 
@@ -372,8 +371,9 @@ def find_failing_variants(mt, args, mode):
     mt_filt = hl.variant_qc(mt_filt, name=varqc_name)
 
     if mode == 'final':
-        gt_filters = hl.is_defined(mt_filt.GT) & mt_filt.GT.is_het()
-        mt_filt = mt_filt.annotate_rows(final_het_callrate=hl.agg.count_where(gt_filters) / mt_filt.final_het_gt_count)
+        het_gt_filters = hl.is_defined(mt_filt.GT) & mt_filt.GT.is_het()
+        mt_filt = mt_filt.annotate_rows(final_het_callrate=hl.agg.count_where(het_gt_filters) /
+                                                           mt_filt.final_het_gt_count)
 
         # Sanity check: is the het callrate ever higher than het allelic balance?
         logging.info('Any variants where het callrate is higher than het allelic balance? Should be zero.')
@@ -383,18 +383,15 @@ def find_failing_variants(mt, args, mode):
     ######################################################
     # Set HWE calculation in either all or only controls #
     ######################################################
-    #TODO continue adapting the code below to mt_filt instead of mt, collecting the annotations that need to be added
-    # back at the end. Also, how the case filters in the rest of the code deal with missing pheno col data.
-
     if args.pheno_col is not None:
-        case_filters = (mt_filt[args.pheno_col] == False) | hl.is_missing(mt_filt.col[args.pheno_col])
+        case_filters = (mt_filt[args.pheno_col] == False) & hl.is_defined(mt_filt[args.pheno_col])
         mt_filt = mt_filt.annotate_rows(
             hwe_ctrls_only=hl.agg.filter(case_filters, hl.agg.hardy_weinberg_test(mt_filt.GT)))
-        logging.info('Annotated with hwe_ctrls_only successfully')
+        logging.info('Calculated HWE with controls only (ignoring samples with missing phenotype information)')
     else:
         logging.info('Phenotype column name not provided, calculating HWE for variants using all samples.')
 
-    mt = mt.checkpoint(args.output_stem + '_filtervartemp3_deleteme.mt', overwrite=True)
+    mt_filt = mt_filt.checkpoint(args.output_stem + mode + '_filtervartemp3_deleteme.mt', overwrite=True)
 
     ###################
     # Filter variants #
@@ -405,60 +402,61 @@ def find_failing_variants(mt, args, mode):
     filter_dict = {}
 
     # Initalize row annotation with variant fail tags #
-    mt = mt.annotate_rows(**{failing_name: hl.empty_array(hl.tstr)})
-    total_variants = mt.count_rows()
+    mt_filt = mt_filt.annotate_rows(**{failing_name: hl.empty_array(hl.tstr)})
+    total_variants = mt_filt.count_rows()
 
     # Failing GSQR filters #
     logging.info("Marking variants with GQSR filters not empty")
-    gqse_filter = hl.cond(hl.len(mt.filters != 0), mt[failing_name].append("failing_GQSR_filters"), mt[failing_name])
-    mt = mt.annotate_rows(**{failing_name: gqse_filter})
-    failing_gqsr = mt.aggregate_rows(hl.agg.count_where(mt[failing_name].contains["failing_GQSR_filters"]))
+    gqse_filter = hl.cond(hl.len(mt_filt.filters != 0), mt_filt[failing_name].append("failing_GQSR_filters"),
+                          mt_filt[failing_name])
+    mt_filt = mt_filt.annotate_rows(**{failing_name: gqse_filter})
+    failing_gqsr = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains["failing_GQSR_filters"]))
     failing_gqsr_perc = round(failing_gqsr / total_variants * 100, 2)
     filter_dict["failing_GSQR"] = failing_gqsr
 
     # Find variants that are snps or indels with QD less than threshold #
-    snps = hl.is_snp(mt.row.alleles[0], mt.row.alleles[1]) & (mt.row.info.QD < args.snp_qd)
-    indels = (~hl.is_snp(mt.row.alleles[0], mt.row.alleles[1])) & (mt.row.info.QD < args.indel_qd)
-    qd_filter = hl.cond(snps | indels, mt[failing_name].append("failing_QD"), mt[failing_name])
-    mt = mt.annotate_rows(**{failing_name: qd_filter})
-    failing_qd = mt.aggregate_rows(hl.agg.count_where(mt[failing_name].contains("failing_QD")))
+    snps = hl.is_snp(mt_filt.row.alleles[0], mt_filt.row.alleles[1]) & (mt_filt.row.info.QD < args.snp_qd)
+    indels = (~hl.is_snp(mt_filt.row.alleles[0], mt_filt.row.alleles[1])) & (mt_filt.row.info.QD < args.indel_qd)
+    qd_filter = hl.cond(snps | indels, mt_filt[failing_name].append("failing_QD"), mt_filt[failing_name])
+    mt_filt = mt_filt.annotate_rows(**{failing_name: qd_filter})
+    failing_qd = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("failing_QD")))
     failing_qd_perc = round(failing_qd / total_variants * 100, 2)
     filter_dict["failing_QD"] = failing_qd
 
     # Find variants with >20% of het genotypes out of allelic balance #
     logging.info("Finding variants failing on het GT allelic balance")
-    ab_filter = hl.cond(hl.is_defined(mt.final_het_ab_all) & (mt.final_het_ab_all < args.final_ab_allowed_dev_het),
-                        mt[failing_name].append("failing_het_ab"), mt[failing_name])
-    mt = mt.annotate_rows(**{failing_name: ab_filter})
-    failing_ab = mt.aggregate_rows(hl.agg.count_where(mt[failing_name].contains("failing_het_ab")))
+    ab_filter = hl.cond(hl.is_defined(mt_filt.final_het_ab_all) & (mt_filt.final_het_ab_all < args.final_ab_allowed_dev_het),
+                        mt_filt[failing_name].append("failing_het_ab"), mt_filt[failing_name])
+    mt_filt = mt_filt.annotate_rows(**{failing_name: ab_filter})
+    failing_ab = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("failing_het_ab")))
     failing_ab_perc = round(failing_ab / total_variants * 100, 2)
     filter_dict["failing_het_allelic_balance"] = failing_ab
 
     # Failing HWE test #
     logging.info(f"Finding variants failing HWE test in {hwe_tag}")
     if args.pheno_col is not None:
-        hwe_cond = mt.row.hwe_ctrls_only.p_value < p_hwe
+        hwe_cond = mt_filt.row.hwe_ctrls_only.p_value < p_hwe
     else:
-        hwe_cond = mt.row[varqc_name].p_value_hwe < p_hwe  # var QC name given at top of function
+        hwe_cond = mt_filt.row[varqc_name].p_value_hwe < p_hwe  # var QC name given at top of function
 
-    hwe_filter = hl.cond(hwe_cond, mt[failing_name].append("failing_hwe"), mt[failing_name])
-    mt = mt.annotate_rows(**{failing_name: hwe_filter})
-    failing_hwe = mt.aggregate_rows(hl.agg.count_where(mt[failing_name].contains['failing_hwe']))
+    hwe_filter = hl.cond(hwe_cond, mt_filt[failing_name].append("failing_hwe"), mt_filt[failing_name])
+    mt_filt = mt_filt.annotate_rows(**{failing_name: hwe_filter})
+    failing_hwe = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains['failing_hwe']))
     failing_hwe_perc = round(failing_hwe / total_variants * 100, 2)
     filter_dict["failing_hwe"] = failing_hwe
 
     # Find variants not passing call rate filter #
     if mode == "final":
         logging.info("Finding variants not passing call rate filter, using sex-aware call rate ")
-        call_rate_cond = mt.row.sexaware_call_rate < args.min_call_rate
+        call_rate_cond = mt_filt.row.sexaware_call_rate < args.min_call_rate
 
     else:  # low-pass
         logging.info("Finding variants not passing call rate filter, NOT using sex-aware call rate ")
-        call_rate_cond = mt[varqc_name].call_rate < args.min_call_rate
+        call_rate_cond = mt_filt[varqc_name].call_rate < args.min_call_rate
 
-    call_rate_filter = hl.cond(call_rate_cond, mt[failing_name].append("failing_call_rate"), mt[failing_name])
-    mt = mt.annotate_rows(**{failing_name: call_rate_filter})
-    failing_call_rate = mt.aggregate_rows(hl.agg.count_where(mt[failing_name].contains("failing_call_rate")))
+    call_rate_filter = hl.cond(call_rate_cond, mt_filt[failing_name].append("failing_call_rate"), mt_filt[failing_name])
+    mt_filt = mt_filt.annotate_rows(**{failing_name: call_rate_filter})
+    failing_call_rate = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("failing_call_rate")))
     failing_cr_perc = round(failing_call_rate / total_variants * 100, 2)
     filter_dict["failing_call_rate"] = failing_call_rate
 
@@ -473,46 +471,20 @@ def find_failing_variants(mt, args, mode):
                  f"\np value HWE < {p_hwe} in {hwe_tag}: {failing_hwe}, {failing_hwe_perc}%"
                  f"\ncall rate < {args.min_call_rate}: {failing_call_rate}, {failing_cr_perc}%")
 
-    failing_any = mt.aggregate_rows(hl.agg.count_where(hl.len(mt[failing_name]) != 0))
+    failing_any = mt_filt.aggregate_rows(hl.agg.count_where(hl.len(mt_filt[failing_name]) != 0))
 
     logging.info(f"Variants failing QC: {failing_any}, {round(failing_any / total_variants * 100, 2)}%")
 
     # Add annotations back to main matrix table (not filtered), return that
+    mt = mt.annotate_globals(**{mode + "_filtered_counts": filter_dict})
     mt = mt.annotate_rows(**{varqc_name: mt_filt.index_rows(mt.row_key)[varqc_name]})
+    mt = mt.annotate_rows(**{failing_name: mt_filt.index_rows(mt.row_key)[failing_name]})
+
+    if args.pheno_col is not None:
+        mt = mt.annotate_rows(hwe_ctrls_only=mt_filt.index_rows(mt.row_key).hwe_ctrls_only)
 
     if mode == 'final':
         mt = mt.annotate_rows(final_het_callrate=mt_filt.index_rows(mt.row_key).final_het_callrate)
 
-
-
-
-    if mode == "low_pass":
-        mt = mt.annotate_globals(variant_qc_fails_lowpass=filter_dict)
-        return mt
-
-    else:  # final
-        mt_orig = mt_orig.annotate_globals(variant_qc_fails_final=filter_dict)
-
-        # Annotate original matrix table with variant failing col annotation, and allelic balance annotations
-        # calculated without population outliers and samples failing QC
-
-        mt_orig = mt_orig.annotate_rows(**{failing_name: mt.index_rows(mt_orig.row_key)[failing_name]})
-
-        mt_orig = mt_orig.annotate_rows(**{varqc_name: mt.index_rows(mt_orig.row_key)[varqc_name]})
-
-        mt_orig = mt_orig.annotate_rows(final_het_gt_count=mt.index_rows(mt_orig.row_key).final_het_gt_count,
-                                        final_het_ab_all=mt.index_rows(mt_orig.row_key).final_het_ab_all,
-                                        final_het_gt_count_cases=mt.index_rows(
-                                            mt_orig.row_key).final_het_gt_count_cases,
-                                        final_het_ab_cases=mt.index_rows(mt_orig.row_key).final_het_ab_cases,
-                                        final_het_gt_count_cont=mt.index_rows(
-                                            mt_orig.row_key).final_het_gt_count_cont,
-                                        final_het_ab_cont=mt.index_rows(mt_orig.row_key).final_het_ab_cont,
-                                        final_het_callrate=mt.index_rows(mt_orig.row_key).final_het_callrate)
-
-        if args.pheno_col is not None:
-            mt_orig = mt_orig.annotate_rows(hwe_ctrls_only=mt.index_rows(mt_orig.row_key).hwe_ctrls_only)
-
-        return mt_orig
-
+    return mt
 
