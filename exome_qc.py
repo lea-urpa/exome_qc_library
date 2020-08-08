@@ -87,7 +87,8 @@ def parse_arguments(arguments):
     kin_thresh.add_argument("--use_case_info", default=True,
                             help="Use case info to minimize case removal when finding unrelated set of individuals.")
     kin_thresh.add_argument("--plot_kin", default=True, help="Plot kinship values for visual inspection.")
-    kin_thresh.add_argument("--relatives_file", type=str, help="File containing kinship information from King.")
+    kin_thresh.add_argument("--relatives_removal_file", type=str,
+                            help="File of related individuals to remove, one sample per line.")
     #TODO run check at beginning to see that relatives file is given if run_king is False
 
     # Samples removal options #

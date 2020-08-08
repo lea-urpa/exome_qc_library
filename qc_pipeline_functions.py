@@ -316,9 +316,12 @@ def find_related_individuals(mt, mt_mafpruned, args):
     ######################################
     else:
         try:  # Try annotating relateds, if it fails exit
-            logging.info('Uploading King relatedness information + annotating matrix table.')
-            mt = sa.annotate_relateds(mt, args.relatives_file)
-            mt_mafpruned = sa.annotate_relateds(mt_mafpruned, args.relatives_file)
+            logging.info('Uploading list of relatives to remove + annotating matrix table.')
+            logging.info('Note: not removing these individuals from the dataset, but marking them for removal in '
+                         'steps such as PCA calculation. They are retained in the dataset.')
+            mt = sa.annotate_relateds(mt, args.relatives_removal_file)
+            mt_mafpruned = sa.annotate_relateds(mt_mafpruned, args.relatives_removal_file)
+
             if args.overwrite_checkpoints:
                 mt = save_checkpoint(mt, step, args)
                 mt_mafpruned = save_checkpoint(mt_mafpruned, step, args, pruned=True)
