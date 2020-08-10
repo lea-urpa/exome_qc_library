@@ -392,12 +392,45 @@ def samples_qc(mt, args):
     ##################
     mt = sq.samples_qc(mt_filtered, mt_to_annotate=mt, args=args)
 
-    # Note! This DOES NOT remove these individuals, just marks them as null in the is_case_final variable.
-    logging.info('Creating final cases statuses (with and without relatives).')
-    mt = sq.create_final_casestat(mt)
-
     if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step, args)
 
     args.cpcounter += 1
+    return mt
+
+
+def impute_sex(mt, args):
+    """
+    Impute sex before variant QC filtering, run sex-specific annotations.
+
+    :param mt:
+    :param args:
+    :return:
+    """
+    if (args.checkpoint > args.cpcounter) | args.run_king:
+        args.cpcounter += 1
+        return mt
+
+    step = 'impute_sex'
+
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'samples_qc', args)
+
+    ##########################################################
+    # Run custom variant annotation, parsing VEP annotations #
+    ##########################################################
+    mt = va.annotate_variants(mt)
+
+    logging.info('Imputing sex.')
+    mt, imputed_sex = sq.impute_sex_plot(mt, args)
+
+    # Annotate  with sex-aware annotations
+    mt = va.sex_aware_variant_annotations(mt, args)
+    mt = sa.sex_aware_sample_annotations(mt,args)
+    logging.info('Imputed sex count: ' + str(imputed_sex.aggregate(hl.agg.counter(imputed_sex.is_female))))
+
+    if args.overwrite_checkpoints:
+        mt = save_checkpoint(mt, step,  args)
+    args.cpcounter += 1
+
     return mt

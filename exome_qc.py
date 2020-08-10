@@ -222,13 +222,9 @@ if __name__ == "__main__":
         # (Excluding population outliers from analysis, but keeping them in the dataset)
         mt = qc.samples_qc(mt, args)
 
-        # MAF prune dataset for sex imputation
-        # This uses the default 0.05 (5%) MAF cutoff for common variants.
-        mt, mt_mafpruned = qc.maf_prune_sex_imputation(mt, args)
-
         # Impute sex
         # (Excluding analytical failing samples from analysis, but keeping them in the dataset)
-        mt = qc.impute_sex(mt, mt_mafpruned, args)
+        mt = qc.impute_sex(mt, args)
 
         # TODO make sure sex_aware_variant_annotations run before this step, or within this step before var qc
         # Variant QC filtering
