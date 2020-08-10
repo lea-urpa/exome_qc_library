@@ -226,13 +226,9 @@ if __name__ == "__main__":
         # (Excluding analytical failing samples from analysis, but keeping them in the dataset)
         mt = qc.impute_sex(mt, args)
 
-        # TODO make sure sex_aware_variant_annotations run before this step, or within this step before var qc
         # Variant QC filtering
         # (Excluding population outliers + analytical samples fails, but keeping them in the dataset)
-        mt = qc.variant_qc(mt, args)
-
-        # Annotate gnomad + CADD
-        mt = qc.annotate_gnomad_cadd(mt, args)
+        mt = qc.final_variant_qc(mt, args)
 
         # Filter variants missing by pheno
         # (Excluding population outliers + analytical sample fails, but keeping them in the dataset)

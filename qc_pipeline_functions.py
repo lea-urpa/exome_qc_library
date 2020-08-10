@@ -444,3 +444,32 @@ def impute_sex(mt, args):
     args.cpcounter += 1
 
     return mt
+
+
+def final_variant_qc(mt, args):
+    """
+    Performs final variant QC on the data
+
+    :param mt: matrix table to annotate failing variants
+    :param args:
+    :return:
+    """
+    if (args.checkpoint > args.cpcounter) | args.run_king:
+        args.cpcounter += 1
+        return mt
+
+    step = "final_variant_qc"
+
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'impute_sex', args)
+
+    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
+
+    logging.info('Running variant QC filtering.')
+    mt = vq.find_failing_variants(mt, args, mode='final')
+
+    if args.overwrite_checkpoints:
+        mt = save_checkpoint(mt, step, args)
+
+    args.cpcounter += 1
+    return mt
