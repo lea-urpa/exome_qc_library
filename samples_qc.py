@@ -253,6 +253,14 @@ def samples_qc(mt, mt_to_annotate, args):
     failing_any = mt.aggregate_cols(hl.agg.count_where(hl.len(mt.failing_samples_qc != 0)))
     logging.info(f"Number of samples failing samples QC on any measure: {failing_any}")
 
+    if args.pheno_col is not None:
+        cases_failing = mt.aggregate_cols(hl.agg.filter(mt[args.pheno_col] == True,
+                                                           hl.agg.count_where(hl.len(mt.failing_samples_qc != 0))))
+        controls_failing = mt.aggregate_cols(hl.agg.filter(mt[args.pheno_col] == False,
+                                                           hl.agg.count_where(hl.len(mt.failing_samples_qc != 0))))
+        logging.info(f"Cases failing QC: {cases_failing}")
+        logging.info(f"Controls failing QC: {controls_failing}")
+
     #######################################################################################################
     # Annotate original (unfiltered) matrix table with failing samples QC information + sample QC measure #
     #######################################################################################################

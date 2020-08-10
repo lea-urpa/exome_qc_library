@@ -392,10 +392,6 @@ def samples_qc(mt, args):
     ##################
     mt = sq.samples_qc(mt_filtered, mt_to_annotate=mt, args=args)
 
-
-    logging.info('Case-control counts by removal criteria:')
-    # TODO do this without pandas, just by aggregates
-
     # Note! This DOES NOT remove these individuals, just marks them as null in the is_case_final variable.
     logging.info('Creating final cases statuses (with and without relatives).')
     mt = sq.create_final_casestat(mt)
