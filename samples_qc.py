@@ -161,6 +161,16 @@ def find_pop_outliers(mt_ldpruned, mt_to_annotate, args, plots=True, max_iter=8)
 
 
 def samples_qc(mt, mt_to_annotate, args):
+    """
+    Performs samples QC on a matrix table, removing samples on chimera and contamination %, as well as being +/- 4
+    standard deviations from mean on TiTv, het/homvar, insertion/deletion ratios and n_singletons for a specific
+    batch or cohort
+
+    :param mt: matrix table, low-pass failing variants and genotypes filtered out
+    :param mt_to_annotate: matrix table to annotate with failing samples information after calculating on filtered mt
+    :param args:
+    :return: returns annotated, unfiltered matrix table
+    """
     datestr = time.strftime("%Y.%m.%d")
 
     # Run variant QC to get up to date variant QC metrics for samples QC
