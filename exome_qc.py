@@ -214,35 +214,24 @@ if __name__ == "__main__":
         mt, mt_ldpruned = qc.find_related_individuals(mt, md_ldpruned, args)
 
         # Find population outliers (excludes relatives)
-        # (Excluding related individuals from analysis, but keeping them in the dataset)
         mt = qc.find_pop_outliers(mt, mt_ldpruned, args)
 
         # Analytical samples QC (samples QC hard filters)
-        # (Excluding population outliers from analysis, but keeping them in the dataset)
         mt = qc.samples_qc(mt, args)
 
         # Impute sex
-        # (Excluding analytical failing samples from analysis, but keeping them in the dataset)
         mt = qc.impute_sex(mt, args)
 
         # Variant QC filtering
-        # (Excluding population outliers + analytical samples fails, but keeping them in the dataset)
         mt = qc.final_variant_qc(mt, args)
 
         # Filter variants missing by pheno
-        # (Excluding population outliers + analytical sample fails, but keeping them in the dataset)
         mt = qc.find_failing_variants_by_pheno(mt, args)
 
         # Calculate final PCS
-        # (Excluding population outliers + analytical sample fails + relatives but projecting them back into the PCS)
         mt = qc.calculate_final_pcs(mt, args)
 
-        # Get final case-control counts
-        # (Excluding population outliers + analytical sample fails)
-        mt = qc.case_control_genotype_counts(mt,  args)
-
         # Export matrix table columns for optmatch
-        mt = mt.filter_cols((mt.non_finns_to_remove == False) & (mt.fail_analytical == 0))
         mtcols = mt.cols()
         mtcols.export(args.output_stem + '_final_dataset_cols_passingQC.tsv')
 
