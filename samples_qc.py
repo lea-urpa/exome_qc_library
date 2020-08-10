@@ -28,7 +28,7 @@ def filter_failing(mt, args, varqc_name, entries=True, variants=True, samples=Tr
         mt = mt.filter_variants(hl.len(mt[varqc_name]) == 0, keep=True)
         tag.append("variants")
     if samples:
-        mt = mt.filter_samples((hl.len(mt.failing_samples_qc) == 0) & mt.population_outlier == False, keep=True)
+        mt = mt.filter_samples((hl.len(mt.failing_samples_qc) == 0) & mt.pop_outlier_sample == False, keep=True)
         tag.append("samples")
 
     final_count = mt.count()
@@ -324,3 +324,72 @@ def impute_sex_plot(mt, args, mt_to_annotate=None):
     else:
         return imputed_sex
 
+
+def pc_project(mt, loadings_ht, loading_location="loadings", af_location="pca_af"):
+    """
+    Projects samples in `mt` on pre-computed PCs.
+    :param MatrixTable mt: MT containing the samples to project into previously calculated PCs
+    :param Table loadings_ht: HT containing the PCA loadings and allele frequencies used for the PCA
+    :param str loading_location: Location of expression for loadings in `loadings_ht`
+    :param str af_location: Location of expression for allele frequency in `loadings_ht`
+    :return: Hail Table with scores calculated from loadings in column `scores`
+    :rtype: Table
+
+    From Konrad Karczewski
+    """
+    n_variants = loadings_ht.count()
+
+    # Annotate matrix table with pca loadings and af from other dataset which pcs were calculated from
+    mt = mt.annotate_rows(
+        pca_loadings=loadings_ht[mt.row_key][loading_location],
+        pca_af=loadings_ht[mt.row_key][af_location]
+    )
+
+    # Filter to rows where pca_loadings and af are defined, and af > 0 and < 1
+    mt = mt.filter_rows(hl.is_defined(mt.pca_loadings) & hl.is_defined(mt.pca_af) &
+                        (mt.pca_af > 0) & (mt.pca_af < 1))
+
+    # Calculate genotype normalization constant
+    # Basically, mean centers and normalizes the genotypes under the binomial distribution so that they can be
+    # multiplied by the PC loadings to get the projected principal components
+    gt_norm = (mt.GT.n_alt_alleles() - 2 * mt.pca_af) / hl.sqrt(n_variants * 2 * mt.pca_af * (1 - mt.pca_af))
+
+    mt = mt.annotate_cols(scores=hl.agg.array_sum(mt.pca_loadings * gt_norm))
+
+    return mt.cols().select('scores')
+
+
+def project_pcs_relateds(mt_ldpruned, mt, covar_pc_num):
+    """
+    Tales LD pruned matrix table, calculates PCs, and projects those PCs back to related individuals included in mt
+    :param mt_ldpruned: matrix table with relatives removed, maf and ld pruned
+    :param mt: matrix table with relatives included
+    :param covar_pc_num: Number of principal components as covariates to calculate
+    :return: returns matrix table with relatives, with PCs annotated
+    """
+    logging.info('Calculating principal components, annotating main dataset.')
+    eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_ldpruned.GT, k=covar_pc_num, compute_loadings=True)
+
+    # Project PCs to related individuals
+    # mt of related individuals only, not pop outliers or failing samples QC
+    related_mt = mt.filter_cols((mt.related_to_remove == True) & (mt.pop_outlier_sample == False) &
+                                (hl.len(mt.failing_samples_qc) == 0), keep=True)
+    mt_ldpruned = mt_ldpruned.annotate_rows(pca_af=hl.agg.mean(mt_ldpruned.GT.n_alt_alleles()) / 2)
+    mtrows = mt_ldpruned.rows()
+    loadings = loadings.annotate(pca_af=mtrows[loadings.locus, loadings.alleles].pca_af)
+    related_scores = pc_project(related_mt, loadings)
+
+    # Add pcs as annotations to main table
+    mt = mt.annotate_cols(**{'pc' + str(k+1): scores[mt.s].scores[k]
+                             for k in range(covar_pc_num)})
+    # Explanation: for k principal components in range 0 to covar_pc_num-1,
+    # make pc k+1 (to start at pc1 instead of pc0) be the corresponding score (keyed by mt.s) from the table scores
+
+    # Add pcs for related individuals
+    mt = mt.annotate_cols(**{'pc' + str(k+1): hl.or_else(mt['pc'+str(k+1)], related_scores[mt.s].scores[k])
+                             for k in range(covar_pc_num)})
+    # Explanation: for k principal components in range from 0 to (covar_pc_num-1)
+    # give either the existing pcX, or if missing give the corresponding score (keyed by mt.s)
+    # from the table related_scores
+
+    return mt

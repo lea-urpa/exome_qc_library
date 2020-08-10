@@ -8,6 +8,7 @@ import sys
 import os
 import logging
 import hail as hl
+from bokeh.io import output_file, save
 
 # Import scripts
 scripts_dir = sys.argv[sys.argv.index('--scripts_dir') + 1]  # Finds the scripts_dir arg and grabs the next string
@@ -504,3 +505,52 @@ def find_failing_variants_by_pheno(mt, args):
 
     return mt
 
+
+def calculate_final_pcs(mt, args):
+    if (args.checkpoint > args.cpcounter) | args.run_king:
+        args.cpcounter += 1
+        return mt
+
+    step = 'final_pc_calculation'
+
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'filter_variants_by_phenotype', args)
+
+    #######################################################################
+    # Filter out failing samples, variants, genotypes for PC calculations #
+    #######################################################################
+    mt_filtered = sq.filter_failing(mt, args, varqc_name=args.final_fail_name, unfilter_entries=True)
+
+    ########################
+    # Filter out relatives #
+    ########################
+    logging.info("Filtering to unrelated individuals for PC calculations.")
+    mt_norelateds = mt.filter_cols(mt_filtered.related_to_remove == False, keep=True)
+
+    ##############################################
+    # MAF prune and LD prune for calculating PCS #
+    ##############################################
+    logging.info("Filtering to common variants and LD pruning dataset.")
+    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
+    mt_mafpruned = vq.maf_filter(mt_norelateds, 0.05)
+    mt_mafpruned = save_checkpoint(mt_mafpruned, 'maf_filter_pcs', args)
+    h.remove_preemptibles(args.cluster_name)
+
+    logging.info('LD pruning final dataset for PC calculation')
+    mt_ldpruned = vq.ld_prune(mt_mafpruned, args)
+    mt_ldpruned = save_checkpoint(mt_ldpruned, 'ld_prune_pcs', args)
+
+    ################################################
+    # Calculate PCs and project to relatives, plot #
+    ################################################
+    mt = sq.project_pcs_relateds(mt_ldpruned, mt, args.covar_pc_num)
+    datestr = time.strftime("%Y.%m.%d")
+    output_file(datestr + '_final_pcs_plot.html')
+    pcplot = hl.plot.scatter(mt.pc1, mt.pc2)
+    save(pcplot)
+
+    if args.overwrite_checkpoints:
+        mt = save_checkpoint(mt, step, args)
+
+    args.cpcounter += 1
+    return mt
