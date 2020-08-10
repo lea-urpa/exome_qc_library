@@ -475,3 +475,32 @@ def final_variant_qc(mt, args):
 
     args.cpcounter += 1
     return mt
+
+
+def find_failing_variants_by_pheno(mt, args):
+    if (args.checkpoint > args.cpcounter) | args.run_king:
+        args.cpcounter += 1
+        return mt
+
+    step = "filter_variants_by_phenotype"
+
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'final_variant_qc', args)
+
+    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
+
+    if args.pheno_col is not None:
+        logging.info('Finding variants failing by phenotype.')
+        mt = vq.find_variants_failing_by_pheno(mt, args)
+
+    else:
+        logging.info("Phenotype column not given, skipping filtering variants by phenotype.")
+
+    if args.overwrite_checkpoints:
+        mt = save_checkpoint(mt, step, args)
+    args.cpcounter += 1
+
+    h.remove_preemptibles(args.cluster_name)
+
+    return mt
+

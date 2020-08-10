@@ -22,7 +22,6 @@ def parse_arguments(arguments):
                         default="GRCh38")
     params.add_argument("--test", action='store_true', help="run test with just chrom 22?")
     params.add_argument('--force', type=bool, default=True, help='Overwrite previous pipeline checkpoints?')
-    params.add_argument('--skip_ab_filter', action='store_true', help='Skip allelic balance filtering?')
     params.add_argument('--run_king', action='store_true', help='Pause pipeline to run King relatedness calculations?')
     params.add_argument('--pc_num', default=10, help="Number of PCs to calculate.")
     params.add_argument('--verbosity', type=int, default=1,
@@ -232,7 +231,7 @@ if __name__ == "__main__":
 
         # Filter variants missing by pheno
         # (Excluding population outliers + analytical sample fails, but keeping them in the dataset)
-        mt = qc.filter_missing_by_pheno(mt, args)
+        mt = qc.find_failing_variants_by_pheno(mt, args)
 
         # Calculate final PCS
         # (Excluding population outliers + analytical sample fails + relatives but projecting them back into the PCS)
