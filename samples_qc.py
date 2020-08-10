@@ -76,6 +76,7 @@ def find_pop_outliers(mt_ldpruned, mt_to_annotate, args, plots=True, max_iter=8)
     elif args.reference_genome == "GRCh37":
         chrom = "X"
     mt_ldpruned = hl.filter_rows(mt_ldpruned.locus.contig == chrom, keep=False)
+    logging.info(f"Variant count after removing chromosome x: {mt_ldpruned.count_rows()}")
 
     #########################################################################
     # Calculate PCAs, detect outliers, and repeat until outliers count == 0 #
