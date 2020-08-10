@@ -41,61 +41,6 @@ def filter_failing(mt, args, varqc_name, unfilter_entries=False):
     return mt
 
 
-def maf_filter(mt, args, filter_ac0_after_pruning=False):
-    """
-    Takes matrix table, filters out failing genotypes, variants, and samples, and MAF prunes the
-    table, and returns the matrix table
-
-    :param mt: matrix table to prune (should be LD pruned and have x chrom removed).
-    :param filter_ac0_after_pruning: filter variants no longer in the data, e.g. sum(AC) = 0?
-    :return: returns maf filtered matrix table.
-    """
-    # Run hl.variant_qc() to get AFs
-    mt = hl.variant_qc(mt)
-
-    # Filter MAF
-    logging.info(f'Filtering out variants with minor allele frequency < {args.ind_maf}')
-    mt = mt.filter_rows(mt.row.variant_qc.AF[1] > args.ind_maf, keep=True)
-    mt = mt.annotate_globals(maf_threshold_LDpruning=args.ind_maf)
-
-    if filter_ac0_after_pruning:
-        logging.info('Removing variants with alt allele count = 0 (monomorphic variants).')
-        mt = hl.variant_qc(mt)
-        mt = mt.filter_rows(hl.sum(mt.row.variant_qc.AC) == hl.int(0), keep=False)
-
-    logging.info("MAF pruned mt count:" + str(mt.count()))
-    return mt
-
-
-def ld_prune(mt, args, rm_chr_x=False):
-    """
-     LD prune and remove chromosome X from a matrix table, for calculating kinship and principal components
-
-    :param mt: matrix table to annotate, should already have related individuals removed.
-    :param args: namespace object with threshold arguments
-    :param rm_chr_x: remove chromosome x?
-    :return: returns the ld pruned matrix table
-    """
-    # LD prune
-    pruned_variant_table = hl.ld_prune(mt.GT, r2=args.r2, bp_window_size=args.bp_window_size)
-    mt_ldpruned = mt.filter_rows(hl.is_defined(pruned_variant_table[mt.row_key]))
-
-    # Remove chromosome X
-    if rm_chr_x:
-        if args.reference_genome == "GRCh38":
-            chrom = "chrX"
-        elif args.reference_genome == "GRCh37":
-            chrom = "X"
-        mt_ldpruned = hl.filter_rows(mt.locus.contig == chrom, keep=False)
-
-    logging.info(f"Variant and sample count after LD pruning: {mt_ldpruned.count()}")
-
-    mt_ldpruned = mt_ldpruned.annotate_globals(ld_pruning_parameters={'r2': args.r2,
-                                                                      'bp_window_size': args.bp_window_size})
-
-    return mt_ldpruned
-
-
 def find_pop_outliers(mt_ldpruned, mt_to_annotate, args, plots=True, max_iter=8):
     """
     Takes an LD pruned matrix table and determines which individuals are not clustering with Finns,
