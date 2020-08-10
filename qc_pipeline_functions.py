@@ -436,8 +436,10 @@ def impute_sex(mt, args):
     ########################################
     # Annotate  with sex-aware annotations #
     ########################################
-    mt = va.sex_aware_variant_annotations(mt, args)
-    mt = sa.sex_aware_sample_annotations(mt, args)
+    logging.info("Annotating sex-aware variant and sample annotations, using dataset with failing samples, variants, "
+                 "and genotypes filtered out.")
+    mt = va.sex_aware_variant_annotations(mt_filtered, mt_to_annotate=mt, args=args)
+    mt = sa.sex_aware_sample_annotations(mt_filtered, mt_to_annotate=mt, args=args)
 
     if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step,  args)

@@ -50,24 +50,27 @@ def annotate_relateds(mt, relateds_to_remove_file):
     return mt
 
 
-def sex_aware_sample_annotations(mt, sex_col='is_female_imputed', female_tag=True):
+def sex_aware_sample_annotations(mt, mt_to_annotate, args):
     """
     Creates sex-aware sample annotations for call rate
 
-    :param mt: matrix table to annotate.
-    :param sex_col: string referring to column in the matrix table with sex information
-    :param female_tag: string or boolean giving female value in the column
-    :return: Returns matrix table with additional column annotation sexaware_sample_call_rate
+    :param mt: Matrix table where failing samples and variants have been filtered out
+    :param mt_to_annotate: matrix table to copy the annotation to, without samples filtered out
+    :return: Returns non-filtered matrix table with additional column annotation sexaware_sample_call_rate
     """
-    logging.info(f"Annotating sex aware sample call rate using column {sex_col}")
+    logging.info(f"Annotating sex aware sample call rate using column {args.sex_col}")
     num_y_non_par_vars = mt.aggregate_rows(hl.agg.count_where(mt.locus.in_y_nonpar()))
     num_all_other_vars = mt.aggregate_rows(hl.agg.count_where(~mt.locus.in_y_nonpar()))
 
     mt = mt.annotate_cols(sexaware_sample_call_rate=(hl.case()
-                                                     .when(mt[sex_col] == female_tag,
+                                                     .when(mt[args.sex_col] == args.female_tag,
                                                            hl.agg.count_where(hl.is_defined(mt.GT) &
                                                                               ~mt.locus.in_y_nonpar()) /
                                                            num_all_other_vars)
                                                      .default(hl.agg.count_where(hl.is_defined(mt.GT)) /
                                                               (num_y_non_par_vars + num_all_other_vars))))
-    return mt
+
+    mt_to_annotate = mt_to_annotate.annotate_cols(sexaware_sample_call_rate=
+                                                  mt.cols()[mt_to_annotate.s].sexaware_sample_call_rate)
+
+    return mt_to_annotate

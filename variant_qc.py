@@ -493,11 +493,11 @@ def find_failing_variants(mt, args, mode):
 
     # Find variants not passing call rate filter #
     if mode == "final":
-        logging.info("Finding variants not passing call rate filter, using sex-aware call rate ")
+        logging.info("Finding variants not passing call rate filter, using sex-aware variant call rate ")
         call_rate_cond = mt_filt.row.sexaware_call_rate < args.min_call_rate
 
     else:  # low-pass
-        logging.info("Finding variants not passing call rate filter, NOT using sex-aware call rate ")
+        logging.info("Finding variants not passing call rate filter, NOT using sex-aware variant call rate ")
         call_rate_cond = mt_filt[varqc_name].call_rate < args.min_call_rate
 
     call_rate_filter = hl.cond(call_rate_cond, mt_filt[failing_name].append("failing_call_rate"), mt_filt[failing_name])
