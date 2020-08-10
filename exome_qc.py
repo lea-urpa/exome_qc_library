@@ -91,6 +91,14 @@ def parse_arguments(arguments):
                             help="File of related individuals to remove, one sample per line.")
     #TODO run check at beginning to see that relatives file is given if run_king is False
 
+    # Pop outlier options #
+    pop_opts = parser.add_argument_group("Options for population outlier removal")
+    pop_opts.add_argument("--pop_sd_threshold", default=4,
+                          help="Number of standard deviations from mean of PC1 and PC2 on which we mark samples as "
+                               "population outliers.")
+    pop_opts.add_argument("--pca_plot_annotations", type=str,
+                          help="column annotations with which to annotate PCA plots, comma separated if > 1.")
+
     # Samples removal options #
     samples_removal = parser.add_argument_group("Arbitrary sample removal options.")
     samples_removal.add_argument("--sample_removal_strings", type=str,
@@ -187,6 +195,8 @@ if __name__ == "__main__":
 
         # Annotate samples
         mt = qc.annotate_samples(mt, args)
+        # TODO add check in this function that pheno col, pca_plot_annotations, any other name column annotations
+        # actually exist in the dataset after annotating samples.
 
         # Phenotype Samples QC
         mt = qc.remove_samples(mt, args)
