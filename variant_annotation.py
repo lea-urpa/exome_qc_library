@@ -123,7 +123,7 @@ def annotate_variants(mt):
     return mt
 
 
-def sex_aware_variant_annotations(mt, sex_col='sex', male_tag='Male', female_tag='Female'):
+def sex_aware_variant_annotations(mt, sex_col='is_female_imputed', male_tag=False, female_tag=True):
     '''
     Creates sex-aware variant annotations for call rate, allele count, and allele number.
 
