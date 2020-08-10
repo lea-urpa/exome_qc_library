@@ -17,6 +17,7 @@ for script in scripts:
 
 import samples_annotation as sa
 import helper_scripts as h
+import variant_annotation as va
 import variant_qc as vq
 import samples_qc as sq
 
@@ -427,6 +428,7 @@ def impute_sex(mt, args):
     mt_filtered = sq.filter_failing(mt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
 
     mt_maffilt = vq.maf_filter(mt_filtered, 0.05)
+
 
     logging.info('Imputing sex.')
     mt, imputed_sex = sq.impute_sex_plot(mt_maffilt, args)
