@@ -33,26 +33,17 @@ def maf_filter(mt, args, filter_ac0_after_pruning=False):
     return mt
 
 
-def ld_prune(mt, args, rm_chr_x=False):
+def ld_prune(mt, args):
     """
-     LD prune and remove chromosome X from a matrix table, for calculating kinship and principal components
+     LD prune a matrix table, for calculating kinship and principal components
 
     :param mt: matrix table to annotate, should already have related individuals removed.
     :param args: namespace object with threshold arguments
-    :param rm_chr_x: remove chromosome x?
     :return: returns the ld pruned matrix table
     """
     # LD prune
     pruned_variant_table = hl.ld_prune(mt.GT, r2=args.r2, bp_window_size=args.bp_window_size)
     mt_ldpruned = mt.filter_rows(hl.is_defined(pruned_variant_table[mt.row_key]))
-
-    # Remove chromosome X
-    if rm_chr_x:
-        if args.reference_genome == "GRCh38":
-            chrom = "chrX"
-        elif args.reference_genome == "GRCh37":
-            chrom = "X"
-        mt_ldpruned = hl.filter_rows(mt.locus.contig == chrom, keep=False)
 
     logging.info(f"Variant and sample count after LD pruning: {mt_ldpruned.count()}")
 
