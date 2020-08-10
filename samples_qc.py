@@ -161,6 +161,7 @@ def find_pop_outliers(mt_ldpruned, mt_to_annotate, args, plots=True, max_iter=8)
 
 
 def samples_qc(mt, mt_to_annotate, args):
+    datestr = time.strftime("%Y.%m.%d")
 
     # Run variant QC to get up to date variant QC metrics for samples QC
     mt = hl.sample_qc(mt)
@@ -221,8 +222,25 @@ def samples_qc(mt, mt_to_annotate, args):
             # Collect thresholds for each batch
             batch_thresholds[batch][measure] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
 
-            # Do box plots for values
+    ##########################################
+    # Create box plots for samples QC values #
+    ##########################################
+    # Convert batch strings to numeric values
+    batch_set_numeric = list(range(len(batch_set)))
+    batch_key = list(zip(batch_set, batch_set_numeric))
 
+    mt_cols = mt.cols()
+    mt_cols = mt_cols.annotate(plot_batch=0)
+
+    for batch in batch_key:
+        mt_cols = mt_cols.annotate(plot_batch=hl.cond(mt_cols[args.batch_col_name] == batch[0],
+                                                      batch[1], mt_cols.plot_batch))
+
+    output_file(f"samples_qc_measure_plots_{datestr}.html")
+    for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
+        p = hl.plot.scatter(mt_cols.plot_batch, mt_cols.sample_qc[measure], label=mt_cols[args.batch_col_name],
+                            title=f"{measure} values split by batch.")
+        save(p)
 
     ##########################
     # Report failing samples #
@@ -238,7 +256,6 @@ def samples_qc(mt, mt_to_annotate, args):
     #######################################################################################################
     # Annotate original (unfiltered) matrix table with failing samples QC information + sample QC measure #
     #######################################################################################################
-    mt_cols = mt.cols()
     mt_to_annotate = mt_to_annotate.annotate_cols(sample_qc=mt_cols[mt_to_annotate.s].sample_qc)
     mt_to_annotate = mt_to_annotate.annotate_cols(failing_samples_qc=mt_cols[mt_to_annotate.s].failing_samples_qc)
 
@@ -250,6 +267,5 @@ def samples_qc(mt, mt_to_annotate, args):
                                                       'batch_cohort_name': args.batch_col_name})
 
     mt_to_annotate = mt_to_annotate.annotate_globals(samples_qc_batch_thresholds=batch_thresholds)
-
 
     return mt_to_annotate
