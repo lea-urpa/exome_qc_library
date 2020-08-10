@@ -216,7 +216,7 @@ def low_pass_var_qc(mt, args):
     return mt
 
 
-def maf_LDprune_relatedness(mt, args):
+def maf_ldprune_relatedness(mt, args):
     """
     MAF prunes dataset for relatedness calculations in King.
 
@@ -245,17 +245,12 @@ def maf_LDprune_relatedness(mt, args):
     ###############################
     # Filter out low MAF variants #
     ###############################
-    mt_maffilt = sq.maf_filter(mt_filtered, args,  filter_ac0_after_pruning=True)
+    mt_maffilt = sq.maf_filter(mt_filtered, args)
 
-    ################################################
-    # LD prune if there are more than 80k variants #
-    ################################################
-    if not mt_maffilt.row_count() < 80000:
-        mt_ldpruned = sq.ld_prune(mt_maffilt, args)
-    else:
-        logging.info("Detected MAF filtered dataset already has less than 80 000 variants, skipping LD pruning for King"
-                     "relatedness calculations.")
-        mt_ldpruned = mt_maffilt
+    ####################
+    # LD prune dataset #
+    ####################
+    mt_ldpruned = sq.ld_prune(mt_maffilt, args)
 
     h.remove_preemptibles(args.cluster_name)
 
@@ -337,3 +332,5 @@ def find_related_individuals(mt, mt_mafpruned, args):
 
             args.cpcounter += 1
             return mt, mt_mafpruned
+
+

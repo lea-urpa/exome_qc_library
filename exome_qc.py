@@ -194,12 +194,11 @@ if __name__ == "__main__":
         # Low-pass variant QC
         mt = qc.low_pass_var_qc(mt, args)
 
-        # Export data to find related individuals in King, if necessary
-        mt, mt_mafpruned = qc.find_related_individuals(mt, args)
+        # LD Prune and MAF filter dataset for relatedness
+        mt, md_ldpruned = qc.maf_ldprune_relatedness(mt, args)
 
-        # LD prune MAF pruned dataset
-        # This uses MAF 0.01 (1%) cutoff since that's what we exported to King before. Should be fine.
-        mt, mt_ldpruned = qc.ld_prune_popoutliers(mt, mt_mafpruned, args)
+        # Export data to find related individuals in King, if necessary
+        mt, mt_ldpruned = qc.find_related_individuals(mt, md_ldpruned, args)
 
         # Find population outliers (excludes relatives)
         # (Excluding related individuals from analysis, but keeping them in the dataset)

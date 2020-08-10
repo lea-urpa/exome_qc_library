@@ -56,6 +56,7 @@ def maf_filter(mt, args, filter_ac0_after_pruning=False):
     mt = mt.annotate_globals(maf_threshold_LDpruning=args.ind_maf)
 
     if filter_ac0_after_pruning:
+        logging.info('Removing variants with alt allele count = 0 (monomorphic variants).')
         mt = hl.variant_qc(mt)
         mt = mt.filter_rows(hl.sum(mt.row.variant_qc.AC) == hl.int(0), keep=False)
 
