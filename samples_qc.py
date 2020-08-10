@@ -287,3 +287,36 @@ def samples_qc(mt, mt_to_annotate, args):
     mt_to_annotate = mt_to_annotate.annotate_globals(samples_qc_batch_thresholds=batch_thresholds)
 
     return mt_to_annotate
+
+
+def impute_sex_plot(mt, args, mt_to_annotate=None):
+    """
+    Impute sex of individuals and plot resultant f stat values
+    :param mt: maf pruned matrix table to caculate f stat values
+    :param mt_to_annotate: matrix table to add sex information to
+    :return: returns either annotated matrix table and imputed sex Hail table, if mt_to_annotate is not None,
+    or else just the imputed sex Hail table.
+    """
+    datestr = time.strftime("%Y.%m.%d")
+    imputed_sex = hl.impute_sex(mt.GT, female_threshold=args.female_threshold, male_threshold=args.male_threshold)
+
+    sex_count = imputed_sex.aggregate(hl.agg.counter(imputed_sex.is_female))
+
+    logging.info(f'Imputed sex count: {sex_count}')
+
+    fstat_stats = imputed_sex.aggregate(hl.agg.stats(imputed_sex.f_stat))
+    fstat_hist = imputed_sex.aggregate(hl.agg.hist(imputed_sex.f_stat, fstat_stats.min, fstat_stats.max, 50))
+
+    output_file(f"Imputed_sex_fstat_hist_{datestr}.html")
+    p = hl.plot.histogram(fstat_hist, legend='F stat', title='F stat histogram')
+    save(p)
+
+    if mt_to_annotate is not None:
+        mt_to_annotate = mt_to_annotate.annotate_cols(is_female_imputed=imputed_sex[mt_to_annotate.s].is_female)
+        mt_to_annotate = mt_to_annotate.annotate_globals(sex_imputation_thresholds=
+                                                         {'female_threshold': args.female_threshold,
+                                                          'male_threshold': args.male_threshold})
+        return mt_to_annotate, imputed_sex
+    else:
+        return imputed_sex
+

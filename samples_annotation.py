@@ -3,6 +3,7 @@ Functions for annotating samples in a matrix table with Hail.
 
 Author: Lea Urpa, August 2020
 """
+import logging
 import hail as hl
 
 
@@ -46,4 +47,27 @@ def annotate_relateds(mt, relateds_to_remove_file):
     mt = mt.annotate_cols(related_to_remove=relatives[mt.s].related_to_remove)
     mt = mt.annotate_cols(related_to_remove=hl.or_else(mt.related_to_remove, False))
 
+    return mt
+
+
+def sex_aware_sample_annotations(mt, sex_col='is_female_imputed', female_tag=True):
+    """
+    Creates sex-aware sample annotations for call rate
+
+    :param mt: matrix table to annotate.
+    :param sex_col: string referring to column in the matrix table with sex information
+    :param female_tag: string or boolean giving female value in the column
+    :return: Returns matrix table with additional column annotation sexaware_sample_call_rate
+    """
+    logging.info(f"Annotating sex aware sample call rate using column {sex_col}")
+    num_y_non_par_vars = mt.aggregate_rows(hl.agg.count_where(mt.locus.in_y_nonpar()))
+    num_all_other_vars = mt.aggregate_rows(hl.agg.count_where(~mt.locus.in_y_nonpar()))
+
+    mt = mt.annotate_cols(sexaware_sample_call_rate=(hl.case()
+                                                     .when(mt[sex_col] == female_tag,
+                                                           hl.agg.count_where(hl.is_defined(mt.GT) &
+                                                                              ~mt.locus.in_y_nonpar()) /
+                                                           num_all_other_vars)
+                                                     .default(hl.agg.count_where(hl.is_defined(mt.GT)) /
+                                                              (num_y_non_par_vars + num_all_other_vars))))
     return mt

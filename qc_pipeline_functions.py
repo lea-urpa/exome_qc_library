@@ -423,20 +423,21 @@ def impute_sex(mt, args):
     mt = va.annotate_variants(mt)
 
     ##################################################################################
-    # Filter out failing genotypes, samples, and variants, filter to common variants #
+    # Filter to common variants, filter out failing genotypes, samples, and variants #
     ##################################################################################
-    mt_filtered = sq.filter_failing(mt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
+    mt_maffilt = vq.maf_filter(mt, 0.05)
+    mt_filtered = sq.filter_failing(mt_maffilt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
 
-    mt_maffilt = vq.maf_filter(mt_filtered, 0.05)
+    ##############
+    # Impute sex #
+    ##############
+    mt, imputed_sex = sq.impute_sex_plot(mt_filtered, mt_to_annotate=mt, args=args)
 
-
-    logging.info('Imputing sex.')
-    mt, imputed_sex = sq.impute_sex_plot(mt_maffilt, args)
-
-    # Annotate  with sex-aware annotations
+    ########################################
+    # Annotate  with sex-aware annotations #
+    ########################################
     mt = va.sex_aware_variant_annotations(mt, args)
-    mt = sa.sex_aware_sample_annotations(mt,args)
-    logging.info('Imputed sex count: ' + str(imputed_sex.aggregate(hl.agg.counter(imputed_sex.is_female))))
+    mt = sa.sex_aware_sample_annotations(mt, args)
 
     if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step,  args)
