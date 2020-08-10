@@ -109,13 +109,17 @@ def parse_arguments(arguments):
 
     # Samples QC thresholds #
     samples_thresh = parser.add_argument_group("Samples QC thresholds.")
-    samples_thresh.add_argument("--batches", action='store_true', help="Stratify samples QC by batch/cohort?")
-    samples_thresh.add_argument("--batch_cohort_name", type=str, help="Samples annotation giving cohort or batch")
+    samples_thresh.add_argument("--chimeras_col", required=True, type=str,
+                                help="Column in matrix table or annotation files giving sample chimera percentage")
     samples_thresh.add_argument("--chimeras_max", default=0.05, help="Max % of chimeras allowed for sample")
+    samples_thresh.add_argument("--contamination_col", required=True, type=str,
+                                help="Column in matrix table or annotation files giving sample contamination percent.")
     samples_thresh.add_argument("--contamination_max", default=0.05, help="Max % contamination allowed for sample")
-    samples_thresh.add_argument("--std_dev", default=4,
+    samples_thresh.add_argument("--batch_col_name", type=str,
+                                help="Samples annotation in matrix table or annotation giving batch/cohort for "
+                                     "stratified samples QC (TiTv, het/homvar, indel ratios, n singletons).")
+    samples_thresh.add_argument("--sampleqc_sd_threshold", default=4,
                                 help="Number of standard deviations from mean sample can deviate on heterozygosity.")
-    samples_thresh.add_argument("--center_measure", default="mad", choices=['mad', 'std_dev'])
 
     # Impute sex thresholds #
     sex_thresh = parser.add_argument_group("Impute sex thresholds.")

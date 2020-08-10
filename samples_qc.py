@@ -10,7 +10,7 @@ import hail as hl
 from bokeh.io import output_file, save
 
 
-def filter_failing(mt, args, varqc_name, unfilter_entries=False):
+def filter_failing(mt, args, varqc_name, entries=True, variants=True, samples=True, unfilter_entries=False):
     """
 
     :param mt:
@@ -19,15 +19,23 @@ def filter_failing(mt, args, varqc_name, unfilter_entries=False):
     :param unfilter_entries: Unfilter entries following maf pruning? Necessary to run PCA later.
     :return:
     """
-    logging.info("Removing failing + pop outlier samples, genotypes, and variants, "
-                 "including genotypes failing on allelic balance.")
     start_count = mt.count()
-
-    mt = mt.filter_entries((hl.len(mt.failing_depth_quality) == 0) & hl.len(mt.failing_ab) == 0, keep=True)
-    mt = mt.filter_samples((hl.len(mt.failing_samples_qc) == 0) & mt.population_outlier == False, keep=True)
-    mt = mt.filter_variants(hl.len(mt[varqc_name]) == 0, keep=True)
+    tag = []
+    if entries:
+        mt = mt.filter_entries((hl.len(mt.failing_depth_quality) == 0) & hl.len(mt.failing_ab) == 0, keep=True)
+        tag.append("entries")
+    if variants:
+        mt = mt.filter_variants(hl.len(mt[varqc_name]) == 0, keep=True)
+        tag.append("variants")
+    if samples:
+        mt = mt.filter_samples((hl.len(mt.failing_samples_qc) == 0) & mt.population_outlier == False, keep=True)
+        tag.append("samples")
 
     final_count = mt.count()
+
+    logging.info(f"Removing failing {', '.join(tag)}.")
+    if entries:
+        logging.info("Including entries failing allelic balance.")
 
     logging.info(f"Matrix table count before filtering: {start_count}. After filtering: {final_count}")
 
@@ -149,4 +157,99 @@ def find_pop_outliers(mt_ldpruned, mt_to_annotate, args, plots=True, max_iter=8)
     mt_to_annotate.filter_cols(mt_to_annotate.pop_outlier_sample == True, keep=True).s.show()
 
     # Return mt and samples list
+    return mt_to_annotate
+
+
+def samples_qc(mt, mt_to_annotate, args):
+
+    # Run variant QC to get up to date variant QC metrics for samples QC
+    mt = hl.sample_qc(mt)
+
+    # Instantiate empty array for failing samples QC tags
+    mt = mt.annotate_cols(failing_samples_qc=hl.empty_array(hl.tstr))
+
+    ############################################################
+    # Find samples failing on chimeras or contamination values #
+    ############################################################
+    mt = mt.annotate_cols(failing_samples_qc=hl.cond(hl.float(mt[args.chimeras_col]) > args.chimeras_max,
+                                                     mt.failing_samples_qc.append("failing_chimeras"),
+                                                     mt.failing_samples_qc))
+
+    mt = mt.annotate_cols(failing_samples_qc=hl.cond(hl.float(mt[args.contamination_col]) > args.contamination_max,
+                                                     mt.failing_samples_qc.append("failing_contamination"),
+                                                     mt.failing_samples_qc))
+
+    failing_chim = mt.aggregate_cols(mt.failing_samples_qc.contains("failing_chimeras"))
+    failing_contam = mt.aggregate_cols(mt.failing_samples_qc.contains("failing_contamination"))
+
+    logging.info(f"Number of samples failing on chimeras %: {failing_chim}")
+    logging.info(f"Number of samples failing on contamination %: {failing_contam}")
+
+    ######################################################################################
+    # Find samples failing per-cohort on titv, het_homvar ratio, indel, and # singletons #
+    ######################################################################################
+    if args.batch_col_name is not None:
+        batch_set = mt.aggregate_cols(hl.agg.collect_as_set(mt[args.batch_col_name]))
+    else:
+        args.batch_col_name = "mock_batch_col"
+        mt = mt.annotate_cols(mock_batch_col="all")
+        batch_set = ["all"]
+
+    batch_thresholds = {}
+    for batch in batch_set:
+        batch_thresholds[batch] = {}
+        for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
+            # Get mean and standard deviation for each measure, for each batch's samples
+            stats = mt.aggregate_cols(hl.agg.filter(mt[args.batch_col_name] == batch,
+                                                    hl.agg.stats(mt.sample_qc[measure])))
+
+            # Get cutoffs for each measure
+            cutoff_upper = stats.mean + (args.sampleqc_sd_threshold * stats.stdev)
+            cutoff_lower = stats.mean - (args.sampleqc_sd_threshold * stats.stdev)
+
+            if measure == "n_singleton":
+                logging.info(f"Max number of singletons for batch {batch}: {stats.max}")
+
+            mt = mt.annotate_cols(failing_samples_qc=hl.cond(mt.sample_qc[measure] > cutoff_upper,
+                                                             mt.failing_samples_qc.append(f"failing_{measure}"),
+                                                             mt.failing_samples_qc))
+
+            mt = mt.annotate_cols(failing_samples_qc=hl.cond(mt.sample_qc[measure] < cutoff_lower,
+                                                             mt.failing_samples_qc.append(f"failing_{measure}"),
+                                                             mt.failing_samples_qc))
+
+            # Collect thresholds for each batch
+            batch_thresholds[batch][measure] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
+
+            # Do box plots for values
+
+
+    ##########################
+    # Report failing samples #
+    ##########################
+    for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
+        failing_count = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains([f"failing_{measure}"])))
+
+        logging.info(f"Number of samples failing on {measure}: {failing_count}")
+
+    failing_any = mt.aggregate_cols(hl.agg.count_where(hl.len(mt.failing_samples_qc != 0)))
+    logging.info(f"Number of samples failing samples QC on any measure: {failing_any}")
+
+    #######################################################################################################
+    # Annotate original (unfiltered) matrix table with failing samples QC information + sample QC measure #
+    #######################################################################################################
+    mt_cols = mt.cols()
+    mt_to_annotate = mt_to_annotate.annotate_cols(sample_qc=mt_cols[mt_to_annotate.s].sample_qc)
+    mt_to_annotate = mt_to_annotate.annotate_cols(failing_samples_qc=mt_cols[mt_to_annotate.s].failing_samples_qc)
+
+    mt_to_annotate = mt_to_annotate.annotate_globals(samples_qc_thresholds=
+                                                     {'chimeras_max': str(args.chimeras_max),
+                                                      'contamination_max': str(args.contamination_max),
+                                                      'deviation_multiplier_threshold': str(args.sampleqc_sd_threshold),
+                                                      'batches': batch_set,
+                                                      'batch_cohort_name': args.batch_col_name})
+
+    mt_to_annotate = mt_to_annotate.annotate_globals(samples_qc_batch_thresholds=batch_thresholds)
+
+
     return mt_to_annotate

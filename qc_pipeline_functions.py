@@ -245,12 +245,12 @@ def maf_ldprune_relatedness(mt, args):
     ###############################
     # Filter out low MAF variants #
     ###############################
-    mt_maffilt = sq.maf_filter(mt_filtered, args)
+    mt_maffilt = vq.maf_filter(mt_filtered, args)
 
     ####################
     # LD prune dataset #
     ####################
-    mt_ldpruned = sq.ld_prune(mt_maffilt, args)
+    mt_ldpruned = vq.ld_prune(mt_maffilt, args)
 
     h.remove_preemptibles(args.cluster_name)
 
@@ -365,3 +365,43 @@ def find_pop_outliers(mt, mt_ldpruned, args):
     args.cpcounter += 1
     return mt
 
+
+def samples_qc(mt, args):
+    """
+    Performs samples quality control on the dataset
+    :param mt: matrix table to analyze
+    :param args:
+    :return: returns matrix table annotated with samples failing analytical samples QC
+    """
+    if (args.checkpoint > args.cpcounter) | args.run_king:
+        args.cpcounter += 1
+        return mt
+
+    step = "samples_qc"
+
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'find_pop_outliers', args)
+
+    ######################################################
+    # Filter failing variants + genotypes for samples QC #
+    ######################################################
+    mt_filtered = sq.filter_failing(mt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
+
+    ##################
+    # Run samples QC #
+    ##################
+    mt = sq.samples_qc(mt_filtered, mt_to_annotate=mt, args=args)
+
+
+    logging.info('Case-control counts by removal criteria:')
+    # TODO do this without pandas, just by aggregates
+
+    # Note! This DOES NOT remove these individuals, just marks them as null in the is_case_final variable.
+    logging.info('Creating final cases statuses (with and without relatives).')
+    mt = sq.create_final_casestat(mt)
+
+    if args.overwrite_checkpoints:
+        mt = save_checkpoint(mt, step, args)
+
+    args.cpcounter += 1
+    return mt
