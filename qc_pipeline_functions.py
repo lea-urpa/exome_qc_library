@@ -245,7 +245,7 @@ def maf_ldprune_relatedness(mt, args):
     ###############################
     # Filter out low MAF variants #
     ###############################
-    mt_maffilt = vq.maf_filter(mt_filtered, args)
+    mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf)
 
     ####################
     # LD prune dataset #
@@ -421,8 +421,15 @@ def impute_sex(mt, args):
     ##########################################################
     mt = va.annotate_variants(mt)
 
+    ##################################################################################
+    # Filter out failing genotypes, samples, and variants, filter to common variants #
+    ##################################################################################
+    mt_filtered = sq.filter_failing(mt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
+
+    mt_maffilt = vq.maf_filter(mt_filtered, 0.05)
+
     logging.info('Imputing sex.')
-    mt, imputed_sex = sq.impute_sex_plot(mt, args)
+    mt, imputed_sex = sq.impute_sex_plot(mt_maffilt, args)
 
     # Annotate  with sex-aware annotations
     mt = va.sex_aware_variant_annotations(mt, args)

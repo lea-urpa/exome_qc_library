@@ -7,7 +7,7 @@ import logging
 import hail as hl
 
 
-def maf_filter(mt, args, filter_ac0_after_pruning=False):
+def maf_filter(mt, maf, filter_ac0_after_pruning=False):
     """
     Takes matrix table, filters out failing genotypes, variants, and samples, and MAF prunes the
     table, and returns the matrix table
@@ -20,9 +20,9 @@ def maf_filter(mt, args, filter_ac0_after_pruning=False):
     mt = hl.variant_qc(mt)
 
     # Filter MAF
-    logging.info(f'Filtering out variants with minor allele frequency < {args.ind_maf}')
-    mt = mt.filter_rows(mt.row.variant_qc.AF[1] > args.ind_maf, keep=True)
-    mt = mt.annotate_globals(maf_threshold_LDpruning=args.ind_maf)
+    logging.info(f'Filtering out variants with minor allele frequency < {maf}')
+    mt = mt.filter_rows(mt.row.variant_qc.AF[1] > maf, keep=True)
+    mt = mt.annotate_globals(maf_threshold_LDpruning=maf)
 
     if filter_ac0_after_pruning:
         logging.info('Removing variants with alt allele count = 0 (monomorphic variants).')
