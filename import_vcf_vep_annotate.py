@@ -25,7 +25,7 @@ if __name__ == "__main__":
                         help="Bucket and folder containing the scripts for this library.")
     parser.add_argument("--log_dir", type=str, required=True, help="Bucket and folder where logs should be written to.")
     parser.add_argument("--data_dir", type=str, required=True, help="Bucket and folder where VCFs to import exist.")
-    parser.add_argument("--vep_config", default="gs://hail-us-vep/vep85-loftee-gcloud.json",
+    parser.add_argument("--vep_config", default="gs://hail-us-vep/vep95-GRCh38-loftee-gcloud.json",
                         help="Location of Hail VEP configuration json file. Default for cluster started with --vep")
     parser.add_argument("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
                         help="Reference genome build.")
