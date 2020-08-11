@@ -485,7 +485,7 @@ def final_variant_qc(mt, args):
 
     :param mt: matrix table to annotate failing variants
     :param args:
-    :return:
+    :return: returns matrix table with variants failing final QC annotated
     """
     if (args.checkpoint > args.cpcounter) | args.run_king:
         args.cpcounter += 1
@@ -509,6 +509,12 @@ def final_variant_qc(mt, args):
 
 
 def find_failing_variants_by_pheno(mt, args):
+    """
+    Finds variants failing on per-phenotype information- allelic balance and call rate, in cases and controls separately
+    :param mt: matrix table to annotate
+    :param args:
+    :return: matrix table with new row annotation for variants failing per-phenotype QC
+    """
     if (args.checkpoint > args.cpcounter) | args.run_king:
         args.cpcounter += 1
         return mt
@@ -537,6 +543,15 @@ def find_failing_variants_by_pheno(mt, args):
 
 
 def calculate_final_pcs(mt, args):
+    """
+    Calculates final principal components, after filtering out failing samples and variants, and annotates unfiltered
+    matrix table. Removes relatives and projects them back with PC loadings.
+
+    :param mt: matrix table on which sample and variant QC has been run
+    :param args:
+    :return: matrix table annotate with principal components.
+    """
+
     if (args.checkpoint > args.cpcounter) | args.run_king:
         args.cpcounter += 1
         return mt
