@@ -186,10 +186,10 @@ def find_failing_genotypes_ab(mt, args, prefix):
     ###################################################
     # Report number and percent of genotypes excluded #
     ###################################################
-    logging.info("Genotypes failing ab, after excluding low DP and low GQ genotypes:")
+    logging.info("\nGenotypes failing ab, after excluding low DP and low GQ genotypes:")
     logging.info(f"Number of het GTs failing ab: {hets_failing_ab}({het_failing_ab_perc}%)")
-    logging.info(f"Number of hom ref GTs excluded: {homref_failing_ab} ({homref_failing_ab_perc}%)")
-    logging.info(f"Number of hom alt GTs excluded: {homalt_failing_ab} ({homalt_failing_ab_perc})")
+    logging.info(f"Number of hom ref GTs failing_ab: {homref_failing_ab} ({homref_failing_ab_perc}%)")
+    logging.info(f"Number of hom alt GTs failing_ab: {homalt_failing_ab} ({homalt_failing_ab_perc})")
 
     global_fail_annot = prefix + "_genotype_qc_failing_ab"
     mt = mt.annotate_globals(**{global_fail_annot:
