@@ -129,6 +129,28 @@ def annotate_samples(mt, args):
     for file in annotation_files:
         mt = sa.annotate_cols_from_file(mt, file, args)
 
+    # Check that particular needed columns exist
+    columns = ['samples_col', 'chimeras_col', 'contamination_col']
+
+    if args.fam_id is not None:
+        columns.append('fam_id')
+    if args.pat_id is not None:
+        columns.append('pad_id')
+    if args.mat_id is not None:
+        columns.append('mat_id')
+    if args.batch_col_name is not None:
+        columns.append('batch_col_name')
+    if args.pheno_col is not None:
+        columns.append('pheno_col')
+
+    for colname in columns:
+        try:
+            test = hl.is_defined(mt[colname])
+        except Exception as e:
+            logging.error(f"Error! Given column annotation {colname} does not actually exist after inputting sample"
+                          f"annotations.")
+            logging.error(e)
+
     if args.force:
         mt = save_checkpoint(mt, step, args)
 

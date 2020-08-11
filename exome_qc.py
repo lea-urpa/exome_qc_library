@@ -287,7 +287,6 @@ if __name__ == "__main__":
 
         # Annotate samples
         mt = qc.annotate_samples(mt, args)
-        # TODO add check in this function that pheno col, pca_plot_annotations, any other name column annotations
         # actually exist in the dataset after annotating samples.
 
         # Phenotype Samples QC
