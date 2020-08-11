@@ -3,6 +3,8 @@ Script for doing exome sequencing data quality control from a Hail matrix table 
 
 Author: Lea Urpa, August 2020
 """
+import subprocess
+import shlex
 import argparse
 
 
@@ -21,7 +23,8 @@ def parse_arguments(arguments):
     params.add_argument("--reference_genome", type=str, help="Reference_genome", choices=["GRCh37", "GRCh38"],
                         default="GRCh38")
     params.add_argument("--test", action='store_true', help="run test with just chrom 22?")
-    params.add_argument('--force', type=bool, default=True, help='Overwrite previous pipeline checkpoints?')
+    params.add_argument('--overwrite_checkpoints', type=bool, default=True,
+                        help='Overwrite previous pipeline checkpoints?')
     params.add_argument('--run_king', action='store_true', help='Pause pipeline to run King relatedness calculations?')
     params.add_argument('--pc_num', default=10, help="Number of PCs to calculate.")
     params.add_argument('--verbosity', type=int, default=1,
@@ -34,6 +37,7 @@ def parse_arguments(arguments):
     inputs.add_argument("-mt", type=str, help="Name of matrix table to run QC pipeline on.")
     inputs.add_argument("--out_name", type=str, help="Output name ")
     inputs.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
+    inputs.add_argument("--region", default='europe-west1', help='Region name for scaling in pipeline.')
     inputs.add_argument("--out_dir", type=str, help="Directory to write output data to.")
     inputs.add_argument("--log_dir", type=str, help="Directory to write logs to.")
     inputs.add_argument("--scripts_dir", type=str, help="Directory containing python scripts.")
@@ -88,7 +92,6 @@ def parse_arguments(arguments):
     kin_thresh.add_argument("--plot_kin", default=True, help="Plot kinship values for visual inspection.")
     kin_thresh.add_argument("--relatives_removal_file", type=str,
                             help="File of related individuals to remove, one sample per line.")
-    #TODO run check at beginning to see that relatives file is given if run_king is False
 
     # Pop outlier options #
     pop_opts = parser.add_argument_group("Options for population outlier removal")
@@ -133,11 +136,96 @@ def parse_arguments(arguments):
     pheno_thresh.add_argument("--pheno_call_rate", default=0.95,
                               help="Min call rate for variant, in cases + controls separately.")
 
-    # TODO add check to make sure all input files exist before running pipeline
-
     parsed_args = parser.parse_args(arguments)
 
     return parsed_args
+
+
+def check_inputs(parsed_args):
+    ################################################################
+    # Check that relatives removal file given if run_king is false #
+    ################################################################
+    if (parsed_args.run_kin is False) and (parsed_args.relatives_removal_file is None):
+        logging.error("Error! If --run_king is false, then give the file with list of relatives to remove with "
+                      "--relatives_removal_file")
+        exit(1)
+
+    ##################################
+    # Check that input folders exist #
+    ##################################
+    dirs = ['mt', 'scripts_dir']
+    for d in dirs:
+        dir = getattr(parsed_args, d)
+        if not dir.enswith("/"):  # add ending slash or qstat fails for directories
+            dir = dir + "/"
+        stat_cmd = ['gsutil', '-q', 'stat', dir]
+
+        status = subprocess.call(stat_cmd)
+        if status != 0:
+            logging.error(f"Error! Input directory {dir} does not exist!")
+            exit(1)
+
+    ################################
+    # Check that input files exist #
+    ################################
+    files = ['bam_metadata', 'relatives_removal_file', 'sample_removal_list']
+
+    multi_files = parsed_args.samples_annotation_files.strip().split(",")
+    files.extend(multi_files)
+
+    for f in files:
+        file = getattr(parsed_args, f)
+        if file is not None:
+            if file.endswith("/"):
+                file = file.rstrip("/")  # remove ending slash or qstat fails for files
+
+            stat_cmd = ['gsutil', '-q', 'stat', file]
+            status = subprocess.call(stat_cmd)
+
+            if status != 0:
+                logging.error(f"Error! Input file {file} does not exist!")
+                exit(1)
+
+    ##################################################
+    # Check that bucket for output directories exist #
+    ##################################################
+    outputs = ['out_dir', 'log_dir']
+
+    test_f = open('test.txt', 'w')
+    test_f.write("testing bucket exists")
+    test_f.close()
+
+    for output in outputs:
+        out_dir = getattr(parsed_args, output)
+        bucket = "/".join(out_dir.split("/")[0:3])
+
+        test_cmd = ['gsutil', 'cp', 'test.txt', bucket]
+        success = subprocess.call(test_cmd)
+
+        if success != 0:
+            logging.error(f"Error! Bucket {bucket} for output {out_dir} does not exist!")
+            exit(1)
+        else:
+            rm_cmd = ['gsutil', 'rm', 'test.txt', bucket]
+            subprocess.call(rm_cmd)
+
+    ##############################################################
+    # Check that cluster name for adding preemptibles is correct #
+    ##############################################################
+    if parsed_args.cluster_name is not None:
+        cmd = shlex.split(f"gcloud dataproc clusters update {parsed_args.cluster_name} --region {parsed_args.region} "
+                          f"--num-preemptible-workers 1")
+
+        success = subprocess.call(cmd)
+
+        if success != 0:
+            logging.error("Error! Cluster name or region given does not exist!")
+            exit(1)
+        else:
+            cmd = shlex.split(f"gcloud dataproc clusters update {parsed_args.cluster_name} --region {parsed_args.region} "
+                              f"--num-preemptible-workers 0")
+
+            subprocess.call(cmd)
 
 
 if __name__ == "__main__":
@@ -151,6 +239,7 @@ if __name__ == "__main__":
     hl.init()
 
     args = parse_arguments(sys.argv[1:])
+    check_inputs(args)
 
     # Import python scripts to access helper functions #
     scripts = ["helper_scripts.py", "v9_exome_qc_parameters.py", "pipeline_functions.py"]
