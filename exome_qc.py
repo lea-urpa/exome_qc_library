@@ -19,7 +19,7 @@ def parse_arguments(arguments):
 
     # Pipeline parameters #
     params = parser.add_argument_group("Pipeline parameters")
-    params.add_argument("--checkpoint", type=int, help="Checkpoint to start pipeline at.")
+    params.add_argument("--checkpoint", type=int, help="Checkpoint to start pipeline at, default start (0).", default=0)
     params.add_argument("--reference_genome", type=str, help="Reference_genome", choices=["GRCh37", "GRCh38"],
                         default="GRCh38")
     params.add_argument("--test", action='store_true', help="run test with just chrom 22?")
@@ -46,9 +46,9 @@ def parse_arguments(arguments):
                         help="Files to annotate the samples with, comma separated.")
     inputs.add_argument("--samples_col", type=str,
                         help="Name of samples column in sample annotation files. Must be the same in all files.")
-    inputs.add_argument("--samples_delim", type=str,
-                        help="Delimiter in sample annotation files. Must be the same in all files.")
-    inputs.add_argument("--samples_miss", type=str,
+    inputs.add_argument("--samples_delim", type=str, default="\t",
+                        help="Delimiter in sample annotation files. Must be the same in all files. Default tab.")
+    inputs.add_argument("--samples_miss", type=str, default="n/a",
                         help="String for missing values in annotation files, e.g. NA. Must be the same in all files.")
     inputs.add_argument("--fam_id", type=str, help="column name corresponding to sample's family ID. Used in kinship.")
     inputs.add_argument("--pat_id", type=str, help="column name corresponding to sample's paternal ID. Used in kinship.")
@@ -148,6 +148,11 @@ def check_inputs(parsed_args):
     if (parsed_args.run_kin is False) and (parsed_args.relatives_removal_file is None):
         logging.error("Error! If --run_king is false, then give the file with list of relatives to remove with "
                       "--relatives_removal_file")
+        exit(1)
+
+    if (parsed_args.samples_annotation_files is not None) and (parsed_args.samples_col is None):
+        logging.error("Error! If --samples_annotation_files given, --samples_col pointing to sample column must also"
+                      "be given!")
         exit(1)
 
     ##################################
