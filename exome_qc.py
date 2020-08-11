@@ -32,7 +32,7 @@ def parse_arguments(arguments):
     params.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
     params.add_argument('--num_preemptible_workers', type=int,
                         help='Number of preemptible workers for scaling in applicable steps.')
-    # TODO add check that cluster name is given if preemptible worker notes are
+
     # Pipeline inputs #
     inputs = parser.add_argument_group("Pipeline inputs and information.")
     inputs.add_argument("-mt", type=str, help="Name of matrix table to run QC pipeline on.")
@@ -156,6 +156,10 @@ def check_inputs(parsed_args):
     if (parsed_args.samples_annotation_files is not None) and (parsed_args.samples_col is None):
         logging.error("Error! If --samples_annotation_files given, --samples_col pointing to sample column must also"
                       "be given!")
+        exit(1)
+
+    if (parsed_args.num_preemptible_workers is not None) and (parsed_args.cluster_name is None):
+        logging.error("Error! If you want to add preemptible workers during the pipeline, give --cluster_name as well")
         exit(1)
 
     ################################
