@@ -54,7 +54,7 @@ def load_data(args):
     return mt
 
 
-def save_checkpoint(mt, step, args, pruned=False):
+def save_checkpoint(mt, step, args):
     '''
     Saves a matrix table at a checkpoint with custom global annotation and file ending.
     :param mt: matrix table to checkpoint
@@ -65,15 +65,10 @@ def save_checkpoint(mt, step, args, pruned=False):
     datestr = time.strftime("%Y.%m.%d")
     step_info = getattr(args, step)
 
-    if pruned:
-        prune_str = "_filtered_pruned"
-    else:
-        prune_str = ""
-
     if args.test:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}_test.mt/"
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}_test.mt/"
     else:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}.mt/"
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}.mt/"
 
     logging.info(f"Writing checkpoint {args.cpcounter}: {step}")
 
@@ -292,7 +287,7 @@ def maf_ldprune_relatedness(mt, args):
     h.remove_preemptibles(args.cluster_name)
 
     if args.overwrite_checkpoints:
-        mt_ldpruned = save_checkpoint(mt_ldpruned, step, args, pruned=True)
+        mt_ldpruned = save_checkpoint(mt_ldpruned, step, args)
     args.cpcounter += 1
     return mt, mt_ldpruned
 
@@ -356,7 +351,7 @@ def find_related_individuals(mt, mt_ldpruned, args):
 
             if args.overwrite_checkpoints:
                 mt = save_checkpoint(mt, step, args)
-                mt_ldpruned = save_checkpoint(mt_ldpruned, step, args, pruned=True)
+                mt_ldpruned = save_checkpoint(mt_ldpruned, step, args)
 
             args.cpcounter += 1
             return mt, mt_ldpruned
