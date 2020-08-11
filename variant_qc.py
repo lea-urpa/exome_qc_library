@@ -284,7 +284,7 @@ def annotate_variant_het_ab(mt, args, prefix):
 
         # Get case het GT fraction in allelic balance
         case_filter = (mt[args.pheno_col] == True) & (hl.is_defined(mt[args.pheno_col])) & \
-                      (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc > 0))
+                      (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) > 0)
         passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & \
                           ~(mt[failing_ab_name].contains("failing_het_ab"))
 
