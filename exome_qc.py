@@ -217,7 +217,7 @@ def check_inputs(parsed_args):
     ##############################################################
     if parsed_args.cluster_name is not None:
         cmd = shlex.split(f"gcloud dataproc clusters update {parsed_args.cluster_name} --region {parsed_args.region} "
-                          f"--num-preemptible-workers 1")
+                          f"--num-secondary-workers 1")
 
         success = subprocess.call(cmd)
 
@@ -226,7 +226,7 @@ def check_inputs(parsed_args):
             exit(1)
         else:
             cmd = shlex.split(f"gcloud dataproc clusters update {parsed_args.cluster_name} --region {parsed_args.region} "
-                              f"--num-preemptible-workers 0")
+                              f"--num-secondary-workers 0")
 
             subprocess.call(cmd)
 
