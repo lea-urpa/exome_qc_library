@@ -130,7 +130,7 @@ def annotate_samples(mt, args):
         mt = sa.annotate_cols_from_file(mt, file, args)
 
     # Check that particular needed columns exist
-    columns = ['samples_col', 'chimeras_col', 'contamination_col']
+    columns = ['chimeras_col', 'contamination_col']
 
     if args.fam_id is not None:
         columns.append('fam_id')
