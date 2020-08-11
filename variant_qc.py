@@ -16,20 +16,27 @@ def maf_filter(mt, maf, filter_ac0_after_pruning=False):
     :param filter_ac0_after_pruning: filter variants no longer in the data, e.g. sum(AC) = 0?
     :return: returns maf filtered matrix table.
     """
-    # Run hl.variant_qc() to get AFs
-    mt = hl.variant_qc(mt)
+    # Count if variants already < 15 000, for testing purposes
+    vars_ct = mt.count_rows()
 
-    # Filter MAF
-    logging.info(f'Filtering out variants with minor allele frequency < {maf}')
-    mt = mt.filter_rows(mt.row.variant_qc.AF[1] > maf, keep=True)
-    mt = mt.annotate_globals(maf_threshold_LDpruning=maf)
-
-    if filter_ac0_after_pruning:
-        logging.info('Removing variants with alt allele count = 0 (monomorphic variants).')
+    if vars_ct > 15000:
+        # Run hl.variant_qc() to get AFs
         mt = hl.variant_qc(mt)
-        mt = mt.filter_rows(hl.sum(mt.row.variant_qc.AC) == hl.int(0), keep=False)
 
-    logging.info("MAF pruned mt count:" + str(mt.count()))
+        # Filter MAF
+        logging.info(f'Filtering out variants with minor allele frequency < {maf}')
+        mt = mt.filter_rows(mt.row.variant_qc.AF[1] > maf, keep=True)
+        mt = mt.annotate_globals(maf_threshold_LDpruning=maf)
+
+        if filter_ac0_after_pruning:
+            logging.info('Removing variants with alt allele count = 0 (monomorphic variants).')
+            mt = hl.variant_qc(mt)
+            mt = mt.filter_rows(hl.sum(mt.row.variant_qc.AC) == hl.int(0), keep=False)
+
+        logging.info("MAF pruned mt count:" + str(mt.count()))
+    else:
+        logging.info("Less than 15000 variants, skipping MAF filter.")
+
     return mt
 
 
@@ -41,15 +48,20 @@ def ld_prune(mt, args):
     :param args: namespace object with threshold arguments
     :return: returns the ld pruned matrix table
     """
-    # LD prune
-    pruned_variant_table = hl.ld_prune(mt.GT, r2=args.r2, bp_window_size=args.bp_window_size)
-    mt_ldpruned = mt.filter_rows(hl.is_defined(pruned_variant_table[mt.row_key]))
+    # Count if variants already < 15 000, for testing purposes
+    vars_ct = mt.count_rows()
 
-    logging.info(f"Variant and sample count after LD pruning: {mt_ldpruned.count()}")
+    if vars_ct > 15000:
+        pruned_variant_table = hl.ld_prune(mt.GT, r2=args.r2, bp_window_size=args.bp_window_size)
+        mt_ldpruned = mt.filter_rows(hl.is_defined(pruned_variant_table[mt.row_key]))
 
-    mt_ldpruned = mt_ldpruned.annotate_globals(ld_pruning_parameters={'r2': args.r2,
-                                                                      'bp_window_size': args.bp_window_size})
+        logging.info(f"Variant and sample count after LD pruning: {mt_ldpruned.count()}")
 
+        mt_ldpruned = mt_ldpruned.annotate_globals(ld_pruning_parameters={'r2': args.r2,
+                                                                          'bp_window_size': args.bp_window_size})
+    else:
+        logging.info("Less than 15000 variants, skipping LD pruning.")
+        mt_ldpruned = mt
     return mt_ldpruned
 
 
