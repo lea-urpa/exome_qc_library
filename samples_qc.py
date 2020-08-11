@@ -47,7 +47,7 @@ def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, un
         mt = mt.unfilter_entries()
 
     logging.info(f"Writing temporary checkpoint for filtered mt.")
-    mt = mt.checkpoint(f"{args.outputstem}_{mode}_removed_tmp.mt")
+    mt = mt.checkpoint(f"{args.output_stem}_{mode}_removed_tmp.mt")
 
     return mt
 
