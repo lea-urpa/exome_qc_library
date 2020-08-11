@@ -71,9 +71,9 @@ def save_checkpoint(mt, step, args, pruned=False):
         prune_str = ""
 
     if args.test:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}_test.mt"
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}_test.mt/"
     else:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}_.mt"
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}.mt/"
 
     logging.info(f"Writing checkpoint after {args.cpcounter}: {step}")
 
@@ -97,9 +97,9 @@ def load_checkpoint(checkpoint, step, args):
     '''
     step_info = getattr(args, step)
     if args.test:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}_test.mt"
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}_test.mt/"
     else:
-        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}.mt"
+        checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}.mt/"
 
     mt = hl.read_matrix_table(os.path.join(args.out_dir, checkpoint_name))
     logging.info(f"Starting at checkpoint {str(checkpoint)}. Loading data from after {step}.")

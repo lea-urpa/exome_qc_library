@@ -29,14 +29,14 @@ def parse_arguments(arguments):
     params.add_argument('--pc_num', default=10, help="Number of PCs to calculate.")
     params.add_argument('--verbosity', type=int, default=1,
                         help='Verbosity? Does counts, takes extra time for processing. 0 is least verbose.')
-    params.add_argument('--num_preemptible_workers', type=int, default=100,
+    params.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
+    params.add_argument('--num_preemptible_workers', type=int,
                         help='Number of preemptible workers for scaling in applicable steps.')
-
+    # TODO add check that cluster name is given if preemptible worker notes are
     # Pipeline inputs #
     inputs = parser.add_argument_group("Pipeline inputs and information.")
     inputs.add_argument("-mt", type=str, help="Name of matrix table to run QC pipeline on.")
     inputs.add_argument("--out_name", type=str, help="Output name ")
-    inputs.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
     inputs.add_argument("--region", default='europe-west1', help='Region name for scaling in pipeline.')
     inputs.add_argument("--out_dir", type=str, help="Directory to write output data to.")
     inputs.add_argument("--log_dir", type=str, help="Directory to write logs to.")
@@ -271,17 +271,17 @@ if __name__ == "__main__":
     ##################################################
     # Pre-define checkpoint names to load data later #
     ##################################################
-    args.samples_annotation = {'prefix': '1', 'suffix': '_after_sample_annotations'}
-    args.sample_removal = {'prefix': '2', 'suffix': '_after_sample_removal'}
-    args.low_pass_variant_qc = {'prefix': '3', 'suffix': '_after_low_pass_variant_qc'}
-    args.maf_ld_prune = {'prefix': '4', 'suffix': '_after_maf_ld_prune'}
-    args.find_related_individuals = {'prefix': '5', 'suffix': '_after_finding_relatives'}
-    args.find_pop_outliers = {'prefix': '6', 'suffix': '_after_finding_pop_outliers'}
-    args.samples_qc = {'prefix': '7', 'suffix': '_after_samples_qc'}
-    args.impute_sex = {'prefix': '8', 'suffix': '_after_imputing_sex'}
-    args.final_variant_qc = {'prefix': '9', 'suffix': '_after_final_variant_qc'}
-    args.filter_variants_by_phenotype = {'prefix': '10', 'suffix': '_after_filter_var_by_pheno'}
-    args.final_pc_calculation = {'prefix': '11', 'suffix': '_after_final_pc_calculation'}
+    args.samples_annotation = {'prefix': '1', 'suffix': 'after_sample_annotations'}
+    args.sample_removal = {'prefix': '2', 'suffix': 'after_sample_removal'}
+    args.low_pass_variant_qc = {'prefix': '3', 'suffix': 'after_low_pass_variant_qc'}
+    args.maf_ld_prune = {'prefix': '4', 'suffix': 'after_maf_ld_prune'}
+    args.find_related_individuals = {'prefix': '5', 'suffix': 'after_finding_relatives'}
+    args.find_pop_outliers = {'prefix': '6', 'suffix': 'after_finding_pop_outliers'}
+    args.samples_qc = {'prefix': '7', 'suffix': 'after_samples_qc'}
+    args.impute_sex = {'prefix': '8', 'suffix': 'after_imputing_sex'}
+    args.final_variant_qc = {'prefix': '9', 'suffix': 'after_final_variant_qc'}
+    args.filter_variants_by_phenotype = {'prefix': '10', 'suffix': 'after_filter_var_by_pheno'}
+    args.final_pc_calculation = {'prefix': '11', 'suffix': 'after_final_pc_calculation'}
 
     ################
     # Run pipeline #
