@@ -144,10 +144,11 @@ def annotate_samples(mt, args):
         columns.append('pheno_col')
 
     for colname in columns:
+        col = getattr(args, colname)
         try:
-            test = hl.is_defined(mt[colname])
+            test = hl.is_defined(mt[col])
         except Exception as e:
-            logging.error(f"Error! Given column annotation {colname} does not actually exist after inputting sample"
+            logging.error(f"Error! Given column annotation {col} does not actually exist after inputting sample "
                           f"annotations.")
             logging.error(e)
             exit(1)

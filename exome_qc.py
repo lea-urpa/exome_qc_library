@@ -242,7 +242,7 @@ if __name__ == "__main__":
     check_inputs(args)
 
     # Import python scripts to access helper functions #
-    scripts = ["helper_scripts.py", "pipeline_functions.py"]
+    scripts = ["helper_scripts.py", "qc_pipeline_functions.py"]
     for script in scripts:
         hl.spark_context().addPyFile(args.scripts_dir + script)
 
