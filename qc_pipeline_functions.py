@@ -150,6 +150,7 @@ def annotate_samples(mt, args):
             logging.error(f"Error! Given column annotation {colname} does not actually exist after inputting sample"
                           f"annotations.")
             logging.error(e)
+            exit(1)
 
     if args.force:
         mt = save_checkpoint(mt, step, args)
