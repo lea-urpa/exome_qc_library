@@ -5,27 +5,30 @@ Author: Lea Urpa, August 2020
 """
 import logging
 import time
-import numpy as np
 import hail as hl
 from bokeh.io import output_file, save
 
 
-def filter_failing(mt, args, varqc_name, entries=True, variants=True, samples=True, unfilter_entries=False):
+def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, unfilter_entries=False):
     """
-
-    :param mt:
+    Filters failing samples, variants, and entries from a given matrix table
+    :param mt: matrix table to filter
     :param args:
-    :param varqc_name:
-    :param unfilter_entries: Unfilter entries following maf pruning? Necessary to run PCA later.
+    :param mode: Filter on final or low_pass variant QC?
+    :param entries: filter entries?
+    :param variants: filter variants?
+    :param samples: filter samples?
+    :param unfilter_entries: Unfilter entries (set to missing) after filtering entries?
     :return:
     """
     start_count = mt.count()
     tag = []
     if entries:
-        mt = mt.filter_entries((hl.len(mt.failing_depth_quality) == 0) & hl.len(mt.failing_ab) == 0, keep=True)
+        mt = mt.filter_entries((hl.len(mt[mode + '_failing_depth_quality']) == 0) &
+                               hl.len(mt[mode + '_failing_ab']) == 0, keep=True)
         tag.append("entries")
     if variants:
-        mt = mt.filter_variants(hl.len(mt[varqc_name]) == 0, keep=True)
+        mt = mt.filter_variants(hl.len(mt[mode + '_failing_variant_qc']) == 0, keep=True)
         tag.append("variants")
     if samples:
         mt = mt.filter_samples((hl.len(mt.failing_samples_qc) == 0) & mt.pop_outlier_sample == False, keep=True)
@@ -44,7 +47,7 @@ def filter_failing(mt, args, varqc_name, entries=True, variants=True, samples=Tr
         mt = mt.unfilter_entries()
 
     logging.info(f"Writing temporary checkpoint for filtered mt.")
-    mt = mt.checkpoint(f"{args.outputstem}_{varqc_name}_removed_tmp.mt")
+    mt = mt.checkpoint(f"{args.outputstem}_{mode}_removed_tmp.mt")
 
     return mt
 

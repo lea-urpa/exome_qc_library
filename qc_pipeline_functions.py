@@ -275,7 +275,7 @@ def maf_ldprune_relatedness(mt, args):
     #######################################################
     # Filter out failing samples, variants, and genotypes #
     #######################################################
-    mt_filtered = sq.filter_failing(mt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=True)
+    mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=True)
 
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
@@ -422,7 +422,7 @@ def samples_qc(mt, args):
     ######################################################
     # Filter failing variants + genotypes for samples QC #
     ######################################################
-    mt_filtered = sq.filter_failing(mt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
+    mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
 
     ##################
     # Run samples QC #
@@ -462,7 +462,7 @@ def impute_sex(mt, args):
     # Filter to common variants, filter out failing genotypes, samples, and variants #
     ##################################################################################
     mt_maffilt = vq.maf_filter(mt, 0.05)
-    mt_filtered = sq.filter_failing(mt_maffilt, args, varqc_name=args.lowpass_fail_name, unfilter_entries=False)
+    mt_filtered = sq.filter_failing(mt_maffilt, args, mode='low_pass', unfilter_entries=False)
 
     ##############
     # Impute sex #
@@ -554,7 +554,7 @@ def calculate_final_pcs(mt, args):
     #######################################################################
     # Filter out failing samples, variants, genotypes for PC calculations #
     #######################################################################
-    mt_filtered = sq.filter_failing(mt, args, varqc_name=args.final_fail_name, unfilter_entries=True)
+    mt_filtered = sq.filter_failing(mt, args, mode="final", unfilter_entries=True)
 
     ########################
     # Filter out relatives #

@@ -343,7 +343,6 @@ def find_failing_variants(mt, args, mode):
         annotation_name = "variant_qc_thresholds_lowpass"
         sex_aware_call_rate = "False"
         varqc_name = 'prefilter_variant_qc'
-        failing_name = args.lowpass_fail_name
 
     elif mode == "final":
         # Check that samples QC has been run
@@ -360,12 +359,12 @@ def find_failing_variants(mt, args, mode):
         annotation_name = "variant_qc_thresholds_final"
         sex_aware_call_rate = "True"
         varqc_name = 'final_no_failing_samples_varqc'
-        failing_name = args.final_fail_name
 
     else:
         logging.error("Error! modes allowed are low_pass and final variant QC")
         return
 
+    failing_name = mode + "_failing_variant_qc"
     #####################################
     # Annotate QC thresholds to globals #
     #####################################

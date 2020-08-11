@@ -287,12 +287,9 @@ if __name__ == "__main__":
     # Run pipeline #
     ################
     args.cpcounter = 0
-    args.lowpass_fail_name = 'failing_lowpass_varqc'
-    args.final_fail_name = 'failing_final_varqc'
     args.output_stem = os.path.join(args.out_dir, args.out_name)
     args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
     args.plot_folder = os.path.join(args.out_dir, "plots")
-
 
     # Load in data according to parameters given
     mt = qc.load_data(args)
