@@ -158,28 +158,33 @@ def check_inputs(parsed_args):
     ################################
     # Check that input files exist #
     ################################
-    files = ['bam_metadata', 'relatives_removal_file', 'sample_removal_list', 'mt', 'scripts_dir']
-
-    multi_files = parsed_args.samples_annotation_files.strip().split(",")
-    files.extend(multi_files)
+    files = ['bam_metadata', 'relatives_removal_file', 'sample_removal_list', 'mt', 'scripts_dir',
+             'samples_annotation_files']
 
     for f in files:
-        file = getattr(parsed_args, f)
-        if file is not None:
-            if file.endswith("/"):
-                file = file.rstrip("/")
+        f1 = getattr(parsed_args, f)
 
-            if f == "mt":
-                file = file + "/metadata.json.gz"
-            if f == "scripts_dir":
-                file = file + "/exome_qc.py"
+        if f == 'samples_annotation_files':
+            files = getattr(parsed_args, f).strip().split(",")
+        else:
+            files = [f1]
 
-            stat_cmd = ['gsutil', '-q', 'stat', file]
-            status = subprocess.call(stat_cmd)
+        for file in files:
+            if file is not None:
+                if file.endswith("/"):
+                    file = file.rstrip("/")
 
-            if status != 0:
-                logging.error(f"Error! Input file {file} does not exist!")
-                exit(1)
+                if f == "mt":
+                    file = file + "/metadata.json.gz"
+                if f == "scripts_dir":
+                    file = file + "/exome_qc.py"
+
+                stat_cmd = ['gsutil', '-q', 'stat', file]
+                status = subprocess.call(stat_cmd)
+
+                if status != 0:
+                    logging.error(f"Error! Input file {file} does not exist!")
+                    exit(1)
 
     ##################################################
     # Check that bucket for output directories exist #
@@ -201,7 +206,7 @@ def check_inputs(parsed_args):
             logging.error(f"Error! Bucket {bucket} for output {out_dir} does not exist!")
             exit(1)
         else:
-            rm_cmd = ['gsutil', 'rm', 'test.txt', bucket]
+            rm_cmd = ['gsutil', 'rm', os.path.join(bucket, 'test.txt')]
             subprocess.call(rm_cmd)
 
     ##############################################################
@@ -237,7 +242,7 @@ if __name__ == "__main__":
     check_inputs(args)
 
     # Import python scripts to access helper functions #
-    scripts = ["helper_scripts.py", "v9_exome_qc_parameters.py", "pipeline_functions.py"]
+    scripts = ["helper_scripts.py", "pipeline_functions.py"]
     for script in scripts:
         hl.spark_context().addPyFile(args.scripts_dir + script)
 
