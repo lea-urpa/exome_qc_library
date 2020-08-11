@@ -145,7 +145,7 @@ def check_inputs(parsed_args):
     ################################################################
     # Check that relatives removal file given if run_king is false #
     ################################################################
-    if (parsed_args.run_kin is False) and (parsed_args.relatives_removal_file is None):
+    if (parsed_args.run_king is False) and (parsed_args.relatives_removal_file is None):
         logging.error("Error! If --run_king is false, then give the file with list of relatives to remove with "
                       "--relatives_removal_file")
         exit(1)
@@ -161,7 +161,7 @@ def check_inputs(parsed_args):
     dirs = ['mt', 'scripts_dir']
     for d in dirs:
         dir = getattr(parsed_args, d)
-        if not dir.enswith("/"):  # add ending slash or qstat fails for directories
+        if not dir.endswith("/"):  # add ending slash or qstat fails for directories
             dir = dir + "/"
         stat_cmd = ['gsutil', '-q', 'stat', dir]
 
