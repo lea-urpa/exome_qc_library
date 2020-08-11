@@ -271,8 +271,17 @@ if __name__ == "__main__":
     ##################################################
     # Pre-define checkpoint names to load data later #
     ##################################################
-    args.sample_annotation = {'prefix': '1', 'suffix': '_after_sample_annotations'}
-    args.low_pass_variant_qc = {'prefix': '2', 'suffix': '_after_low_pass_variant_qc'}
+    args.samples_annotation = {'prefix': '1', 'suffix': '_after_sample_annotations'}
+    args.sample_removal = {'prefix': '2', 'suffix': '_after_sample_removal'}
+    args.low_pass_variant_qc = {'prefix': '3', 'suffix': '_after_low_pass_variant_qc'}
+    args.maf_ld_prune = {'prefix': '4', 'suffix': '_after_maf_ld_prune'}
+    args.find_related_individuals = {'prefix': '5', 'suffix': '_after_finding_relatives'}
+    args.find_pop_outliers = {'prefix': '6', 'suffix': '_after_finding_pop_outliers'}
+    args.samples_qc = {'prefix': '7', 'suffix': '_after_samples_qc'}
+    args.impute_sex = {'prefix': '8', 'suffix': '_after_imputing_sex'}
+    args.final_variant_qc = {'prefix': '9', 'suffix': '_after_final_variant_qc'}
+    args.filter_variants_by_phenotype = {'prefix': '10', 'suffix': '_after_filter_var_by_pheno'}
+    args.final_pc_calculation = {'prefix': '11', 'suffix': '_after_final_pc_calculation'}
 
     ################
     # Run pipeline #
