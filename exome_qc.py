@@ -155,25 +155,10 @@ def check_inputs(parsed_args):
                       "be given!")
         exit(1)
 
-    ##################################
-    # Check that input folders exist #
-    ##################################
-    dirs = ['mt', 'scripts_dir']
-    for d in dirs:
-        dir = getattr(parsed_args, d)
-        if not dir.endswith("/"):  # add ending slash or qstat fails for directories
-            dir = dir + "/"
-        stat_cmd = ['gsutil', '-q', 'stat', dir]
-
-        status = subprocess.call(stat_cmd)
-        if status != 0:
-            logging.error(f"Error! Input directory {dir} does not exist!")
-            exit(1)
-
     ################################
     # Check that input files exist #
     ################################
-    files = ['bam_metadata', 'relatives_removal_file', 'sample_removal_list']
+    files = ['bam_metadata', 'relatives_removal_file', 'sample_removal_list', 'mt', 'scripts_dir']
 
     multi_files = parsed_args.samples_annotation_files.strip().split(",")
     files.extend(multi_files)
@@ -182,7 +167,12 @@ def check_inputs(parsed_args):
         file = getattr(parsed_args, f)
         if file is not None:
             if file.endswith("/"):
-                file = file.rstrip("/")  # remove ending slash or qstat fails for files
+                file = file.rstrip("/")
+
+            if f == "mt":
+                file = file + "/metadata.json.gz"
+            if f == "scripts_dir":
+                file = file + "/exome_qc.py"
 
             stat_cmd = ['gsutil', '-q', 'stat', file]
             status = subprocess.call(stat_cmd)
