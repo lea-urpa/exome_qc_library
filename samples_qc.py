@@ -25,13 +25,13 @@ def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, un
     tag = []
     if entries:
         mt = mt.filter_entries((hl.len(mt[mode + '_failing_depth_quality']) == 0) &
-                               hl.len(mt[mode + '_failing_ab']) == 0, keep=True)
+                               (hl.len(mt[mode + '_failing_ab']) == 0), keep=True)
         tag.append("entries")
     if variants:
-        mt = mt.filter_variants(hl.len(mt[mode + '_failing_variant_qc']) == 0, keep=True)
+        mt = mt.filter_rows(hl.len(mt[mode + '_failing_variant_qc']) == 0, keep=True)
         tag.append("variants")
     if samples:
-        mt = mt.filter_samples((hl.len(mt.failing_samples_qc) == 0) & mt.pop_outlier_sample == False, keep=True)
+        mt = mt.filter_cols((hl.len(mt.failing_samples_qc) == 0) & mt.pop_outlier_sample == False, keep=True)
         tag.append("samples")
 
     final_count = mt.count()
