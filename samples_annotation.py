@@ -7,7 +7,7 @@ import logging
 import hail as hl
 
 
-def annotate_cols_from_file(mt, file, args):
+def annotate_cols_from_file(mt, file, delim, samples_col, missing):
     """
     Takes a matrix table, a file with sample information, and annotates the cols of the matrix table with each column
     in the given file. File can be hail table, as long as the file ends with .ht it is detected and read.
@@ -18,8 +18,7 @@ def annotate_cols_from_file(mt, file, args):
     :return:
     """
     if not file.endswith(".ht"):
-        ht = hl.import_table(file, delimiter=args.samples_delim, impute=True, key=args.samples_col,
-                             missing=args.samples_miss)
+        ht = hl.import_table(file, delimiter=delim, impute=True, key=samples_col, missing=missing)
     else:
         ht = hl.read_table(file)
 

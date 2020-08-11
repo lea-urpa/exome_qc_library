@@ -124,12 +124,23 @@ def annotate_samples(mt, args):
     logging.info('Annotating samples.')
     step = 'samples_annotation'
 
-    annotation_files = args.samples_annotation_files.strip().split(",")
+    ###################################################
+    # Annotate with optional samples annotation files #
+    ###################################################
+    if args.samples_annotation_files is not None:
+        annotation_files = args.samples_annotation_files.strip().split(",")
 
-    for file in annotation_files:
-        mt = sa.annotate_cols_from_file(mt, file, args)
+        for file in annotation_files:
+            mt = sa.annotate_cols_from_file(mt, file, args.samples_delim, args.samples_col, args.samples_miss)
 
-    # Check that particular needed columns exist
+    ##############################
+    # Annotate with bam metadata #
+    ##############################
+    mt = sa.annotate_cols_from_file(mt, args.bam_metadata, args.bam_delim, args.bam_sample_col, args.bam_miss)
+
+    ##############################################
+    # Check that particular needed columns exist #
+    ##############################################
     columns = ['chimeras_col', 'contamination_col']
 
     if args.fam_id is not None:

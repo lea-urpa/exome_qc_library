@@ -41,7 +41,10 @@ def parse_arguments(arguments):
     inputs.add_argument("--out_dir", type=str, help="Directory to write output data to.")
     inputs.add_argument("--log_dir", type=str, help="Directory to write logs to.")
     inputs.add_argument("--scripts_dir", type=str, help="Directory containing python scripts.")
-    inputs.add_argument("--bam_metadata", type=str, help="File containing bam metadata information.")
+    inputs.add_argument("--bam_metadata", type=str, required=True, help="File containing bam metadata information.")
+    inputs.add_argument("--bam_sample_col", type=str, required=True, help="Sample column name in bam metadata file")
+    inputs.add_argument("--bam_delim", type=str, default="\t", help="Delimiter in bam metadata file")
+    inputs.add_argument("--bam_miss", type=str, default="n/a", help="Missing data string in bam metadata file.")
     inputs.add_argument("--samples_annotation_files", type=str,
                         help="Files to annotate the samples with, comma separated.")
     inputs.add_argument("--samples_col", type=str,
