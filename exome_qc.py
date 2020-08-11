@@ -342,8 +342,9 @@ if __name__ == "__main__":
     mt = qc.calculate_final_pcs(mt, args)
 
     # Export matrix table columns for optmatch
-    mtcols = mt.cols()
-    mtcols.export(args.output_stem + '_final_dataset_cols_passingQC.tsv')
+    if not args.run_king:
+        mtcols = mt.cols()
+        mtcols.export(args.output_stem + '_final_dataset_cols_passingQC.tsv')
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
