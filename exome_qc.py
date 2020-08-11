@@ -293,53 +293,49 @@ if __name__ == "__main__":
     args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
     args.plot_folder = os.path.join(args.out_dir, "plots")
 
-    try:
-        # Load in data according to parameters given
-        mt = qc.load_data(args)
 
-        # Annotate samples
-        mt = qc.annotate_samples(mt, args)
-        # actually exist in the dataset after annotating samples.
+    # Load in data according to parameters given
+    mt = qc.load_data(args)
 
-        # Phenotype Samples QC
-        mt = qc.remove_samples(mt, args)
+    # Annotate samples
+    mt = qc.annotate_samples(mt, args)
+    # actually exist in the dataset after annotating samples.
 
-        # Low-pass variant QC
-        mt = qc.low_pass_var_qc(mt, args)
+    # Phenotype Samples QC
+    mt = qc.remove_samples(mt, args)
 
-        # LD Prune and MAF filter dataset for relatedness
-        mt, md_ldpruned = qc.maf_ldprune_relatedness(mt, args)
+    # Low-pass variant QC
+    mt = qc.low_pass_var_qc(mt, args)
 
-        # Export data to find related individuals in King, if necessary
-        mt, mt_ldpruned = qc.find_related_individuals(mt, md_ldpruned, args)
+    # LD Prune and MAF filter dataset for relatedness
+    mt, md_ldpruned = qc.maf_ldprune_relatedness(mt, args)
 
-        # Find population outliers (excludes relatives)
-        mt = qc.find_pop_outliers(mt, mt_ldpruned, args)
+    # Export data to find related individuals in King, if necessary
+    mt, mt_ldpruned = qc.find_related_individuals(mt, md_ldpruned, args)
 
-        # Analytical samples QC (samples QC hard filters)
-        mt = qc.samples_qc(mt, args)
+    # Find population outliers (excludes relatives)
+    mt = qc.find_pop_outliers(mt, mt_ldpruned, args)
 
-        # Impute sex
-        mt = qc.impute_sex(mt, args)
+    # Analytical samples QC (samples QC hard filters)
+    mt = qc.samples_qc(mt, args)
 
-        # Variant QC filtering
-        mt = qc.final_variant_qc(mt, args)
+    # Impute sex
+    mt = qc.impute_sex(mt, args)
 
-        # Filter variants missing by pheno
-        mt = qc.find_failing_variants_by_pheno(mt, args)
+    # Variant QC filtering
+    mt = qc.final_variant_qc(mt, args)
 
-        # Calculate final PCS
-        mt = qc.calculate_final_pcs(mt, args)
+    # Filter variants missing by pheno
+    mt = qc.find_failing_variants_by_pheno(mt, args)
 
-        # Export matrix table columns for optmatch
-        mtcols = mt.cols()
-        mtcols.export(args.output_stem + '_final_dataset_cols_passingQC.tsv')
+    # Calculate final PCS
+    mt = qc.calculate_final_pcs(mt, args)
 
-        # Send logs and finish-up notice
-        logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
-        h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, plot_dir=args.plot_folder)
+    # Export matrix table columns for optmatch
+    mtcols = mt.cols()
+    mtcols.export(args.output_stem + '_final_dataset_cols_passingQC.tsv')
 
-    except Exception as e:
-        logging.error('Something went wrong! Copying logs and shutting down cluster in 10 minutes.')
-        logging.error(e)
-        h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, plot_dir=args.plot_folder)
+    # Send logs and finish-up notice
+    logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
+    h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, plot_dir=args.plot_folder)
+
