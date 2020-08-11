@@ -26,7 +26,7 @@ def parse_arguments(arguments):
     params.add_argument('--overwrite_checkpoints', type=bool, default=True,
                         help='Overwrite previous pipeline checkpoints?')
     params.add_argument('--run_king', action='store_true', help='Pause pipeline to run King relatedness calculations?')
-    params.add_argument('--pc_num', default=10, help="Number of PCs to calculate.")
+    params.add_argument('--pc_num', default=10, type=int, help="Number of PCs to calculate.")
     params.add_argument('--verbosity', type=int, default=1,
                         help='Verbosity? Does counts, takes extra time for processing. 0 is least verbose.')
     params.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
@@ -61,35 +61,43 @@ def parse_arguments(arguments):
     var_thresh = parser.add_argument_group("Variant QC thresholds. If not indicated 'final' or 'low pass' in name, "
                                            "thresholds are used for both low pass variant filtering and final variant"
                                            "filtering.")
-    var_thresh.add_argument("--low_pass_p_hwe", default=1e-9, help="Low pass variant QC HWE cutoff")
-    var_thresh.add_argument("--final_p_hwe", default=1e-6, help="Final variant QC HWE cutoff")
-    var_thresh.add_argument("--low_pass_min_call_rate", default=0.8, help="Low pass variant QC min call rate")
-    var_thresh.add_argument("--final_min_call_rate", default=0.9, help="Final variant QC min call rate")
-    var_thresh.add_argument("--min_dp", default=10, help="Variant QC min read depth")
-    var_thresh.add_argument("--snp_qd", default=2, help="Variant QC min quality by depth for snps")
-    var_thresh.add_argument("--indel_qd", default=3, help="Variant QC min quality by depth for indels")
+    var_thresh.add_argument("--low_pass_p_hwe", default=1e-9, type=float, help="Low pass variant QC HWE cutoff")
+    var_thresh.add_argument("--final_p_hwe", default=1e-6, type=float, help="Final variant QC HWE cutoff")
+    var_thresh.add_argument("--low_pass_min_call_rate", default=0.8, type=float,
+                            help="Low pass variant QC min call rate")
+    var_thresh.add_argument("--final_min_call_rate", default=0.9, type=float, help="Final variant QC min call rate")
+    var_thresh.add_argument("--min_dp", default=10, type=float, help="Variant QC min read depth")
+    var_thresh.add_argument("--snp_qd", default=2, type=float, help="Variant QC min quality by depth for snps")
+    var_thresh.add_argument("--indel_qd", default=3, type=float, help="Variant QC min quality by depth for indels")
 
     # Genotype QC thresholds #
     geno_thresh = parser.add_argument_group("Genotype QC thresholds. If not indicated 'final' or 'low pass' in name,"
                                             "thresholds are used for both low pass and final genotype filtering.")
-    geno_thresh.add_argument("--min_gq", default=20, help="min genotype quality for all GT calls.")
-    geno_thresh.add_argument("--min_het_ref_reads", default=0.2, help="min % reference reads for a het GT call")
-    geno_thresh.add_argument("--max_het_ref_reads", default=0.8, help="max % reference reads for a het GT call")
-    geno_thresh.add_argument("--min_hom_ref_ref_reads", default=0.9, help="min % reference reads for a ref GT call")
-    geno_thresh.add_argument("--max_hom_alt_ref_reads", default=0.1, help="max % reference reads for an alt GT call")
-    geno_thresh.add_argument("--ab_allowed_dev_het", default=0.8,
+    geno_thresh.add_argument("--min_gq", default=20, type=float, help="min genotype quality for all GT calls.")
+    geno_thresh.add_argument("--min_het_ref_reads", default=0.2, type=float,
+                             help="min % reference reads for a het GT call")
+    geno_thresh.add_argument("--max_het_ref_reads", default=0.8, type=float,
+                             help="max % reference reads for a het GT call")
+    geno_thresh.add_argument("--min_hom_ref_ref_reads", default=0.9, type=float,
+                             help="min % reference reads for a ref GT call")
+    geno_thresh.add_argument("--max_hom_alt_ref_reads", default=0.1, type=float,
+                             help="max % reference reads for an alt GT call")
+    geno_thresh.add_argument("--ab_allowed_dev_het", default=0.8, type=float,
                              help="% of het GT calls for a variant allowed to be out of allelic balance (% ref or alt "
                                   "reads out of range for het GT call)")
 
     # LD pruning thresholds #
     ld_thresh = parser.add_argument_group("Thresholds for LD pruning.")
-    ld_thresh.add_argument("--r2", default=0.2, help="r2 correlation cutoff for LD pruning.")
-    ld_thresh.add_argument("--bp_window_size", default=500000, help="Sliding window size for LD pruning in bp.")
+    ld_thresh.add_argument("--r2", default=0.2, type=float, help="r2 correlation cutoff for LD pruning.")
+    ld_thresh.add_argument("--bp_window_size", default=500000, type=int,
+                           help="Sliding window size for LD pruning in bp.")
 
     # Kinship thresholds #
     kin_thresh = parser.add_argument_group("Kinship thresholds.")
-    kin_thresh.add_argument("--kinship_threshold", default=0.088, help="Kinship cutoff for finding related pairs.")
-    kin_thresh.add_argument("--ind_maf", default=0.001, help="Minor allele frequency cutoff for calculating kinship.")
+    kin_thresh.add_argument("--kinship_threshold", default=0.088, type=float,
+                            help="Kinship cutoff for finding related pairs.")
+    kin_thresh.add_argument("--ind_maf", default=0.001, type=float,
+                            help="Minor allele frequency cutoff for calculating kinship.")
     kin_thresh.add_argument("--use_case_info", default=True,
                             help="Use case info to minimize case removal when finding unrelated set of individuals.")
     kin_thresh.add_argument("--plot_kin", default=True, help="Plot kinship values for visual inspection.")
@@ -98,7 +106,7 @@ def parse_arguments(arguments):
 
     # Pop outlier options #
     pop_opts = parser.add_argument_group("Options for population outlier removal")
-    pop_opts.add_argument("--pop_sd_threshold", default=4,
+    pop_opts.add_argument("--pop_sd_threshold", default=4, type=int,
                           help="Number of standard deviations from mean of PC1 and PC2 on which we mark samples as "
                                "population outliers.")
     pop_opts.add_argument("--pca_plot_annotations", type=str,
@@ -116,27 +124,28 @@ def parse_arguments(arguments):
     samples_thresh = parser.add_argument_group("Samples QC thresholds.")
     samples_thresh.add_argument("--chimeras_col", required=True, type=str,
                                 help="Column in matrix table or annotation files giving sample chimera percentage")
-    samples_thresh.add_argument("--chimeras_max", default=0.05, help="Max % of chimeras allowed for sample")
+    samples_thresh.add_argument("--chimeras_max", default=0.05, type=float, help="Max % of chimeras allowed for sample")
     samples_thresh.add_argument("--contamination_col", required=True, type=str,
                                 help="Column in matrix table or annotation files giving sample contamination percent.")
-    samples_thresh.add_argument("--contamination_max", default=0.05, help="Max % contamination allowed for sample")
+    samples_thresh.add_argument("--contamination_max", default=0.05, type=float,
+                                help="Max % contamination allowed for sample")
     samples_thresh.add_argument("--batch_col_name", type=str,
                                 help="Samples annotation in matrix table or annotation giving batch/cohort for "
                                      "stratified samples QC (TiTv, het/homvar, indel ratios, n singletons).")
-    samples_thresh.add_argument("--sampleqc_sd_threshold", default=4,
+    samples_thresh.add_argument("--sampleqc_sd_threshold", default=4, type=int,
                                 help="Number of standard deviations from mean sample can deviate on heterozygosity.")
 
     # Impute sex thresholds #
     sex_thresh = parser.add_argument_group("Impute sex thresholds.")
-    sex_thresh.add_argument("--female_threshold", default=0.4, help="F-stat cutoff for defining female")
-    sex_thresh.add_argument("--male_threshold", default=0.8, help="F-stat cutoff for defining male")
+    sex_thresh.add_argument("--female_threshold", default=0.4, type=float, help="F-stat cutoff for defining female")
+    sex_thresh.add_argument("--male_threshold", default=0.8, type=float, help="F-stat cutoff for defining male")
 
     # Filter by phenotype thresholds #
     pheno_thresh = parser.add_argument_group("Thresholds for filtering by phenotype.")
     pheno_thresh.add_argument("--pheno_col", type=str,
                               help="Samples annotation giving phenotype boolean annotation. Note: samples missing"
                                    "phenotype information are ignored in many cases.")
-    pheno_thresh.add_argument("--pheno_call_rate", default=0.95,
+    pheno_thresh.add_argument("--pheno_call_rate", default=0.95, type=float,
                               help="Min call rate for variant, in cases + controls separately.")
 
     parsed_args = parser.parse_args(arguments)
