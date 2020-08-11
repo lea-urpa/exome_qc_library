@@ -458,10 +458,10 @@ def find_failing_variants(mt, args, mode):
 
     # Failing GSQR filters #
     logging.info("Marking variants with GQSR filters not empty")
-    gqse_filter = hl.cond(hl.len(mt_filt.filters != 0), mt_filt[failing_name].append("failing_GQSR_filters"),
+    gqse_filter = hl.cond(hl.len(mt_filt.filters) != 0, mt_filt[failing_name].append("failing_GQSR_filters"),
                           mt_filt[failing_name])
     mt_filt = mt_filt.annotate_rows(**{failing_name: gqse_filter})
-    failing_gqsr = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains["failing_GQSR_filters"]))
+    failing_gqsr = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("failing_GQSR_filters")))
     failing_gqsr_perc = round(failing_gqsr / total_variants * 100, 2)
     filter_dict["failing_GSQR"] = failing_gqsr
 
@@ -476,7 +476,9 @@ def find_failing_variants(mt, args, mode):
 
     # Find variants with >20% of het genotypes out of allelic balance #
     logging.info("Finding variants failing on het GT allelic balance")
-    ab_filter = hl.cond(hl.is_defined(mt_filt.final_het_ab_all) & (mt_filt.final_het_ab_all < args.final_ab_allowed_dev_het),
+    failing_het_ab_name = mode + '_frac_het_gts_in_ab'
+    ab_filter = hl.cond(hl.is_defined(mt_filt[failing_het_ab_name]) &
+                        (mt_filt[failing_het_ab_name] < args.ab_allowed_dev_het),
                         mt_filt[failing_name].append("failing_het_ab"), mt_filt[failing_name])
     mt_filt = mt_filt.annotate_rows(**{failing_name: ab_filter})
     failing_ab = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("failing_het_ab")))
@@ -492,18 +494,18 @@ def find_failing_variants(mt, args, mode):
 
     hwe_filter = hl.cond(hwe_cond, mt_filt[failing_name].append("failing_hwe"), mt_filt[failing_name])
     mt_filt = mt_filt.annotate_rows(**{failing_name: hwe_filter})
-    failing_hwe = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains['failing_hwe']))
+    failing_hwe = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains('failing_hwe')))
     failing_hwe_perc = round(failing_hwe / total_variants * 100, 2)
     filter_dict["failing_hwe"] = failing_hwe
 
     # Find variants not passing call rate filter #
     if mode == "final":
         logging.info("Finding variants not passing call rate filter, using sex-aware variant call rate ")
-        call_rate_cond = mt_filt.row.sexaware_call_rate < args.min_call_rate
+        call_rate_cond = mt_filt.row.sexaware_call_rate < args.final_min_call_rate
 
     else:  # low-pass
         logging.info("Finding variants not passing call rate filter, NOT using sex-aware variant call rate ")
-        call_rate_cond = mt_filt[varqc_name].call_rate < args.min_call_rate
+        call_rate_cond = mt_filt[varqc_name].call_rate < args.low_pass_min_call_rate
 
     call_rate_filter = hl.cond(call_rate_cond, mt_filt[failing_name].append("failing_call_rate"), mt_filt[failing_name])
     mt_filt = mt_filt.annotate_rows(**{failing_name: call_rate_filter})
@@ -517,10 +519,10 @@ def find_failing_variants(mt, args, mode):
     # Report exclusion numbers to logs
     logging.info(f"\nVariants with length mt.row.filters != 0: {failing_gqsr}, {failing_gqsr_perc}%"
                  f"\nsnp QD < {args.snp_qd} or indel QD < {args.indel_qd}: {failing_qd}, {failing_qd_perc}%"
-                 f"\n>{args.final_ab_allowed_dev_het*100}% of het genotypes out of allelic balance: "
+                 f"\n>{args.ab_allowed_dev_het*100}% of het genotypes out of allelic balance: "
                  f"{failing_ab}, {failing_ab_perc}%"
                  f"\np value HWE < {p_hwe} in {hwe_tag}: {failing_hwe}, {failing_hwe_perc}%"
-                 f"\ncall rate < {args.min_call_rate}: {failing_call_rate}, {failing_cr_perc}%")
+                 f"\ncall rate < {getattr(args, mode + '_min_call_rate')}: {failing_call_rate}, {failing_cr_perc}%")
 
     failing_any = mt_filt.aggregate_rows(hl.agg.count_where(hl.len(mt_filt[failing_name]) != 0))
 
