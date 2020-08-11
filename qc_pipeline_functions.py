@@ -164,7 +164,7 @@ def annotate_samples(mt, args):
             logging.error(e)
             exit(1)
 
-    if args.force:
+    if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step, args)
 
     args.cpcounter += 1
