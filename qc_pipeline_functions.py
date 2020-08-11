@@ -75,7 +75,7 @@ def save_checkpoint(mt, step, args, pruned=False):
     else:
         checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}{prune_str}.mt/"
 
-    logging.info(f"Writing checkpoint after {args.cpcounter}: {step}")
+    logging.info(f"Writing checkpoint {args.cpcounter}: {step}")
 
     step_name = f"{args.cpcounter}_{step}"
     mt = mt.annotate_globals(**{step_name: datestr})
