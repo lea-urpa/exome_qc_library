@@ -295,14 +295,14 @@ def samples_qc(mt, mt_to_annotate, args):
         logging.info(f"Number of samples failing on {measure}: {failing_count}")
         logging.info(f"Number of samples missing {measure}: {missing_count}")
 
-    failing_any = mt.aggregate_cols(hl.agg.count_where(hl.len(mt.failing_samples_qc != 0)))
+    failing_any = mt.aggregate_cols(hl.agg.count_where(hl.len(mt.failing_samples_qc) != 0))
     logging.info(f"Number of samples failing samples QC on any measure: {failing_any}")
 
     if args.pheno_col is not None:
         cases_failing = mt.aggregate_cols(hl.agg.filter(mt[args.pheno_col] == True,
-                                                           hl.agg.count_where(hl.len(mt.failing_samples_qc != 0))))
+                                                           hl.agg.count_where(hl.len(mt.failing_samples_qc) != 0)))
         controls_failing = mt.aggregate_cols(hl.agg.filter(mt[args.pheno_col] == False,
-                                                           hl.agg.count_where(hl.len(mt.failing_samples_qc != 0))))
+                                                           hl.agg.count_where(hl.len(mt.failing_samples_qc) != 0)))
         logging.info(f"Cases failing QC: {cases_failing}")
         logging.info(f"Controls failing QC: {controls_failing}")
 
@@ -316,8 +316,8 @@ def samples_qc(mt, mt_to_annotate, args):
                                                      {'chimeras_max': str(args.chimeras_max),
                                                       'contamination_max': str(args.contamination_max),
                                                       'deviation_multiplier_threshold': str(args.sampleqc_sd_threshold),
-                                                      'batches': batch_set,
-                                                      'batch_cohort_name': args.batch_col_name})
+                                                      'batches': str(batch_set),
+                                                      'batch_cohort_name': str(args.batch_col_name)})
 
     mt_to_annotate = mt_to_annotate.annotate_globals(samples_qc_batch_thresholds=batch_thresholds)
 
