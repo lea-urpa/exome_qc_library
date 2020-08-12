@@ -462,7 +462,7 @@ def impute_sex(mt, args):
     ##############
     # Impute sex #
     ##############
-    mt, imputed_sex = sq.impute_sex_plot(mt_filtered, mt_to_annotate=mt, args=args)
+    mt_filt, imputed_sex, mt = sq.impute_sex_plot(mt_filtered, mt_to_annotate=mt, args=args)
 
     ########################################
     # Annotate  with sex-aware annotations #
