@@ -193,8 +193,8 @@ def samples_qc(mt, mt_to_annotate, args):
                                                      mt.failing_samples_qc.append("failing_contamination"),
                                                      mt.failing_samples_qc))
 
-    failing_chim = mt.aggregate_cols(mt.failing_samples_qc.contains("failing_chimeras"))
-    failing_contam = mt.aggregate_cols(mt.failing_samples_qc.contains("failing_contamination"))
+    failing_chim = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("failing_chimeras")))
+    failing_contam = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("failing_contamination")))
 
     logging.info(f"Number of samples failing on chimeras %: {failing_chim}")
     logging.info(f"Number of samples failing on contamination %: {failing_contam}")
