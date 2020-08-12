@@ -290,12 +290,10 @@ def samples_qc(mt, mt_to_annotate, args):
     # Report failing samples #
     ##########################
     for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
-        defined_values = mt.aggregate_cols(hl.agg.count_where(hl.is_defined(mt.sample_qc[measure])))
-        if defined_values > 0:
-            failing_count = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains([f"failing_{measure}"])))
-            missing_count = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains([f"missing_{measure}"])))
-            logging.info(f"Number of samples failing on {measure}: {failing_count}")
-            logging.info(f"Number of samples missing {measure}: {missing_count}")
+        failing_count = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains(f"failing_{measure}")))
+        missing_count = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains(f"missing_{measure}")))
+        logging.info(f"Number of samples failing on {measure}: {failing_count}")
+        logging.info(f"Number of samples missing {measure}: {missing_count}")
 
     failing_any = mt.aggregate_cols(hl.agg.count_where(hl.len(mt.failing_samples_qc != 0)))
     logging.info(f"Number of samples failing samples QC on any measure: {failing_any}")
