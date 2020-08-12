@@ -185,19 +185,35 @@ def samples_qc(mt, mt_to_annotate, args):
     ############################################################
     # Find samples failing on chimeras or contamination values #
     ############################################################
-    mt = mt.annotate_cols(failing_samples_qc=hl.cond(hl.float(mt[args.chimeras_col]) > args.chimeras_max,
-                                                     mt.failing_samples_qc.append("failing_chimeras"),
-                                                     mt.failing_samples_qc))
+    mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+        (mt[args.chimeras_col] > args.chimeras_max) & hl.is_defined(mt[args.chimeras_col]),
+        mt.failing_samples_qc.append("failing_chimeras"),
+        mt.failing_samples_qc))
 
-    mt = mt.annotate_cols(failing_samples_qc=hl.cond(hl.float(mt[args.contamination_col]) > args.contamination_max,
-                                                     mt.failing_samples_qc.append("failing_contamination"),
-                                                     mt.failing_samples_qc))
+    mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+        ~(hl.is_defined(mt[args.chimeras_col])),
+        mt.failing_samples_qc.append("missing_chimeras"),
+        mt.failing_samples_qc))
+
+    mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+        (mt[args.contamination_col] > args.contamination_max) & hl.is_defined(mt[args.contamination_col]),
+        mt.failing_samples_qc.append("failing_contamination"),
+        mt.failing_samples_qc))
+
+    mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+        ~(hl.is_defined(mt[args.contamination_col])),
+        mt.failing_samples_qc.append("missing_contamination"),
+        mt.failing_samples_qc))
 
     failing_chim = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("failing_chimeras")))
+    miss_chim = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("missing_chimeras")))
     failing_contam = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("failing_contamination")))
+    miss_contam = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("missing_contamination")))
 
-    logging.info(f"Number of samples failing on chimeras %: {failing_chim}")
-    logging.info(f"Number of samples failing on contamination %: {failing_contam}")
+    logging.info(f"Number of samples failing on chimeras % > {args.chimeras_max}: {failing_chim}")
+    logging.info(f"Number of samples missing chimeras %: {miss_chim}")
+    logging.info(f"Number of samples failing on contamination % > {args.contamination_max}: {failing_contam}")
+    logging.info(f"Number of samples missing contamination %: {miss_contam}")
 
     ######################################################################################
     # Find samples failing per-cohort on titv, het_homvar ratio, indel, and # singletons #
@@ -213,27 +229,40 @@ def samples_qc(mt, mt_to_annotate, args):
     for batch in batch_set:
         batch_thresholds[batch] = {}
         for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
-            # Get mean and standard deviation for each measure, for each batch's samples
-            stats = mt.aggregate_cols(hl.agg.filter(mt[args.batch_col_name] == batch,
-                                                    hl.agg.stats(mt.sample_qc[measure])))
+            defined_values = mt.aggregate_cols(hl.agg.count_where(hl.is_defined(mt.sample_qc[measure])))
 
-            # Get cutoffs for each measure
-            cutoff_upper = stats.mean + (args.sampleqc_sd_threshold * stats.stdev)
-            cutoff_lower = stats.mean - (args.sampleqc_sd_threshold * stats.stdev)
+            if defined_values > 0:
+                # Get mean and standard deviation for each measure, for each batch's samples
+                stats = mt.aggregate_cols(hl.agg.filter(mt[args.batch_col_name] == batch,
+                                                        hl.agg.stats(mt.sample_qc[measure])))
 
-            if measure == "n_singleton":
-                logging.info(f"Max number of singletons for batch {batch}: {stats.max}")
+                # Get cutoffs for each measure
+                cutoff_upper = stats.mean + (args.sampleqc_sd_threshold * stats.stdev)
+                cutoff_lower = stats.mean - (args.sampleqc_sd_threshold * stats.stdev)
 
-            mt = mt.annotate_cols(failing_samples_qc=hl.cond(mt.sample_qc[measure] > cutoff_upper,
-                                                             mt.failing_samples_qc.append(f"failing_{measure}"),
-                                                             mt.failing_samples_qc))
+                if measure == "n_singleton":
+                    logging.info(f"Max number of singletons for batch {batch}: {stats.max}")
 
-            mt = mt.annotate_cols(failing_samples_qc=hl.cond(mt.sample_qc[measure] < cutoff_lower,
-                                                             mt.failing_samples_qc.append(f"failing_{measure}"),
-                                                             mt.failing_samples_qc))
+                mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+                    (mt.sample_qc[measure] > cutoff_upper) & hl.is_defined(mt.sample_qc[measure]),
+                    mt.failing_samples_qc.append(f"failing_{measure}"),
+                    mt.failing_samples_qc))
 
-            # Collect thresholds for each batch
-            batch_thresholds[batch][measure] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
+                mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+                    (mt.sample_qc[measure] < cutoff_lower) & hl.is_defined(mt.sample_qc[measure]),
+                    mt.failing_samples_qc.append(f"failing_{measure}"),
+                    mt.failing_samples_qc))
+
+                mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+                    ~(hl.is_defined(mt.sample_qc[measure])),
+                    mt.failing_samples_qc.append(f"missing_{measure}"),
+                    mt.failing_samples_qc))
+
+                # Collect thresholds for each batch
+                batch_thresholds[batch][measure] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
+            else:
+                logging.error(f"Error- no defined values for measure {measure}. NAs can be introduced by division by "
+                              f"zero. Samples not filtered on {measure}!")
 
     ##########################################
     # Create box plots for samples QC values #
@@ -251,17 +280,20 @@ def samples_qc(mt, mt_to_annotate, args):
 
     output_file(f"samples_qc_measure_plots_{datestr}.html")
     for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
-        p = hl.plot.scatter(mt_cols.plot_batch, mt_cols.sample_qc[measure], label=mt_cols[args.batch_col_name],
-                            title=f"{measure} values split by batch.")
-        save(p)
+        defined_values = mt.aggregate_cols(hl.agg.count_where(hl.is_defined(mt.sample_qc[measure])))
+        if defined_values > 0:
+            p = hl.plot.scatter(mt_cols.plot_batch, mt_cols.sample_qc[measure], label=mt_cols[args.batch_col_name],
+                                title=f"{measure} values split by batch.")
+            save(p)
 
     ##########################
     # Report failing samples #
     ##########################
     for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
         failing_count = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains([f"failing_{measure}"])))
-
+        missing_count = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains([f"missing_{measure}"])))
         logging.info(f"Number of samples failing on {measure}: {failing_count}")
+        logging.info(f"Number of samples missing {measure}: {missing_count}")
 
     failing_any = mt.aggregate_cols(hl.agg.count_where(hl.len(mt.failing_samples_qc != 0)))
     logging.info(f"Number of samples failing samples QC on any measure: {failing_any}")
