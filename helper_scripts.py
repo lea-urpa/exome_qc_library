@@ -44,12 +44,13 @@ def add_preemptibles(cluster_name, num_preemptibles, region='europe-west1'):
     :param region: region (default europe-west1)
     :return:
     """
-    logging.info(f"Adding {str(num_preemptibles)} preemptiple nodes to cluster {cluster_name}")
+    if cluster_name is not None:
+        logging.info(f"Adding {str(num_preemptibles)} preemptiple nodes to cluster {cluster_name}")
 
-    cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
-                      f"--num-secondary-workers {str(num_preemptibles)}")
+        cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
+                          f"--num-secondary-workers {str(num_preemptibles)}")
 
-    subprocess.call(cmd)
+        subprocess.call(cmd)
 
 
 def remove_preemptibles(cluster_name, region='europe-west1'):
@@ -59,9 +60,10 @@ def remove_preemptibles(cluster_name, region='europe-west1'):
     :param region: region, default 'europe-west1'
     :return:
     """
-    logging.info('Removing preemptible nodes.')
+    if cluster_name is not None:
+        logging.info('Removing preemptible nodes.')
 
-    cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
-                      f"--num-secondary-workers 0")
+        cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
+                          f"--num-secondary-workers 0")
 
-    subprocess.call(cmd)
+        subprocess.call(cmd)
