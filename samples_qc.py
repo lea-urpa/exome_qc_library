@@ -351,7 +351,7 @@ def impute_sex_plot(mt, args, mt_to_annotate=None):
         mt_to_annotate = mt_to_annotate.annotate_globals(sex_imputation_thresholds=
                                                          {'female_threshold': args.female_threshold,
                                                           'male_threshold': args.male_threshold})
-        args.sex_col = "is_female_imputed"
+        args.sex_col = "is_female"
         args.male_tag = False
         args.female_tag = True
 
