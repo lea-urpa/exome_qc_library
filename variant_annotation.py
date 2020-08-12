@@ -165,10 +165,10 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
     mt_rows = mt.rows()
 
     annotations_to_transfer = ['male_hets', 'male_homvars', 'male_calls', 'female_hets', 'female_homvars',
-                               'females_calls', 'sexaware_call_rate', 'sexaware_AC', 'sexaware_AN']
+                               'female_calls', 'sexaware_call_rate', 'sexaware_AC', 'sexaware_AN']
 
     for annotation in annotations_to_transfer:
-        mt_to_annotate = mt_to_annotate.annotate_rows(**{annotation: mt_rows[mt.s][annotation]})
+        mt_to_annotate = mt_to_annotate.annotate_rows(**{annotation: mt_rows[mt_to_annotate.row_key][annotation]})
 
     if args.pheno_col is not None:
         logging.info("Annotating sex-aware variant annotations, taking case/control status into account.")
@@ -190,7 +190,7 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
                               (hl.case()
                                   .when(mt.locus.in_y_nonpar(), (mt.case_male_calls / num_case_males))
                                   .when(mt.locus.in_x_nonpar(),
-                                        (mt.case_male_calls + 2 * mt.num_case_females) /
+                                        (mt.case_male_calls + 2 * num_case_females) /
                                         (num_case_males + 2 * num_case_females))
                                   .default((mt.case_male_homvars + mt.case_female_calls) /
                                            (num_case_males + num_case_females))),
@@ -230,7 +230,7 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
                               (hl.case()
                                .when(mt.locus.in_y_nonpar(), (mt.cont_male_calls / num_cont_males))
                                .when(mt.locus.in_x_nonpar(),
-                                     (mt.cont_male_calls + 2 * mt.num_cont_females) /
+                                     (mt.cont_male_calls + 2 * num_cont_females) /
                                      (num_cont_males + 2 * num_cont_females))
                                .default((mt.cont_male_homvars + mt.cont_female_calls) /
                                         (num_cont_males + num_cont_females))),
@@ -254,7 +254,7 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
                                         'sexaware_cont_AC', 'sexaware_cont_AN'])
 
         for annotation in case_annots_to_transfer:
-            mt_to_annotate = mt_to_annotate.annotate_rows(**{annotation: mt_rows[mt.s][annotation]})
+            mt_to_annotate = mt_to_annotate.annotate_rows(**{annotation: mt_rows[mt_to_annotate.row_key][annotation]})
 
     return mt_to_annotate
 
