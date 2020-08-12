@@ -181,7 +181,7 @@ def remove_samples(mt, args):
     step = "sample_removal"
     # Load data from after sample annotation, if we are starting at this checkpoint, else pass from prev step
     if args.checkpoint == args.cpcounter:
-        mt = hl.load_checkpoint(args.checkpoint, 'samples_annotation', args)
+        mt = load_checkpoint(args.checkpoint, 'samples_annotation', args)
 
     if (args.sample_removal_strings is not None) or (args.sample_removal_list is not None):
         samples_start = mt.count_cols()
