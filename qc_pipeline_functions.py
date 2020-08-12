@@ -384,7 +384,7 @@ def find_pop_outliers(mt, mt_ldpruned, args):
 
     if args.checkpoint == args.cpcounter:
         mt = load_checkpoint(args.checkpoint, 'find_related_individuals', args)
-        mt_ldpruned = load_checkpoint(args.checkpoint, 'maf_ld_prune', args)
+        mt_ldpruned = load_checkpoint(args.checkpoint, 'find_related_individuals', args)
 
     ##########################################################################################
     # Find population outliers from filtered + LD pruned dataset, annotate unfiltered datset #
