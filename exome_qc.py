@@ -331,11 +331,11 @@ if __name__ == "__main__":
     # Find population outliers (excludes relatives)
     mt = qc.find_pop_outliers(mt, mt_ldpruned, args)
 
-    # Analytical samples QC (samples QC hard filters)
-    mt = qc.samples_qc(mt, args)
-
     # Impute sex
     mt = qc.impute_sex(mt, args)
+
+    # Samples QC
+    mt = qc.samples_qc(mt, args)
 
     # Variant QC filtering
     mt = qc.final_variant_qc(mt, args)
