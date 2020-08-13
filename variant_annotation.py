@@ -15,7 +15,7 @@ def annotate_variants(mt):
     :return: returns matrix table with new row annotations gene, LOF, and missense.
     '''
     try:
-        test = mt.row.was_split.describe()
+        test = hl.is_defined(mt.row.was_split)
     except Exception as e:
         print('Split multi-allelics before running!')
         print(e)
