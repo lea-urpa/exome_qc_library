@@ -117,7 +117,7 @@ def find_failing_genotypes_depth_quality(mt, args, prefix):
     if missing_depth > 0:
         logging.info(f"Number of GTs that are defined but missing depth measure: {missing_depth} ({missing_depth_perc}%)")
 
-    passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.len(mt[failing_name]) == 0))
+    passing_gts = mt.aggregate_entries(hl.agg.count_where((hl.len(mt[failing_name]) == 0) & hl.is_defined(mt.GT)))
     passing_gts_perc = round(passing_gts / gt_total * 100, 2)
 
     logging.info(f"Number of passing genotypes: {passing_gts} ({passing_gts_perc}%)")
@@ -426,10 +426,10 @@ def find_failing_variants(mt, args, mode):
     elif mode == "final":
         # Check that samples QC has been run
         try:
-            test = hl.is_defined(mt.failing_qc_samples)
+            test = hl.is_defined(mt.failing_samples_qc)
             test = hl.is_defined(mt.pop_outlier_samples)
         except Exception as e:
-            logging.info('failing_qc_samples and pop_outlier_samples not defined! Run samples QC before invoking this.')
+            logging.info('failing_samples_qc and pop_outlier_samples not defined! Run samples QC before invoking this.')
             logging.info(e)
 
         # Define variables
@@ -693,10 +693,10 @@ def find_variants_failing_by_pheno(mt, args):
     """
     # Check that samples QC has been run
     try:
-        test = hl.is_defined(mt.failing_qc_samples)
+        test = hl.is_defined(mt.failing_samples_qc)
         test = hl.is_defined(mt.pop_outlier_samples)
     except Exception as e:
-        logging.info('failing_qc_samples and pop_outlier_samples not defined! Run samples QC before running this.')
+        logging.info('failing_samples_qc and pop_outlier_samples not defined! Run samples QC before running this.')
         logging.info(e)
 
     # Initialize sample annotation for phenotype-specific measures
