@@ -427,9 +427,9 @@ def find_failing_variants(mt, args, mode):
         # Check that samples QC has been run
         try:
             test = hl.is_defined(mt.failing_samples_qc)
-            test = hl.is_defined(mt.pop_outlier_samples)
+            test = hl.is_defined(mt.pop_outlier_sample)
         except Exception as e:
-            logging.info('failing_samples_qc and pop_outlier_samples not defined! Run samples QC before invoking this.')
+            logging.info('failing_samples_qc and pop_outlier_sample not defined! Run samples QC before invoking this.')
             logging.info(e)
 
         # Define variables
@@ -623,13 +623,13 @@ def find_failing_variants(mt, args, mode):
     if mode == "final":
         logging.info("Finding variants not passing call rate filter, using sex-aware variant call rate ")
         call_rate_cond = (mt_filt.row.sexaware_call_rate < args.final_min_call_rate) & \
-                         hl.is_defined(mt_filt.sexaware_call_rate)
+                          hl.is_defined(mt_filt.sexaware_call_rate)
         cr_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt.sexaware_call_rate)))
 
     else:  # low-pass
         logging.info("Finding variants not passing call rate filter, NOT using sex-aware variant call rate ")
         call_rate_cond = (mt_filt[varqc_name].call_rate < args.low_pass_min_call_rate) & \
-                         hl.is_defined(mt_filt[varqc_name].call_rate)
+                          hl.is_defined(mt_filt[varqc_name].call_rate)
         cr_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt[varqc_name].call_rate)))
     call_rate_filter = hl.cond(call_rate_cond, mt_filt[failing_name].append("failing_call_rate"), mt_filt[failing_name])
 
@@ -667,9 +667,6 @@ def find_failing_variants(mt, args, mode):
 
     if args.pheno_col is not None:
         mt = mt.annotate_rows(hwe_ctrls_only=mt_filt.index_rows(mt.row_key).hwe_ctrls_only)
-
-    if mode == 'final':
-        mt = mt.annotate_rows(final_het_callrate=mt_filt.index_rows(mt.row_key).final_het_callrate)
 
     return mt
 
