@@ -681,13 +681,13 @@ def find_variants_failing_by_pheno(mt, args):
     # Check that samples QC has been run
     try:
         test = hl.is_defined(mt.failing_samples_qc)
-        test = hl.is_defined(mt.pop_outlier_samples)
+        test = hl.is_defined(mt.pop_outlier_sample)
     except Exception as e:
-        logging.info('failing_samples_qc and pop_outlier_samples not defined! Run samples QC before running this.')
+        logging.info('failing_samples_qc and pop_outlier_sample not defined! Run samples QC before running this.')
         logging.info(e)
 
     # Initialize sample annotation for phenotype-specific measures
-    mt = mt.annotate_cols(failing_pheno_varqc=hl.empty_array(hl.tstr))
+    mt = mt.annotate_rows(failing_pheno_varqc=hl.empty_array(hl.tstr))
 
     ##############################################################
     # Annotate variants failing on case-specific allelic balance #
@@ -696,14 +696,14 @@ def find_variants_failing_by_pheno(mt, args):
                         (mt.final_case_frac_het_gts_in_ab < args.ab_allowed_dev_het),
                         mt.failing_pheno_varqc.append("failing_case_het_ab"),
                         mt.failing_pheno_varqc)
-    mt = mt.annotate_cols(failing_pheno_varqc=case_cond)
+    mt = mt.annotate_rows(failing_pheno_varqc=case_cond)
     failing_ab_case = mt.aggregate_rows(hl.agg.count_where(mt.failing_pheno_varqc.contains("failing_case_het_ab")))
 
     control_cond = hl.cond(hl.is_defined(mt.final_control_frac_het_gts_in_ab) &
                            (mt.final_control_frac_het_gts_in_ab < args.ab_allowed_dev_het),
                            mt.failing_pheno_varqc.append("failing_control_het_ab"),
                            mt.failing_pheno_varqc)
-    mt = mt.annotate_cols(failing_pheno_varqc=control_cond)
+    mt = mt.annotate_rows(failing_pheno_varqc=control_cond)
     failing_ab_cont = mt.aggregate_rows(hl.agg.count_where(mt.failing_pheno_varqc.contains("failing_control_het_ab")))
 
     ################################################################
@@ -713,14 +713,14 @@ def find_variants_failing_by_pheno(mt, args):
                            (mt.sexaware_case_call_rate < args.pheno_call_rate),
                            mt.failing_pheno_varqc.append("failing_case_call_rate"),
                            mt.failing_pheno_varqc)
-    mt = mt.annotate_cols(failing_pheno_varqc=case_cr_cond)
+    mt = mt.annotate_rows(failing_pheno_varqc=case_cr_cond)
     failing_cr_case = mt.aggregate_rows(hl.agg.count_where(mt.failing_pheno_varqc.contains("failing_case_call_rate")))
 
     cont_cr_cond = hl.cond(hl.is_defined(mt.sexaware_cont_call_rate) &
                            (mt.sexaware_cont_call_rate < args.pheno_call_rate),
                            mt.failing_pheno_varqc.append("failing_cont_call_rate"),
                            mt.failing_pheno_varqc)
-    mt = mt.annotate_cols(failing_pheno_varqc=cont_cr_cond)
+    mt = mt.annotate_rows(failing_pheno_varqc=cont_cr_cond)
     failing_cr_cont = mt.aggregate_rows(hl.agg.count_where(mt.failing_pheno_varqc.contains("failing_cont_call_rate")))
 
     mt = mt.annotate_globals(case_control_callrate_threshold=args.pheno_call_rate)
