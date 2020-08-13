@@ -570,7 +570,7 @@ def calculate_final_pcs(mt, args):
     # Filter out relatives #
     ########################
     logging.info("Filtering to unrelated individuals for PC calculations.")
-    mt_norelateds = mt.filter_cols(mt_filtered.related_to_remove == False, keep=True)
+    mt_norelateds = mt_filtered.filter_cols(mt_filtered.related_to_remove == False, keep=True)
 
     ##############################################
     # MAF prune and LD prune for calculating PCS #
