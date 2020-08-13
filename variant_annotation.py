@@ -135,8 +135,8 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
     female_homvars, female_calls, sexaware_call_rate, sexaware_ac and sexaware_an.
     '''
     logging.info('Annotating sex-aware variant annotations.')
-    is_female = mt[args.sex_col] == args.female_tag
-    is_male = mt[args.sex_col] == args.male_tag
+    is_female = (mt[args.sex_col] == args.female_tag) & hl.is_defined(mt[args.sex_col])
+    is_male = (mt[args.sex_col] == args.male_tag) & hl.is_defined(mt[args.sex_col])
 
     num_males = mt.aggregate_cols(hl.agg.count_where(is_male))
     num_females = mt.aggregate_cols(hl.agg.count_where(is_female))
@@ -149,8 +149,9 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
                           female_calls=hl.agg.count_where(hl.is_defined(mt.GT) & is_female))
 
     mt = mt.annotate_rows(sexaware_call_rate=(hl.case()
-                                              .when(mt.locus.in_y_nonpar(), (mt.male_calls / num_males))
-                                              .when(mt.locus.in_x_nonpar(),
+                                              .when(mt.locus.in_y_nonpar() & hl.is_defined(mt.locus),
+                                                    (mt.male_calls / num_males))
+                                              .when(mt.locus.in_x_nonpar() & hl.is_defined(mt.locus),
                                                     (mt.male_calls + 2*mt.female_calls) / (num_males + 2*num_females))
                                               .default((mt.male_calls + mt.female_calls) / (num_males + num_females))),
                           sexaware_AC=(hl.case()  # MINOR allele count
