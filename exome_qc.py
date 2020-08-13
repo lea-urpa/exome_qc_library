@@ -293,8 +293,8 @@ if __name__ == "__main__":
     args.find_related_individuals = {'prefix': '5', 'suffix': 'after_finding_relatives'}
     args.find_related_individuals_ld_pruned = {'prefix': '5', 'suffix': 'after_finding_relatives_ld_pruned'}
     args.find_pop_outliers = {'prefix': '6', 'suffix': 'after_finding_pop_outliers'}
-    args.samples_qc = {'prefix': '7', 'suffix': 'after_samples_qc'}
-    args.impute_sex = {'prefix': '8', 'suffix': 'after_imputing_sex'}
+    args.impute_sex = {'prefix': '7', 'suffix': 'after_imputing_sex'}
+    args.samples_qc = {'prefix': '8', 'suffix': 'after_samples_qc'}
     args.final_variant_qc = {'prefix': '9', 'suffix': 'after_final_variant_qc'}
     args.filter_variants_by_phenotype = {'prefix': '10', 'suffix': 'after_filter_var_by_pheno'}
     args.maf_filter_pcs = {'prefix': '11', 'suffix': 'after_maf_filter_pcs'}

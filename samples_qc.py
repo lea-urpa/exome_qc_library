@@ -225,6 +225,34 @@ def samples_qc(mt, mt_to_annotate, args):
     logging.info(f"Number of samples failing on contamination % > {args.contamination_max}: {failing_contam}")
     logging.info(f"Number of samples missing contamination %: {miss_contam}")
 
+    ###############################################
+    # Find samples failing on sex-aware call rate #
+    ###############################################
+    mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+        (mt.sexaware_sample_call_rate > args.sample_call_rate) & hl.is_defined(mt.sexaware_sample_call_rate),
+        mt.failing_samples_qc.append("failing_sexaware_sample_call_rate"),
+        mt.failing_samples_qc))
+
+    mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+        ~(hl.is_defined(mt.sexaware_sample_call_rate)),
+        mt.failing_samples_qc.append("missing_sexaware_sample_call_rate"),
+        mt.failing_samples_qc))
+
+    failing_cr = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("failing_sexaware_sample_call_rate")))
+    missing_cr = mt.aggregate_cols(
+        hl.agg.count_where(mt.failing_samples_qc.contains("missing_sexaware_sample_call_rate")))
+
+    logging.info(f"Number of samples failing on sex-aware call rate > {args.sexaware_sample_call_rate}: {failing_cr}")
+    logging.info(f"Number of samples missing sex-aware call rate : {missing_cr}")
+
+    cr_stats = mt.aggregate_cols(hl.agg.stats(mt.sexaware_sample_call_rate))
+    chim_stats = mt.aggregate_cols(hl.agg.stats(mt[args.chimeras_col]))
+    cont_stats = mt.aggregate_cols(hl.agg.stats(mt[args.contamination_col]))
+
+    logging.info(f"Sex-aware call rate statistics: {cr_stats}")
+    logging.info(f"Chimeras statistics: {chim_stats}")
+    logging.info(f"Contamination statistics: {cont_stats}")
+
     ######################################################################################
     # Find samples failing per-cohort on titv, het_homvar ratio, indel, and # singletons #
     ######################################################################################

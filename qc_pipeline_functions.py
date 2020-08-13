@@ -398,39 +398,6 @@ def find_pop_outliers(mt, mt_ldpruned, args):
     return mt
 
 
-def samples_qc(mt, args):
-    """
-    Performs samples quality control on the dataset
-    :param mt: matrix table to analyze
-    :param args:
-    :return: returns matrix table annotated with samples failing analytical samples QC
-    """
-    if (args.checkpoint > args.cpcounter) | args.run_king:
-        args.cpcounter += 1
-        return mt
-
-    step = "samples_qc"
-
-    if args.checkpoint == args.cpcounter:
-        mt = load_checkpoint(args.checkpoint, 'find_pop_outliers', args)
-
-    ######################################################
-    # Filter failing variants + genotypes for samples QC #
-    ######################################################
-    mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
-
-    ##################
-    # Run samples QC #
-    ##################
-    mt = sq.samples_qc(mt_filtered, mt_to_annotate=mt, args=args)
-
-    if args.overwrite_checkpoints:
-        mt = save_checkpoint(mt, step, args)
-
-    args.cpcounter += 1
-    return mt
-
-
 def impute_sex(mt, args):
     """
     Impute sex before variant QC filtering, run sex-specific annotations.
@@ -446,7 +413,7 @@ def impute_sex(mt, args):
     step = 'impute_sex'
 
     if args.checkpoint == args.cpcounter:
-        mt = load_checkpoint(args.checkpoint, 'samples_qc', args)
+        mt = load_checkpoint(args.checkpoint, 'find_pop_outliers', args)
 
     ##########################################################
     # Run custom variant annotation, parsing VEP annotations #
@@ -480,6 +447,39 @@ def impute_sex(mt, args):
         mt = save_checkpoint(mt, step,  args)
     args.cpcounter += 1
 
+    return mt
+
+
+def samples_qc(mt, args):
+    """
+    Performs samples quality control on the dataset
+    :param mt: matrix table to analyze
+    :param args:
+    :return: returns matrix table annotated with samples failing analytical samples QC
+    """
+    if (args.checkpoint > args.cpcounter) | args.run_king:
+        args.cpcounter += 1
+        return mt
+
+    step = "samples_qc"
+
+    if args.checkpoint == args.cpcounter:
+        mt = load_checkpoint(args.checkpoint, 'impute_sex', args)
+
+    ######################################################
+    # Filter failing variants + genotypes for samples QC #
+    ######################################################
+    mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
+
+    ##################
+    # Run samples QC #
+    ##################
+    mt = sq.samples_qc(mt_filtered, mt_to_annotate=mt, args=args)
+
+    if args.overwrite_checkpoints:
+        mt = save_checkpoint(mt, step, args)
+
+    args.cpcounter += 1
     return mt
 
 
