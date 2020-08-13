@@ -728,4 +728,12 @@ def find_variants_failing_by_pheno(mt, args):
 
     mt = mt.annotate_globals(case_control_callrate_threshold=args.pheno_call_rate)
 
+    logging.info(f"Number of variants failing on case ab: {failing_ab_case}")
+    logging.info(f"Number of variants failing on control ab: {failing_ab_cont}")
+    logging.info(f"Number of variants failing on case call rate: {failing_cr_case}")
+    logging.info(f"Number of variants failing on control call rate: {failing_cr_cont}")
+
+    failing_any = mt.aggregate_rows(hl.agg.count_where(hl.len(mt.failing_pheno_varqc != 0)))
+    logging.info(f"Number of variants failing on any phenotype-specific measure: {failing_any}")
+
     return mt
