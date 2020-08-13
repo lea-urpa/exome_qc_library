@@ -9,7 +9,7 @@ import hail as hl
 from bokeh.io import output_file, save
 
 
-def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, unfilter_entries=False):
+def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, unfilter_entries=False, pheno_qc=False):
     """
     Filters failing samples, variants, and entries from a given matrix table
     :param mt: matrix table to filter
@@ -25,20 +25,30 @@ def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, un
     tag = []
     if entries:
         mt = mt.filter_entries((hl.len(mt[mode + '_failing_depth_quality']) == 0) &
-                               (hl.len(mt[mode + '_failing_ab']) == 0), keep=True)
+                                hl.is_defined(mt[mode + '_failing_depth_quality']) &
+                               (hl.len(mt[mode + '_failing_ab']) == 0) & hl.is_defined(mt[mode + "_failing_ab"]),
+                               keep=True)
         tag.append("entries")
     if variants:
-        mt = mt.filter_rows(hl.len(mt[mode + '_failing_variant_qc']) == 0, keep=True)
+        mt = mt.filter_rows((hl.len(mt[mode + '_failing_variant_qc']) == 0) &
+                            hl.is_defined(mt[mode + "_failing_variant_qc"]), keep=True)
         tag.append("variants")
+        if (args.pheno_col is not None) and (pheno_qc is True):
+            mt = mt.filter_rows((hl.len(mt.failing_pheno_varqc) == 0) & hl.is_defined(mt.failing_pheno_varqc),
+                                keep=True)
+
+            tag.append("variants by phenotype")
+
     if samples:
-        mt = mt.filter_cols((hl.len(mt.failing_samples_qc) == 0) & mt.pop_outlier_sample == False, keep=True)
+        mt = mt.filter_cols((hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc) &
+                            (mt.pop_outlier_sample == False) & hl.is_defined(mt.pop_outlier_sample), keep=True)
         tag.append("samples")
 
     final_count = mt.count()
 
     logging.info(f"Removing failing {', '.join(tag)}.")
     if entries:
-        logging.info("Including entries failing allelic balance.")
+        logging.info("(including entries failing allelic balance)")
 
     logging.info(f"Matrix table count before filtering: {start_count}. After filtering: {final_count}")
 

@@ -114,8 +114,10 @@ def find_failing_genotypes_depth_quality(mt, args, prefix):
 
     if missing_gq > 0:
         logging.info(f"Number of GTs that are defined but missing GQ or PL measures: {missing_gq} ({missing_gq_perc}%)")
+        logging.info("(these genotypes missing GQ or PL measures are counted as failing)")
     if missing_depth > 0:
         logging.info(f"Number of GTs that are defined but missing depth measure: {missing_depth} ({missing_depth_perc}%)")
+        logging.info("(these genotypes missing depth measure are counted as failing)")
 
     passing_gts = mt.aggregate_entries(hl.agg.count_where((hl.len(mt[failing_name]) == 0) & hl.is_defined(mt.GT)))
     passing_gts_perc = round(passing_gts / gt_total * 100, 2)
@@ -625,12 +627,21 @@ def find_failing_variants(mt, args, mode):
         call_rate_cond = (mt_filt.row.sexaware_call_rate < args.final_min_call_rate) & \
                           hl.is_defined(mt_filt.sexaware_call_rate)
         cr_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt.sexaware_call_rate)))
+        low_passing_vars = mt_filt.aggregate_rows(hl.agg.count_where(hl.len(mt_filt.low_pass_failing_variant_qc) == 0))
+        if cr_defined < low_passing_vars:
+            logging.error(f"Note! sex aware call rate annotation defined for only {cr_defined} variants, where "
+                          f"there are {low_passing_vars} variants passing low pass variant QC.Something is wrong!")
 
     else:  # low-pass
         logging.info("Finding variants not passing call rate filter, NOT using sex-aware variant call rate ")
         call_rate_cond = (mt_filt[varqc_name].call_rate < args.low_pass_min_call_rate) & \
                           hl.is_defined(mt_filt[varqc_name].call_rate)
         cr_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt[varqc_name].call_rate)))
+        if cr_defined < total_variants:
+            # We should always expect defined values for this.
+            logging.error(f"Note! Call rate annotation defined for only {cr_defined} variants! "
+                          f"Something is wrong, check this.")
+
     call_rate_filter = hl.cond(call_rate_cond, mt_filt[failing_name].append("failing_call_rate"), mt_filt[failing_name])
 
     # Annotate rows
@@ -639,11 +650,6 @@ def find_failing_variants(mt, args, mode):
     failing_call_rate = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("failing_call_rate")))
     failing_cr_perc = round(failing_call_rate / total_variants * 100, 2)
     filter_dict["failing_call_rate"] = failing_call_rate
-    # Report if variant annotation undefined
-    if cr_defined < total_variants:
-        # We should always expect defined values for this.
-        logging.error(f"Note! Call rate annotation defined for only {cr_defined} variants! "
-                      f"Something is wrong, check this.")
 
     ######################################################
     # Annotate failing counts to globals, report to logs #
@@ -656,10 +662,9 @@ def find_failing_variants(mt, args, mode):
                  f"\np value HWE < {p_hwe} in {hwe_tag}: {failing_hwe}, {failing_hwe_perc}%"
                  f"\ncall rate < {getattr(args, mode + '_min_call_rate')}: {failing_call_rate}, {failing_cr_perc}%")
 
-    failing_any = mt_filt.aggregate_rows(hl.agg.count_where(hl.len(mt_filt[failing_name]) != 0))
+    passing = mt_filt.aggregate_rows(hl.agg.count_where(hl.len(mt_filt[failing_name]) == 0))
 
-    logging.info(f"Variants failing QC: {failing_any}, {round(failing_any / total_variants * 100, 2)}%")
-
+    logging.info(f"Variants passing QC: {passing}, {round(passing / total_variants * 100, 2)}%")
     # Add annotations back to main matrix table (not filtered), return that
     mt = mt.annotate_globals(**{mode + "_filtered_counts": filter_dict})
     mt = mt.annotate_rows(**{varqc_name: mt_filt.index_rows(mt.row_key)[varqc_name]})

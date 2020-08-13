@@ -467,10 +467,10 @@ def impute_sex(mt, args):
     ########################################
     # Annotate  with sex-aware annotations #
     ########################################
-    logging.info("Annotating sex-aware variant and sample annotations, using dataset with failing samples, variants, "
+    logging.info("Annotating sex-aware sample annotations, using dataset with failing samples, variants, "
                  "and genotypes filtered out.")
-    mt = va.sex_aware_variant_annotations(mt_filtered, mt_to_annotate=mt, args=args)
     mt = sa.sex_aware_sample_annotations(mt_filtered, mt_to_annotate=mt, args=args)
+    mt = va.sex_aware_variant_annotations(mt_filtered, mt_to_annotate=mt, args=args)
 
     if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step,  args)
@@ -564,7 +564,7 @@ def calculate_final_pcs(mt, args):
     #######################################################################
     # Filter out failing samples, variants, genotypes for PC calculations #
     #######################################################################
-    mt_filtered = sq.filter_failing(mt, args, mode="final", unfilter_entries=True)
+    mt_filtered = sq.filter_failing(mt, args, mode="final", unfilter_entries=True, pheno_qc=True)
 
     ########################
     # Filter out relatives #
@@ -588,7 +588,7 @@ def calculate_final_pcs(mt, args):
     ################################################
     # Calculate PCs and project to relatives, plot #
     ################################################
-    mt = sq.project_pcs_relateds(mt_ldpruned, mt, args.covar_pc_num)
+    mt = sq.project_pcs_relateds(mt_ldpruned, mt, args.pc_num)
     datestr = time.strftime("%Y.%m.%d")
     output_file(datestr + '_final_pcs_plot.html')
     pcplot = hl.plot.scatter(mt.pc1, mt.pc2)
