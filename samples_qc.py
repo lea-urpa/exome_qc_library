@@ -229,7 +229,7 @@ def samples_qc(mt, mt_to_annotate, args):
     # Find samples failing on sex-aware call rate #
     ###############################################
     mt = mt.annotate_cols(failing_samples_qc=hl.cond(
-        (mt.sexaware_sample_call_rate > args.sample_call_rate) & hl.is_defined(mt.sexaware_sample_call_rate),
+        (mt.sexaware_sample_call_rate < args.sample_call_rate) & hl.is_defined(mt.sexaware_sample_call_rate),
         mt.failing_samples_qc.append("failing_sexaware_sample_call_rate"),
         mt.failing_samples_qc))
 
