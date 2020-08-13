@@ -36,7 +36,6 @@ def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, un
         if (args.pheno_col is not None) and (pheno_qc is True):
             mt = mt.filter_rows((hl.len(mt.failing_pheno_varqc) == 0) & hl.is_defined(mt.failing_pheno_varqc),
                                 keep=True)
-
             tag.append("variants by phenotype")
 
     if samples:
@@ -57,7 +56,8 @@ def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, un
         mt = mt.unfilter_entries()
 
     logging.info(f"Writing temporary checkpoint for filtered mt.")
-    mt = mt.checkpoint(f"{args.output_stem}_{mode}_removed_tmp.mt", overwrite=True)
+    mt = mt.checkpoint(f"{args.output_stem}_{mode}_removed_tmp_{args.tmp_counter}.mt", overwrite=True)
+    args.tmp_counter = args.tmp_counter + 1
 
     return mt
 

@@ -308,6 +308,7 @@ if __name__ == "__main__":
     args.output_stem = os.path.join(args.out_dir, args.out_name)
     args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
     args.plot_folder = os.path.join(args.out_dir, "plots")
+    args.tmp_counter = 0
 
     # Load in data according to parameters given
     mt = qc.load_data(args)
