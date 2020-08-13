@@ -294,7 +294,9 @@ if __name__ == "__main__":
     args.impute_sex = {'prefix': '8', 'suffix': 'after_imputing_sex'}
     args.final_variant_qc = {'prefix': '9', 'suffix': 'after_final_variant_qc'}
     args.filter_variants_by_phenotype = {'prefix': '10', 'suffix': 'after_filter_var_by_pheno'}
-    args.final_pc_calculation = {'prefix': '11', 'suffix': 'after_final_pc_calculation'}
+    args.maf_filter_pcs = {'prefix': '11', 'suffix': 'after_maf_filter_pcs'}
+    args.ld_prune_pcs = {'prefix': '12', 'suffix': 'after_ld_prune_pcs'}
+    args.final_pc_calculation = {'prefix': '13', 'suffix': 'after_final_pc_calculation'}
 
     ################
     # Run pipeline #
