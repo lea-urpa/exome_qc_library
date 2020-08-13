@@ -75,8 +75,11 @@ def check_counts(mt, args):
     defined_cols = mt.aggregate_cols(hl.agg.count_where(hl.is_defined(mt.s)))
     if (counts[0] != args.start_rows) or (counts[1] != args.start_cols):
         print(f"Error! counts mismatch! Start rows: {args.start_rows}, start cols: {args.start_cols}, count: {counts}")
-        exit()
+    else:
+        print("counts OK")
 
     if (defined_rows != args.start_rows) or (defined_cols != args.start_cols):
         print(f"Error! defined mismatch! Start rows: {args.start_rows}, start cols: {args.start_cols}, "
               f"defined rows: {defined_rows}, defined cols: {defined_cols}")
+    else:
+        print("defined counts OK ")
