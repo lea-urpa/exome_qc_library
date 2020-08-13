@@ -351,7 +351,7 @@ def find_related_individuals(mt, mt_ldpruned, args):
 
             if args.overwrite_checkpoints:
                 mt = save_checkpoint(mt, step, args)
-                mt_ldpruned = save_checkpoint(mt_ldpruned, step, args)
+                mt_ldpruned = save_checkpoint(mt_ldpruned, step + "_ld_pruned", args)
 
             args.cpcounter += 1
             return mt, mt_ldpruned
@@ -560,7 +560,6 @@ def calculate_final_pcs(mt, args):
 
     if args.checkpoint == args.cpcounter:
         mt = load_checkpoint(args.checkpoint, 'filter_variants_by_phenotype', args)
-
     #######################################################################
     # Filter out failing samples, variants, genotypes for PC calculations #
     #######################################################################

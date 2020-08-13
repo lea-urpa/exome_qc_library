@@ -291,6 +291,7 @@ if __name__ == "__main__":
     args.low_pass_variant_qc = {'prefix': '3', 'suffix': 'after_low_pass_variant_qc'}
     args.maf_ld_prune = {'prefix': '4', 'suffix': 'after_maf_ld_prune'}
     args.find_related_individuals = {'prefix': '5', 'suffix': 'after_finding_relatives'}
+    args.find_related_individuals_ld_pruned = {'prefix': '5', 'suffix': 'after_finding_relatives_ld_pruned'}
     args.find_pop_outliers = {'prefix': '6', 'suffix': 'after_finding_pop_outliers'}
     args.samples_qc = {'prefix': '7', 'suffix': 'after_samples_qc'}
     args.impute_sex = {'prefix': '8', 'suffix': 'after_imputing_sex'}
