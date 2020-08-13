@@ -603,8 +603,8 @@ def find_failing_variants(mt, args, mode):
         hwe_cond = (mt_filt.row.hwe_ctrls_only.p_value < p_hwe) & hl.is_defined(mt_filt.hwe_ctrls_only.p_value)
         hwe_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt.hwe_ctrls_only.p_value)))
     else:
-        hwe_cond = (mt_filt.row[varqc_name].p_value_hwe < p_hwe) & hl.is_defined(mt_filt[varqc_name].p_value)
-        hwe_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt[varqc_name].p_value)))
+        hwe_cond = (mt_filt.row[varqc_name].p_value_hwe < p_hwe) & hl.is_defined(mt_filt[varqc_name].p_value_hwe)
+        hwe_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt[varqc_name].p_value_hwe)))
     hwe_filter = hl.cond(hwe_cond, mt_filt[failing_name].append("failing_hwe"), mt_filt[failing_name])
     # Annotate rows
     mt_filt = mt_filt.annotate_rows(**{failing_name: hwe_filter})
