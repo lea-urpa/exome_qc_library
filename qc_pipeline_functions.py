@@ -420,26 +420,23 @@ def impute_sex(mt, args):
     ##########################################################
     mt = va.annotate_variants(mt)
 
-    #######################################################
-    # Filter out failing samples, variants, and genotypes #
-    #######################################################
-    mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
-
-    ############################
-    # Filter out rare variants #
-    ############################
-    mt_maf = vq.maf_filter(mt_filtered, 0.05)
+    #################################################################################
+    # Filter out failing samples, variants, and genotypes, filter out rare variants #
+    #################################################################################
+    mt_maf = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
+    mt_maf = vq.maf_filter(mt_maf, 0.05)
 
     ##############
     # Impute sex #
     ##############
-    mt_filtered, imputed_sex, mt = sq.impute_sex_plot(mt_maf, mt_to_annotate=mt, args=args)
+    mt_maf, imputed_sex, mt = sq.impute_sex_plot(mt_maf, mt_to_annotate=mt, args=args)
 
     ########################################
     # Annotate  with sex-aware annotations #
     ########################################
     logging.info("Annotating sex-aware sample annotations, using dataset with failing samples, variants, "
                  "and genotypes filtered out.")
+    mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
     mt = sa.sex_aware_sample_annotations(mt_filtered, mt_to_annotate=mt, args=args)
     mt = va.sex_aware_variant_annotations(mt_filtered, mt_to_annotate=mt, args=args)
 
