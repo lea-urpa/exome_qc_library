@@ -134,6 +134,9 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
     :return: Returns matrix table with new row annotations male_hets, male_homvars, male_calls, female_hets,
     female_homvars, female_calls, sexaware_call_rate, sexaware_ac and sexaware_an.
     '''
+    ####################################
+    # Do sex-aware variant annotations #
+    ####################################
     logging.info('Annotating sex-aware variant annotations.')
     is_female = (mt[args.sex_col] == args.female_tag) & hl.is_defined(mt[args.sex_col])
     is_male = (mt[args.sex_col] == args.male_tag) & hl.is_defined(mt[args.sex_col])
@@ -171,6 +174,9 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
     for annotation in annotations_to_transfer:
         mt_to_annotate = mt_to_annotate.annotate_rows(**{annotation: mt_rows[mt_to_annotate.row_key][annotation]})
 
+    ##################################################
+    # Do case-specific sex-aware variant annotations #
+    ##################################################
     if args.pheno_col is not None:
         logging.info("Annotating sex-aware variant annotations, taking case/control status into account.")
         case_female = (mt[args.sex_col] == args.female_tag) & (mt[args.pheno_col] == True)
