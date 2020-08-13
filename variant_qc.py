@@ -490,16 +490,6 @@ def find_failing_variants(mt, args, mode):
     # Run variant QC on filtered matrix table
     mt_filt = hl.variant_qc(mt_filt, name=varqc_name)
 
-    if mode == 'final':
-        het_gt_filters = hl.is_defined(mt_filt.GT) & mt_filt.GT.is_het()
-        mt_filt = mt_filt.annotate_rows(final_het_callrate=hl.agg.count_where(het_gt_filters) /
-                                                           mt_filt.final_het_gt_count)
-
-        # Sanity check: is the het callrate ever higher than het allelic balance?
-        logging.info('Any variants where het callrate is higher than het allelic balance? Should be zero.')
-        logging.info(mt_filt.aggregate_rows(hl.agg.count_where(
-            mt_filt.final_het_callrate > mt_filt.final_frac_het_gts_in_ab)))
-
     ######################################################
     # Set HWE calculation in either all or only controls #
     ######################################################
@@ -737,42 +727,5 @@ def find_variants_failing_by_pheno(mt, args):
     failing_cr_cont = mt.aggregate_rows(hl.agg.count_where(mt.failing_pheno_varqc.contains("failing_cont_call_rate")))
 
     mt = mt.annotate_globals(case_control_callrate_threshold=args.pheno_call_rate)
-
-    ##############################################################################################
-    # Sanity check: check het call rate for cases and controls, make sure its > case-specific ab #
-    ##############################################################################################
-    passing_cases = (mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]) & \
-                    (mt.pop_outlier_sample == False) & hl.is_defined(mt.pop_outlier_sample) & \
-                    (hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc)
-
-    passing_het_gts = (hl.len(mt.final_failing_depth_quality) == 0) & hl.is_defined(mt.final_failing_depth_quality) & \
-                      (hl.len(mt.final_failing_ab) == 0) & hl.is_defined(mt.final_failing_ab) & \
-                      hl.is_defined(mt.GT) & mt.GT.is_het()
-
-    mt = mt.annotate_rows(final_het_callrate_cases=hl.agg.filter(passing_cases,
-                          hl.agg.count_where(passing_het_gts) / mt.final_case_het_gt_count))
-
-    passing_cont = (mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]) & \
-                    (mt.pop_outlier_sample == False) & hl.is_defined(mt.pop_outlier_sample) & \
-                    (hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc)
-
-    passing_het_gts = (hl.len(mt.final_failing_depth_quality) == 0) & hl.is_defined(mt.final_failing_depth_quality) & \
-                      (hl.len(mt.final_failing_ab) == 0) & hl.is_defined(mt.final_failing_ab) & \
-                      hl.is_defined(mt.GT) & mt.GT.is_het()
-
-    mt = mt.annotate_rows(final_het_callrate_cont=hl.agg.filter(passing_cont,
-                          hl.agg.count_where(passing_het_gts) / mt.final_cont_het_gt_count))
-
-    logging.info('Sanity check: Number of variants where case/control het callrate is > case/control ab:')
-    logging.info(mt.aggregate_rows(hl.agg.count_where(mt.final_het_callrate_cases > mt.final_het_ab_cases)))
-    logging.info(mt.aggregate_rows(hl.agg.count_where(mt.final_het_callrate_cont > mt.final_het_ab_cont)))
-
-    logging.info(f"Number of variants failing on case ab: {failing_ab_case}")
-    logging.info(f"Number of variants failing on control ab: {failing_ab_cont}")
-    logging.info(f"Number of variants failing on case call rate: {failing_cr_case}")
-    logging.info(f"Number of variants failing on control call rate: {failing_cr_cont}")
-
-    failing_any = mt.aggregate_rows(hl.agg.count_where(hl.len(mt.failing_pheno_varqc != 0)))
-    logging.info(f"Number of variants failing on any phenotype-specific measure: {failing_any}")
 
     return mt
