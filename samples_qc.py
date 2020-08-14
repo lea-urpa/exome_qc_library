@@ -201,24 +201,14 @@ def samples_qc(mt, mt_to_annotate, args):
         mt.failing_samples_qc))
 
     mt = mt.annotate_cols(failing_samples_qc=hl.cond(
-        ~(hl.is_defined(mt[args.chimeras_col])),
-        mt.failing_samples_qc.append("missing_chimeras"),
-        mt.failing_samples_qc))
-
-    mt = mt.annotate_cols(failing_samples_qc=hl.cond(
         (mt[args.contamination_col] > args.contamination_max) & hl.is_defined(mt[args.contamination_col]),
         mt.failing_samples_qc.append("failing_contamination"),
         mt.failing_samples_qc))
 
-    mt = mt.annotate_cols(failing_samples_qc=hl.cond(
-        ~(hl.is_defined(mt[args.contamination_col])),
-        mt.failing_samples_qc.append("missing_contamination"),
-        mt.failing_samples_qc))
-
     failing_chim = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("failing_chimeras")))
-    miss_chim = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("missing_chimeras")))
+    miss_chim = mt.aggregate_cols(hl.agg.count_where(~(hl.is_defined(mt[args.chimeras_col]))))
     failing_contam = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("failing_contamination")))
-    miss_contam = mt.aggregate_cols(hl.agg.count_where(mt.failing_samples_qc.contains("missing_contamination")))
+    miss_contam = mt.aggregate_cols(hl.agg.count_where(~(hl.is_defined(mt[args.contamination_col]))))
 
     logging.info(f"Number of samples failing on chimeras % > {args.chimeras_max}: {failing_chim}")
     logging.info(f"Number of samples missing chimeras %: {miss_chim}")
