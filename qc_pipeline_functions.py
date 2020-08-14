@@ -39,6 +39,13 @@ def load_data(args):
     mt = hl.read_matrix_table(args.mt)
     mt.annotate_globals(original_mt_input={'file': args.mt, 'date': datestr})
 
+    try:
+        test = hl.is_defined(mt.vep)
+    except Exception as e:
+        logging.error("Error! Input matrix table has not been VEP annotated!")
+        logging.error(e)
+        exit()
+
     if args.test:
         logging.info('Test flag given, filtering to on chrom 22.')
         if args.reference_genome == "GRCh38":
