@@ -43,7 +43,7 @@ def parse_arguments(arguments):
     inputs.add_argument("--scripts_dir", type=str, help="Directory containing python scripts.")
     inputs.add_argument("--bam_metadata", type=str,
                         help="File containing bam metadata information, if not in sample annotation file.")
-    inputs.add_argument("--bam_sample_col", type=str, required=True, help="Sample column name in bam metadata file")
+    inputs.add_argument("--bam_sample_col", type=str, help="Sample column name in bam metadata file")
     inputs.add_argument("--bam_delim", type=str, default="\t", help="Delimiter in bam metadata file")
     inputs.add_argument("--bam_miss", type=str, default="n/a", help="Missing data string in bam metadata file.")
     inputs.add_argument("--samples_annotation_files", type=str,
