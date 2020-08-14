@@ -36,7 +36,7 @@ def parse_arguments(arguments):
     # Pipeline inputs #
     inputs = parser.add_argument_group("Pipeline inputs and information.")
     inputs.add_argument("-mt", type=str, help="Name of matrix table to run QC pipeline on.")
-    inputs.add_argument("--out_name", require=True, type=str, help="Output name ")
+    inputs.add_argument("--out_name", required=True, type=str, help="Output name ")
     inputs.add_argument("--region", default='europe-west1', help='Region name for scaling in pipeline.')
     inputs.add_argument("--out_dir", type=str, help="Directory to write output data to.")
     inputs.add_argument("--log_dir", type=str, help="Directory to write logs to.")
