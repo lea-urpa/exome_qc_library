@@ -258,7 +258,7 @@ if __name__ == "__main__":
     # Import python scripts to access helper functions #
     scripts = ["helper_scripts.py", "qc_pipeline_functions.py"]
     for script in scripts:
-        hl.spark_context().addPyFile(args.scripts_dir + script)
+        hl.spark_context().addPyFile(os.path.join(args.scripts_dir, script))
 
     import helper_scripts as h
     import qc_pipeline_functions as qc
