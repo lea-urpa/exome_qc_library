@@ -49,11 +49,11 @@ def load_data(args):
     if args.test:
         logging.info('Test flag given, filtering to on chrom 22.')
         if args.reference_genome == "GRCh38":
-            chrom_codes = ["chr22", "chrX"]
+            chrom_codes = hl.array(["chr22", "chrX"])
         else:
-            chrom_codes = ["22", "X"]
+            chrom_codes = hl.array(["22", "X"])
 
-        mt = mt.filter_rows(mt.locus.contig.contains(chrom_codes))
+        mt = mt.filter_rows(chrom_codes.contains(mt.locus.contig))
 
         checkpoint_name = args.mt.replace(".mt", "") + "_test.mt"
         mt = mt.checkpoint(checkpoint_name, overwrite=True)
@@ -138,7 +138,8 @@ def annotate_samples(mt, args):
     ##############################
     # Annotate with bam metadata #
     ##############################
-    mt = sa.annotate_cols_from_file(mt, args.bam_metadata, args.bam_delim, args.bam_sample_col, args.bam_miss)
+    if args.bam_metadata is not None:
+        mt = sa.annotate_cols_from_file(mt, args.bam_metadata, args.bam_delim, args.bam_sample_col, args.bam_miss)
 
     ##############################################
     # Check that particular needed columns exist #
