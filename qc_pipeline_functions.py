@@ -14,7 +14,7 @@ from bokeh.io import output_file, save
 scripts_dir = sys.argv[sys.argv.index('--scripts_dir') + 1]  # Finds the scripts_dir arg and grabs the next string
 scripts = ["variant_qc.py", "samples_qc.py", "samples_annotation.py", "variant_annotation.py", "helper_scripts.py"]
 for script in scripts:
-    hl.spark_context().addPyFile(scripts_dir + script)
+    hl.spark_context().addPyFile(os.path.join(scripts_dir, script))
 
 import samples_annotation as sa
 import helper_scripts as h
