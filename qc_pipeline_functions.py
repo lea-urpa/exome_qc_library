@@ -149,7 +149,7 @@ def annotate_samples(mt, args):
     if args.fam_id is not None:
         columns.append('fam_id')
     if args.pat_id is not None:
-        columns.append('pad_id')
+        columns.append('pat_id')
     if args.mat_id is not None:
         columns.append('mat_id')
     if args.batch_col_name is not None:
