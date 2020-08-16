@@ -266,7 +266,7 @@ if __name__ == "__main__":
     ####################
     # Configure logger #
     ####################
-    logstem = 'import_vep_annotate-'
+    logstem = 'exome-qc-'
     datestr, timestr, log_file = h.configure_logging(logstem=logstem)
 
     log_dir = os.path.join(args.log_dir, logstem + datestr)
