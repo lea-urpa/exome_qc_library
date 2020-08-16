@@ -266,10 +266,7 @@ if __name__ == "__main__":
     ####################
     # Configure logger #
     ####################
-    logstem = 'exome-qc-'
-    datestr, timestr, log_file = h.configure_logging(logstem=logstem)
-
-    log_dir = os.path.join(args.log_dir, logstem + datestr)
+    datestr, timestr, log_file = h.configure_logging(logstem='exome-qc')
 
     # Configure logger
     root = logging.getLogger()
@@ -350,5 +347,5 @@ if __name__ == "__main__":
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
-    h.copy_logs_output(log_dir, timestr=timestr, log_file=log_file, plot_dir=args.plot_folder)
+    h.copy_logs_output(log_file, timestr=timestr, log_file=log_file, plot_dir=args.plot_folder)
 

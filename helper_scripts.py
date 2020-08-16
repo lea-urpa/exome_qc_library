@@ -27,7 +27,7 @@ def configure_logging(logstem):
 
 
 def copy_logs_output(log_dir, timestr, log_file, plot_dir):
-    hl.copy_log(log_dir + "hail_log" + timestr + ".txt")
+    hl.copy_log(log_dir + "hail_log_" + timestr + ".txt")
     cmd = ['gsutil', 'cp', log_file, log_dir]
     subprocess.call(cmd)
     cmd = ['gsutil', 'cp', '*.html', plot_dir]
