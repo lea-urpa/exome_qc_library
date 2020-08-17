@@ -28,7 +28,7 @@ def load_data(args):
     Loads in dataset from given directory, either test or full datset, or creates new dataset.
 
     :param args: command line arguments
-    :return: Returns matrix table if args.checkpoint == cpcounter (0), or else None
+    :return: Returns matrix table if args.checkpoint == cpcounter (1), or else None
     '''
     if args.checkpoint != args.cpcounter:
         mt = None

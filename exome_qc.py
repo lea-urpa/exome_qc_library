@@ -19,7 +19,7 @@ def parse_arguments(arguments):
 
     # Pipeline parameters #
     params = parser.add_argument_group("Pipeline parameters")
-    params.add_argument("--checkpoint", type=int, help="Checkpoint to start pipeline at, default start (0).", default=0)
+    params.add_argument("--checkpoint", type=int, help="Checkpoint to start pipeline at, default start (0).", default=1)
     params.add_argument("--reference_genome", type=str, help="Reference_genome", choices=["GRCh37", "GRCh38"],
                         default="GRCh38")
     params.add_argument("--test", action='store_true', help="run test with just chrom 22?")
@@ -297,11 +297,11 @@ if __name__ == "__main__":
     ################
     # Run pipeline #
     ################
-    args.cpcounter = 0
+    args.cpcounter = 1
     args.output_stem = os.path.join(args.out_dir, args.out_name)
     args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
     args.plot_folder = os.path.join(args.out_dir, "plots")
-    args.tmp_counter = 0
+    args.tmp_counter = 1
 
     # Load in data according to parameters given
     mt = qc.load_data(args)
