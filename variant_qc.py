@@ -231,13 +231,12 @@ def find_failing_genotypes_ab(mt, args, prefix):
     #########################################
     # Find genotypes defined but missing AD #
     #########################################
-    ad_cond = hl.cond(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)), mt[failing_name].append("missing_ad"),
-                      mt[failing_name])
-
-    mt = mt.annotate_entries(**{failing_name: ad_cond})
-
-    missing_ad = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("missing_AD")))
-    missing_ad_perc = round(missing_ad / (gthet + gthomref + gthomvar)*100, 2)
+    missing_ad_het = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
+                                                             mt.GT.is_het()))
+    missing_ad_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
+                                                                mt.GT.is_hom_ref()))
+    missing_ad_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
+                                                                mt.GT.is_hom_var()))
 
     ###################################################
     # Report number and percent of genotypes excluded #
@@ -247,15 +246,20 @@ def find_failing_genotypes_ab(mt, args, prefix):
     logging.info(f"Number of hom ref GTs failing_ab: {homref_failing_ab} ({homref_failing_ab_perc}%)")
     logging.info(f"Number of hom alt GTs failing_ab: {homalt_failing_ab} ({homalt_failing_ab_perc})")
 
-    if missing_ad > 0:
-        logging.info(f"Number of GTs missing AD info: {missing_ad}({missing_ad_perc}%)")
+    logging.info(f"Number of het GTs missing AD info: {missing_ad_het} "
+                 f"({round(missing_ad_het/gthet*100, 2)}% of het GTs)")
+    logging.info(f"Number of hom ref GTs missing AD info: {missing_ad_homref} "
+                 f"({round(missing_ad_homref/gthomref*100, 2)}% of hom ref GTs)")
+    logging.info(f"Number of hom alt GTs missing AD info: {missing_ad_homalt} "
+                 f"({round(missing_ad_homalt/gthomvar*100, 2)}% of hom alt GTs)")
 
     global_fail_annot = prefix + "_genotype_qc_failing_ab"
     mt = mt.annotate_globals(**{global_fail_annot:
                                {'het_excluded_ct_percent': [hets_failing_ab, het_failing_ab_perc],
                                 'hom_ref_excluded_ct_percent': [homref_failing_ab, homref_failing_ab_perc],
                                 'hom_var_excluded_ct_percent': [homalt_failing_ab, homalt_failing_ab_perc],
-                                'missing_ad': [missing_ad, missing_ad_perc]}})
+                                'missing_ad': [('het', missing_ad_het), ('hom_ref', missing_ad_homref),
+                                               'hom_var', missing_ad_homalt]}})
 
     return mt
 
