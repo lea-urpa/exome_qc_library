@@ -258,9 +258,9 @@ def find_failing_genotypes_ab(mt, args, prefix):
                                {'het_excluded_ct_percent': [hets_failing_ab, het_failing_ab_perc],
                                 'hom_ref_excluded_ct_percent': [homref_failing_ab, homref_failing_ab_perc],
                                 'hom_var_excluded_ct_percent': [homalt_failing_ab, homalt_failing_ab_perc],
-                                'het_missing_ad': [missing_ad_het],
-                                'hom_ref_missing_ad': [missing_ad_homref],
-                                'hom_var_missing_ad': [missing_ad_homalt]}})
+                                'het_missing_ad': [float(missing_ad_het)],
+                                'hom_ref_missing_ad': [float(missing_ad_homref)],
+                                'hom_alt_missing_ad': [float(missing_ad_homalt)]}})
 
     return mt
 
