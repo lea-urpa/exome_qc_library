@@ -69,6 +69,9 @@ def find_failing_genotypes_depth_quality(mt, args, prefix):
 
     # Get starting genotypes count, instantiate genotype annotation
     gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
+    gt_het_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) &
+                                                            (mt.GT.is_hom_var() | mt.GT.is_het())))
+    gt_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
     mt = mt.annotate_entries(**{failing_name: hl.empty_array(hl.tstr)})
 
     ############################
@@ -98,23 +101,37 @@ def find_failing_genotypes_depth_quality(mt, args, prefix):
                       mt[failing_name].append("failing_GQ"), mt[failing_name])
     mt = mt.annotate_entries(**{failing_name: pl_cond})
 
-    gq_miss = hl.cond((~(hl.is_defined(mt.PL)) | ~(hl.is_defined(mt.GQ))) & hl.is_defined(mt.GT),
-                      mt[failing_name].append("missing_GQ_or_PL"), mt[failing_name])
+    gq_miss = hl.cond(~(hl.is_defined(mt.GQ)) & hl.is_defined(mt.GT) & mt.GT.is_hom_ref(),
+                      mt[failing_name].append("missing_GQ_hom_ref"), mt[failing_name])
 
     mt = mt.annotate_entries(**{failing_name: gq_miss})
 
-    failing_gq = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_PL") |
-                                                         mt[failing_name].contains("failing_GQ")))
-    failing_gq_perc = round(failing_gq / gt_total * 100, 2)
+    pl_miss = hl.cond(~(hl.is_defined(mt.PL)) & (mt.GT.is_het() | mt.GT.is_hom_var()) & hl.is_defined(mt.GT),
+                      mt[failing_name].append("missing_PL_het_homvar"), mt[failing_name])
+    mt = mt.annotate_entries(**{failing_name: pl_miss})
+
+    failing_gq = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_GQ")))
+    failing_pl = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_PL")))
     missing_gq = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("missing_GQ_or_PL")))
-    missing_gq_perc = round(missing_gq / gt_total * 100, 2)
+    missing_pl = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("missing_PL_het_homvar")))
 
     logging.info(f"Number of GTs with depth < {args.min_dp}: {failing_depth} ({failing_depth_perc}%)")
-    logging.info(f"Number of GTs with GQ/PL < {args.min_gq}: {failing_gq} ({failing_gq_perc}%)")
+    logging.info(f"Number of hom ref GTs with GQ < {args.min_gq}: {failing_gq} "
+                 f"({round(failing_gq/gt_total*100, 2)}% of all GTs, "
+                 f"{round(failing_gq/gt_homref*100, 2)}% of homref GTs)")
+    logging.info(f"Number of het or hom alt GTs with PL[0] < {args.min_gq}: {failing_pl} "
+                 f"({round(failing_pl/gt_total*100, 2)}% of all GTs, "
+                 f"{round(failing_pl/gt_het_homalt*100, 2)} % of homalt + het GTs)")
 
     if missing_gq > 0:
-        logging.info(f"Number of GTs that are defined but missing GQ or PL measures: {missing_gq} ({missing_gq_perc}%)")
-        logging.info("(these genotypes missing GQ or PL measures are counted as failing)")
+        logging.info(f"Number of hom ref GTs that are defined but missing GQ : {missing_gq} "
+                     f"({round(missing_gq/gt_total*100, 2)}% of all GTs, "
+                     f"{round(missing_gq/gt_homref*100, 2)}% of homref GTs)")
+        logging.info("(these genotypes are counted as failing)")
+    if missing_pl > 0:
+        logging.info(f"Number of het or hom alt GTs that are defined but missing PL: {missing_pl} "
+                     f"({round(missing_pl/gt_total*100, 2)}% of all GTs, "
+                     f"{round(missing_pl/gt_het_homalt*100, 2)}% of het and hom alt GTs)")
     if missing_depth > 0:
         logging.info(f"Number of GTs that are defined but missing depth measure: {missing_depth} ({missing_depth_perc}%)")
         logging.info("(these genotypes missing depth measure are counted as failing)")
