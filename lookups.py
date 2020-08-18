@@ -64,7 +64,7 @@ if __name__ == "__main__":
     parser.add_argument("--genes", required=True, type=str,
                         help="comma-separated genes or single gene in which to search for damaging variants.")
     parser.add_argument("--scripts_dir", required=True, help="Directory for exome qc library scripts")
-    parser.add_argument("--reference_genome", default="GRCh38", options=["GRCh37",  "GRCh38"])
+    parser.add_argument("--reference_genome", default="GRCh38", choices=["GRCh37",  "GRCh38"])
 
     args = parser.parse_args()
 

@@ -1,8 +1,8 @@
-## Purpose
+# Purpose
 This library is a collection of tools to analyze and run quality control on exome sequecing data with Hail. The scripts 
 are explained in the order I usually run them.
 
-## Prerequisites
+# Prerequisites
 [Install Hail on your computer](https://hail.is/docs/0.2/getting_started.html),
  even if you are running in the cloud. This will also install the `hailctl` library 
 as well.
@@ -10,7 +10,7 @@ as well.
 Clone this library to your laptop. If you are running in the cloud with `dataproc`, you must also `gsutil cp` this 
 library to the cloud as well.
 
-## Import VCF and VEP annotate
+# Import VCF and VEP annotate
 `import_vcf_vep_annotate.py` takes one or more VCF files, imports them to Hail matrix table format, combines them, and 
 then runs Variant Effect Predictor (VEP) annotation on the files. **Note**: this assumes your VCF files are 
 not/no longer split by chromosome, as
@@ -20,11 +20,11 @@ it combines the VCF files sample-wise. It's (usually) trivial to combine VCFs sp
 To submit the script to a Google Cloud dataproc cluster, use `hailctl dataproc submit` 
 ([more info](https://hail.is/docs/0.2/cloud/google_cloud.html).) 
 
-### Start your cluster with the `--vep flag!
+## Start your cluster with the `--vep flag!
 If you are submitting to a Google Cloud dataproc cluster, for this script you must start your cluster with 
 `hailctl dataproc start NAME --vep GENOME_BUILD`
 
-### Example submission
+## Example submission
 In this example submission, the `import_vcf_vep_annotate.py` script is submitted via `hailctl dataproc submit` from a
 local copy of this repo to the cloud, pointing to where the copy of the repo exists
 in the bucket for the script to find the helper functions.
@@ -44,4 +44,10 @@ hailctl dataproc submit vep-test \
 --force_bgz --test
 ```
 
-## Exome sequencing data QC
+# Exome sequencing data QC
+
+## 
+
+## Example Submission Scripts
+### Part One- up to King relatedness calculation
+King relatedness calculation is not supported in Hail,
