@@ -35,7 +35,7 @@ def run_king(args):
     else:
         input_name = args.plink_data + '.bed'
 
-    cmd = f"{args.king_dir} -b {input_name} --kinship --prefix {args.plink_data} --degree 3"
+    cmd = f"{args.king_path} -b {input_name} --kinship --prefix {args.plink_data} --degree 3"
     print(f"King commnad to run: {cmd}")
     subprocess.call(cmd.split())
 
