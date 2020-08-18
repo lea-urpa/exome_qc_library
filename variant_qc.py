@@ -21,6 +21,9 @@ def downsample_variants(mt, target_count):
         keep_fraction = target_count/var_count
         mt = mt.sample_rows(keep_fraction)
 
+        count = mt.count()
+        logging.info(f"Matrix table count after downsampling: {count}")
+
         return mt
     else:
         logging.info(f"Matrix table already has fewer than {target_count} variants, skipping downsampling.")
