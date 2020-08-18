@@ -292,6 +292,11 @@ def maf_ldprune_relatedness(mt, args):
     ####################
     mt_ldpruned = vq.ld_prune(mt_maffilt, args)
 
+    ##########################################
+    # Downsample variants if row count > 80k #
+    ##########################################
+    mt_ldpruned = vq.downsample_variants(mt_ldpruned, 80000)
+
     h.remove_preemptibles(args.cluster_name)
 
     if args.overwrite_checkpoints:

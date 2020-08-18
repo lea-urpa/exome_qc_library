@@ -8,6 +8,26 @@ import hail as hl
 import samples_qc as sq
 
 
+def downsample_variants(mt, target_count):
+    """
+    Takes a matrix table, checks if the variant count is above a target count, and if so downsamples the matrix table.
+    :param mt: matrix table to downsample
+    :param target_count: target number of variants the matrix table should be
+    :return: downsampled matrix table, if mt count > target count, or original matrix table if not.
+    """
+    var_count = mt.count_rows()
+    if var_count > target_count:
+        logging.info(f"Matrix table has more than {target_count} variants, randomly downsampling to {target_count} variants.")
+        keep_fraction = target_count/var_count
+        mt = mt.sample_rows(keep_fraction)
+
+        return mt
+    else:
+        logging.info(f"Matrix table already has fewer than {target_count} variants, skipping downsampling.")
+
+        return mt
+
+
 def maf_filter(mt, maf, filter_ac0_after_pruning=False):
     """
     Takes matrix table, filters out failing genotypes, variants, and samples, and MAF prunes the
