@@ -58,7 +58,7 @@ if __name__ == "__main__":
     hl.init()
 
     parser = argparse.ArgumentParser(description="Lookups for damaging variants in genes from exome sequencing data.")
-    parser.add_argument("-mt", "Matrix table to search for damaging variants in genes and/or specific variants.")
+    parser.add_argument("-mt", help="Matrix table to search for damaging variants in genes and/or specific variants.")
     parser.add_argument("--output_name", required=True, type=str, help="Output name stem for results.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for results.")
     parser.add_argument("--genes", required=True, type=str,
