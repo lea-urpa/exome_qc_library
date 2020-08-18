@@ -38,7 +38,7 @@ def get_lof_carriers(mt, args):
     if (lof_homalt_ct > 0) or (lof_het_ct > 0):
         print(f"{lof_homalt_ct} homalt and {lof_het_ct} het carriers found.")
 
-        lofmt = mt.filter_rows((mt.LOF == True) & ((mt.het_lof_count > 0) | (mt.homalt_lof_count > 0)), keep=True)
+        lofmt = mt.filter_rows((mt.LOF == True) & ((mt.het_gt_count > 0) | (mt.hom_alt_gt_count > 0)), keep=True)
 
         # Then export the rows as a table, print and save to file
         carriers_ht = lofmt.rows()
