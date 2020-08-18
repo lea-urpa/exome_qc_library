@@ -67,13 +67,16 @@ def parse_arguments(arguments):
     var_thresh.add_argument("--low_pass_min_call_rate", default=0.8, type=float,
                             help="Low pass variant QC min call rate")
     var_thresh.add_argument("--final_min_call_rate", default=0.9, type=float, help="Final variant QC min call rate")
-    var_thresh.add_argument("--min_dp", default=10, type=float, help="Variant QC min read depth")
     var_thresh.add_argument("--snp_qd", default=2, type=float, help="Variant QC min quality by depth for snps")
     var_thresh.add_argument("--indel_qd", default=3, type=float, help="Variant QC min quality by depth for indels")
+    var_thresh.add_argument("--ab_allowed_dev_het", default=0.8, type=float,
+                             help="% of het GT calls for a variant that must be in allelic balance (% ref or alt "
+                                  "reads out of range for het GT call)")
 
     # Genotype QC thresholds #
     geno_thresh = parser.add_argument_group("Genotype QC thresholds. If not indicated 'final' or 'low pass' in name,"
                                             "thresholds are used for both low pass and final genotype filtering.")
+    geno_thresh.add_argument("--min_dp", default=10, type=float, help="min read depth for a genotype")
     geno_thresh.add_argument("--min_gq", default=20, type=float, help="min genotype quality for all GT calls.")
     geno_thresh.add_argument("--min_het_ref_reads", default=0.2, type=float,
                              help="min % reference reads for a het GT call")
@@ -83,9 +86,7 @@ def parse_arguments(arguments):
                              help="min % reference reads for a ref GT call")
     geno_thresh.add_argument("--max_hom_alt_ref_reads", default=0.1, type=float,
                              help="max % reference reads for an alt GT call")
-    geno_thresh.add_argument("--ab_allowed_dev_het", default=0.8, type=float,
-                             help="% of het GT calls for a variant allowed to be out of allelic balance (% ref or alt "
-                                  "reads out of range for het GT call)")
+
 
     # LD pruning thresholds #
     ld_thresh = parser.add_argument_group("Thresholds for LD pruning.")
@@ -310,7 +311,7 @@ if __name__ == "__main__":
     mt = qc.annotate_samples(mt, args)
     # actually exist in the dataset after annotating samples.
 
-    # Phenotype Samples QC
+    # Samples removal
     mt = qc.remove_samples(mt, args)
 
     # Low-pass variant QC
