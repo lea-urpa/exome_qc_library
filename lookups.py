@@ -42,7 +42,7 @@ def get_lof_carriers(mt, args):
 
         # Then export the rows as a table, print and save to file
         carriers_ht = lofmt.rows()
-        carriers_ht.export(f"{args.output_stem}_{gene}LOF_carriers.txt")
+        carriers_ht.export(f"{args.output_stem}_{gene}_LOF_carriers.txt")
 
     else:
         print(f"No LOF variant carriers found in gene {gene}")
