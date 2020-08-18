@@ -16,6 +16,7 @@ def recode_bim(filestem):
     :param filestem:
     :return:
     """
+    print(f'Recoding bim file: {filestem}.bim')
     old_bim = filestem + "_old_chrom_names.bim"
     new_bim = filestem + ".bim"
     os.rename(new_bim, old_bim)
