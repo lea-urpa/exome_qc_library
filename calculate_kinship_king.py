@@ -9,6 +9,27 @@ import argparse
 import networkx as nx
 
 
+def recode_bim(filestem):
+    """
+    Takes a Plink filestem and recodes 'chr1' style chromosome IDs to '1' style chromsome IDs.
+
+    :param filestem:
+    :return:
+    """
+    old_bim = filestem + "_old_chrom_names.bim"
+    new_bim = filestem + ".bim"
+    os.rename(new_bim, old_bim)
+
+    new_bim = open(new_bim, "w")
+    with open(old_bim) as old:
+        for line in old:
+            words = line.strip().split('\t')
+            new_chrom = words[1].replace("chr", "")
+            words[0] = new_chrom
+
+            new_bim.write("\t".join(words) + "\n")
+
+
 def run_king(args):
     """
     Wrapper function to run King relatedness calculations.
@@ -175,8 +196,15 @@ if __name__ == "__main__":
     parser.add_argument("--king_path", help="Path of plink executable.")
     parser.add_argument("--plink_path", help="Path of plink executable, if remaking bed needed.")
     parser.add_argument("--remake_bed", action='store_true', help="Remake bed files?")
+    parser.add_argument("--recode_bim", action='store_true', help="Recode bim file chromosomes?")
 
     arguments = parser.parse_args()
+
+    ################################
+    # Recode bim file if necessary #
+    ################################
+    if arguments.recode_bim:
+        recode_bim(arguments.plink_data)
 
     ################################
     # Run king on input plink file #
