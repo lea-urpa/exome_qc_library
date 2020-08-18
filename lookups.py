@@ -1,13 +1,8 @@
 """
-This script contains functions to look up variants, samples, and genes from matrix tables.
+Contains functions to look up variants, samples, and genes from matrix tables.
+
+Author: Lea Urpa, August 2020
 """
-
-import hail as hl
-import variant_annotation as va
-
-# TODO write these functions
-# def get_variant_carriers(mt, variant):
-# def filter_to_samples(mt, samples):
 
 
 def calculate_carrier_counts_ids(mt):
@@ -15,86 +10,115 @@ def calculate_carrier_counts_ids(mt):
     Calculate for a matrix table the number of het and hom alt genotypes per variant, and the carriers for each.
 
     :param mt: matrix table to annotate
-    :param qc_done: Has QC been done on the dataset? Looks for row annotation 
     :return: 
     """
-    mt = mt.annotate_rows(hom_alt_gt_count=hl.agg.count_where(mt.GT.is_hom_var()))
-    mt = mt.annotate_rows(hom_alt_carriers=hl.agg.filter(mt.GT.is_hom_var(), hl.agg.collect(mt.s)))
-    mt = mt.annotate_rows(het_gt_count=hl.agg.count_where(mt.GT.is_het()))
-    mt = mt.annotate_rows(het_carriers=hl.agg.filter(mt.GT.is_het(), hl.agg.collect(mt.s)))
+    mt = mt.annotate_rows(hom_ref_gt_count=hl.agg.count_where(mt.GT.is_hom_ref() & hl.is_defined(mt.GT)))
+    mt = mt.annotate_rows(het_gt_count=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT)))
+    mt = mt.annotate_rows(het_carriers=hl.agg.filter(mt.GT.is_het() & hl.is_defined(mt.GT), hl.agg.collect(mt.s)))
+    mt = mt.annotate_rows(hom_alt_gt_count=hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT)))
+    mt = mt.annotate_rows(hom_alt_carriers=hl.agg.filter(mt.GT.is_hom_var() & hl.is_defined(mt.GT),
+                                                         hl.agg.collect(mt.s)))
 
     return mt
 
 
-def get_lof_carriers(mt):
-    # Add a row annotation for the number of hom alt and het carriers if the variant is LOF
-    mt = mt.annotate_rows(homalt_lof_count=hl.agg.count_where((mt.LOF == True) & (mt.hom_alt_gt_count > 0)))
-    mt = mt.annotate_rows(het_lof_count=hl.agg.count_where((mt.LOF == True) & (mt.het_gt_count > 0)))
-    # TODO check whether this produces 0 or missing if mt.LOF is false
+def get_lof_carriers(mt, args):
 
-    # Count if any of these counts is greater than zero
-    lof_homalt_count = mt.aggregate_rows(hl.agg.count_where(mt.homalt_lof_count > 0))
-    lof_het_count = mt.aggregate_rows(hl.agg.count_where(mt.het_lof_count > 0))
+    ###############################################################
+    # Count the number of LOF homalt or het genotypes in the gene #
+    ###############################################################
+    lof_homalt_ct = mt.aggregate_rows(
+        hl.agg.count_where(hl.is_defined(mt.LOF) & (mt.LOF == True) & (mt.hom_alt_gt_count > 0)))
+    lof_het_ct = mt.aggregate_rows(
+        hl.agg.count_where(hl.is_defined(mt.LOF) & (mt.LOF == True) & (mt.het_gt_count > 0)))
 
-    # If so, filter to variants that are LOF and the counts are greater than zero
-    if (lof_homalt_count > 0) or (lof_het_count > 0):
-        print("%s homalt and %s het carriers found." % (lof_homalt_count, lof_het_count))
-        lofmt = mt.filter_rows((mt.LOF == True) & ((mt.het_lof_count > 0) | (mt.homalt_lof_count > 0)))
+    ################################################################
+    # If any, filter mt to those variants and export to Hail table #
+    ################################################################
+    if (lof_homalt_ct > 0) or (lof_het_ct > 0):
+        print(f"{lof_homalt_ct} homalt and {lof_het_ct} het carriers found.")
 
-        # Then filter to individuals that are hom alt or het for the remaining samples
-        lofmt = lofmt.annotate_cols(alt_gt_count=hl.agg.count_where(lofmt.GT.is_hom_var() | lofmt.GT.is_het()))
-        lofmt = lofmt.filter_cols(lofmt.alt_gt_count > 0)
-
-        # Then annotate the carriers for each variant
-        lofmt = lofmt.annotate_rows(het_carriers=hl.agg.filter(lofmt.GT.is_het(), hl.agg.collect(mt.s)))
-        lofmt = lofmt.annotate_rows(hom_alt_carriers=hl.agg.filter(lofmt.GT.is_hom_var(), hl.agg.collect(lofmt.s)))
+        lofmt = mt.filter_rows((mt.LOF == True) & ((mt.het_lof_count > 0) | (mt.homalt_lof_count > 0)), keep=True)
 
         # Then export the rows as a table, print and save to file
         carriers_ht = lofmt.rows()
-        carriers_ht.show(-1) # TODO test this
+        carriers_ht.export(f"{args.output_stem}_{gene}LOF_carriers.txt")
+
     else:
-        carriers_ht = None
-
-    return carriers_ht
+        print(f"No LOF variant carriers found in gene {gene}")
 
 
-#def get_missense_carriers(mt):
-    # Test for CADD and MPC annotations
+if __name__ == "__main__":
+    ######################################
+    # Initialize Hail and import scripts #
+    ######################################
+    import os
+    import argparse
+    import hail as hl
+    hl.init()
 
+    parser = argparse.ArgumentParser(description="Lookups for damaging variants in genes from exome sequencing data.")
+    parser.add_argument("-mt", "Matrix table to search for damaging variants in genes and/or specific variants.")
+    parser.add_argument("--output_name", required=True, type=str, help="Output name stem for results.")
+    parser.add_argument("--output_dir", required=True, type=str, help="Output directory for results.")
+    parser.add_argument("--genes", required=True, type=str,
+                        help="comma-separated genes or single gene in which to search for damaging variants.")
+    parser.add_argument("--scripts_dir", required=True, help="Directory for exome qc library scripts")
+    parser.add_argument("--reference_genome", default="GRCh38", options=["GRCh37",  "GRCh38"])
 
-    # Add a new row annotation for the number of hom alt and het carriers if the variant is damaging missense
+    args = parser.parse_args()
 
-def get_gene_damaging_carriers(mt, gene, report_all_homozygotes=True):
+    args.output_stem = os.path.join(args.output_dir, args.output_name)
 
-    # Check if gene/LOF/missense variant annotations have been created by running va.annotate_variants
+    ##########################
+    # Import python scripts  #
+    ##########################
+    scripts = ["variant_annotation.py"]
+    for script in scripts:
+        hl.spark_context().addPyFile(os.path.join(args.scripts_dir, script))
+
+    import variant_annotation as va
+
+    ########################
+    # Load in matrix table #
+    ########################
+    fullmt = hl.load_matrix_table(args.mt)
+
+    ####################################
+    # Check if variant annotation done #
+    ####################################
     try:
-        mt.gene.describe()
+        fullmt.gene.describe()
     except Exception as e:
         print('Missing LOF annotation! Annotating now.')
         print(e)
         try:
-            mt = va.annotate_variants(mt)
+            fullmt = va.annotate_variants(fullmt)
         except Exception as e:
             print('Error! LOF/missense/synonymous annotation failed. Have you run VEP?')
             print(e)
-            return
+            exit()
 
-    # Filter MT to gene of interest
-    genemt = mt.filter_rows(mt.gene.contains(gene))
+    #################################
+    # Filter MT to gene of interest #
+    #################################
+    gene_list = args.genes.strip().split(",")
 
-    if genemt.count_rows() == 0:
-        print('Gene %s not in dataset. Did you spell it right?' % gene)
-        return
+    for gene in gene_list:
+        genemt = fullmt.filter_rows(fullmt.gene.contains(gene))
 
-    # Calculate carrier counts for individuals in this gene
-    genemt = calculate_carrier_counts_ids(genemt)
+        if genemt.count_rows() == 0:
+            print(f'Gene {gene} not in dataset. Did you spell it right?')
+            continue
 
-    # Report damaging variants + carriers
-    print('Checking for LOF variants in gene %s' % gene)
-    lof_homalt_count, lof_het_count, carriers_ht = get_lof_carriers(genemt)
+        #########################################################
+        # Calculate carrier counts for individuals in this gene #
+        #########################################################
+        genemt = calculate_carrier_counts_ids(genemt)
 
-    print('Saving this table to het_carriers.txt')
-    carriers_ht.export("%s_het_carriers.txt" % gene)
-
-    print('Checking for damaging missense variants in gene %s' % gene)
+        #######################################
+        # Report damaging variants + carriers #
+        #######################################
+        print(f'Checking for LOF variants in gene {gene}')
+        get_lof_carriers(genemt, args)
 
