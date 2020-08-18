@@ -278,7 +278,7 @@ def maf_ldprune_relatedness(mt, args):
     #######################################################
     # Filter out failing samples, variants, and genotypes #
     #######################################################
-    mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=True)
+    mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=True, checkpoint=False)
 
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 

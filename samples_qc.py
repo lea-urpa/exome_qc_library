@@ -9,7 +9,8 @@ import hail as hl
 from bokeh.io import output_file, save
 
 
-def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, unfilter_entries=False, pheno_qc=False):
+def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, unfilter_entries=False, pheno_qc=False,
+                   checkpoint=True):
     """
     Filters failing samples, variants, and entries from a given matrix table
     :param mt: matrix table to filter
@@ -55,9 +56,10 @@ def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, un
         logging.info('Unfiltering entries (setting them to missing)')
         mt = mt.unfilter_entries()
 
-    logging.info(f"Writing temporary checkpoint for filtered mt.")
-    mt = mt.checkpoint(f"{args.output_stem}_{mode}_removed_tmp_{args.tmp_counter}.mt", overwrite=True)
-    args.tmp_counter = args.tmp_counter + 1
+    if checkpoint:
+        logging.info(f"Writing temporary checkpoint for filtered mt.")
+        mt = mt.checkpoint(f"{args.output_stem}_{mode}_removed_tmp_{args.tmp_counter}.mt", overwrite=True)
+        args.tmp_counter = args.tmp_counter + 1
 
     return mt
 
