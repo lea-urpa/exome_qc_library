@@ -82,7 +82,7 @@ if __name__ == "__main__":
     ########################
     # Load in matrix table #
     ########################
-    fullmt = hl.load_matrix_table(args.mt)
+    fullmt = hl.read_matrix_table(args.mt)
 
     ####################################
     # Check if variant annotation done #

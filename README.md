@@ -46,7 +46,10 @@ hailctl dataproc submit vep-test \
 
 # Exome sequencing data QC
 
-## 
+## Steps in QC process
+The exome QC pipeline runs through a number of steps for weeding out failing samples and variants
+from your dataset. In general, however, *no samples or variants are excluded*- they are only marked with annotations
+that they are failing,  
 
 ## Example Submission Scripts
 ### Part One- up to King relatedness calculation
