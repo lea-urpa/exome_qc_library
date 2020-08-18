@@ -148,13 +148,13 @@ Options for LD pruning and MAF filtering for relatedness:
 
 ### Step 5: Find related individuals
 This step either exports the MAF filtered, LD pruned, and downsampled dataset to Plink format to run King
-relatedness calculations, (see get_relatedness.py), or uploads a list of related individuals to remove for further
+relatedness calculations, (see calculate_kinship_king.py), or uploads a list of related individuals to remove for further
 steps where it's necessary to use only unrelated individuals.
 
 Options for finding related individuals:
 ```
 --run_king                  If this flag is given, exports file to Plink and exits pipeline.
---relatives_removal_file    List of samples to remove to give maximum unrelated set (output of get_relatedness.py).
+--relatives_removal_file    List of samples to remove to give maximum unrelated set (output of calculate_kinship_king.py).
                             If run_king is not given, this list must be given.
 ```
 
