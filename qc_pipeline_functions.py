@@ -297,10 +297,10 @@ def maf_ldprune_relatedness(mt, args):
     ##########################################
     mt_ldpruned = vq.downsample_variants(mt_ldpruned, 80000)
 
-    h.remove_preemptibles(args.cluster_name)
-
     if args.overwrite_checkpoints:
         mt_ldpruned = save_checkpoint(mt_ldpruned, step, args)
+
+    h.remove_preemptibles(args.cluster_name)
     args.cpcounter += 1
     return mt, mt_ldpruned
 
