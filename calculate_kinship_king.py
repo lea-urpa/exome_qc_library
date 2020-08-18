@@ -176,16 +176,14 @@ if __name__ == "__main__":
     parser.add_argument("--plink_path", help="Path of plink executable, if remaking bed needed.")
     parser.add_argument("--remake_bed", action='store_true', help="Remake bed files?")
 
-
-    parser.add_argument("-f", '--pheno-file', metavar='F',
-                        help="Phenotype filepath", required=True)
-
     arguments = parser.parse_args()
 
     ################################
     # Run king on input plink file #
     ################################
     if not arguments.skip_king:
+        if arguments.king_path is None:
+            print("Error! --king_path must be given if not skipping king calculations.")
         run_king(arguments)
     else:
         if not (os.path.isfile(arguments.plink_data + ".kin") | (os.path.isfile(arguments.plink_data + ".kin0"))):
