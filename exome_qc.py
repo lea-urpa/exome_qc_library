@@ -273,16 +273,20 @@ if __name__ == "__main__":
     ####################
     datestr = time.strftime("%Y.%m.%d")  # Used for output folder
     timestr = time.strftime("%Y.%m.%d-%H.%M.%S")  # Used for output files, for more than one run per day
-
     log_file = 'exome-qc_' + timestr + '.txt'
 
-    # Configure logger
+    # Create logger
     root = logging.getLogger()
-    log_formatter = '%(asctime)s - %(levelname)s - %(message)s'
-    logging.basicConfig(filename=log_file, format=log_formatter, level=logging.INFO)
+    root.setLevel(logging.INFO)
 
-    handler = logging.StreamHandler(sys.stdout)
-    root.addHandler(handler)
+    # create formatter
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+    # Add file handler
+    fh = logging.FileHandler(log_file)
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(formatter)
+    root.addHandler(fh)
 
     ##################################################
     # Pre-define checkpoint names to load data later #
