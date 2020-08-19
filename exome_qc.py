@@ -6,6 +6,7 @@ Author: Lea Urpa, August 2020
 import subprocess
 import shlex
 import argparse
+import time
 
 
 def parse_arguments(arguments):
@@ -270,7 +271,10 @@ if __name__ == "__main__":
     ####################
     # Configure logger #
     ####################
-    datestr, timestr, log_file = h.configure_logging(logstem='exome-qc')
+    datestr = time.strftime("%Y.%m.%d")  # Used for output folder
+    timestr = time.strftime("%Y.%m.%d-%H.%M.%S")  # Used for output files, for more than one run per day
+
+    log_file = 'exome-qc_' + timestr + '.txt'
 
     # Configure logger
     root = logging.getLogger()
@@ -351,5 +355,5 @@ if __name__ == "__main__":
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
-    h.copy_logs_output(log_file, timestr=timestr, log_file=log_file, plot_dir=args.plot_folder)
+    h.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
 
