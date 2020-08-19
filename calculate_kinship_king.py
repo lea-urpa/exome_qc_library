@@ -19,7 +19,8 @@ def recode_bim(filestem):
     print(f'Recoding bim file: {filestem}.bim')
     old_bim = filestem + "_old_chrom_names.bim"
     new_bim = filestem + ".bim"
-    os.rename(new_bim, old_bim)
+    if not os.path.isfile(old_bim):
+        os.rename(new_bim, old_bim)
 
     new_bim = open(new_bim, "w")
     with open(old_bim) as old:
