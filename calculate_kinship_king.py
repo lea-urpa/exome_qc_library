@@ -231,7 +231,7 @@ if __name__ == "__main__":
     #########################################################
     # Format kin output to edgelist, get list of cases only #
     #########################################################
-    create_edgelist(arguments.plink_data)
+    create_edgelist(arguments.plink_data, arguments)
     case_list = create_case_list(arguments.plink_data)
 
     ##################################################
