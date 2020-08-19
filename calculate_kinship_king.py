@@ -58,12 +58,12 @@ def run_king(args):
     else:
         input_name = args.plink_data + '.bed'
 
-    cmd = f"{args.king_path} -b {input_name} --kinship --prefix {args.plink_data} --degree {args.degree}"
+    cmd = f"{args.king_path} -b {input_name} --kinship --prefix {args.plink_data} --degree 3"
     print(f"King command to run: {cmd}")
     subprocess.call(cmd.split())
 
 
-def create_edgelist(filestem):
+def create_edgelist(filestem, args):
     """
     Takes king output and creates list of related couples
     :param filestem: filestem of .kin/.kin0 output
@@ -82,8 +82,9 @@ def create_edgelist(filestem):
                 if words[0] != "FID":
                     id1 = words[1]
                     id2 = words[2]
-
-                    edgelist.write("\t".join([id1, id2]) + "\n")
+                    kinship = words[8]
+                    if kinship > args.kinship_cutoff:
+                        edgelist.write("\t".join([id1, id2]) + "\n")
     kin_in.close()
 
     ######################################################
@@ -96,8 +97,9 @@ def create_edgelist(filestem):
                 if words[0] != "FID1":
                     id1 = words[1]
                     id2 = words[3]
-
-                    edgelist.write("\t".join([id1, id2]) + "\n")
+                    kinship = float(words[7])
+                    if kinship > args.kinship_cutoff:
+                        edgelist.write("\t".join([id1, id2]) + "\n")
 
     kin0_in.close()
     edgelist.close()
@@ -196,8 +198,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Runs King relatedness calculation and finds maximal independent "
                                                  "set of relatives.")
     parser.add_argument("--plink_data", required=True, help="Plink 1.9 fileset (bed/bim/fam) file stem name.")
-    parser.add_argument("--degree", default=2,
-                        help="Degree of kinship to calculate and detect, to subsequently remove one individual.")
+    parser.add_argument("--kinship_cutoff", default=0.0883,
+                        help="Kinship threshold to declare a pair of related individuals, of which one will be removed."
+                             " Default 0.0883, approximately the lower cutoff for as second degree relative.")
     parser.add_argument("--skip_king", action='store_true', help="Skip calculating kinship coefficients.")
     parser.add_argument("--king_path", help="Path of plink executable.")
     parser.add_argument("--plink_path", help="Path of plink executable, if remaking bed needed.")
