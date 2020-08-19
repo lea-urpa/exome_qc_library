@@ -124,6 +124,11 @@ def create_case_list(filestem):
     return cases
 
 
+def connected_component_subgraphs(G):
+    for c in nx.connected_components(G):
+        yield G.subgraph(c).copy()
+
+
 def nx_algorithm(g, cases):
     """
     nx native based method for filtering cases. In each subgraph it maximizes the independent cases (read: disease
@@ -140,16 +145,13 @@ def nx_algorithm(g, cases):
     ##########################################
     # Loop through subgraphs in larger graph #
     ##########################################
-    for subgraph in nx.connected_component_subgraphs(g, copy=True):
+    for subgraph in connected_component_subgraphs(g):
         subcases = filter_graph_cases(subgraph, cases)   # list of local cases
         if len(subcases) > 0:
             # graph induced by local cases
             case_graph = subgraph.subgraph(cases)
             # get maximal set of cases in case graph
             unrelated_subcases = nx.maximal_independent_set(case_graph)
-            # remove cases that are not in the set of independent cases
-            related_subcases = list(set(cases) - set(unrelated_subcases))
-            subgraph.remove_nodes_from(related_subcases)
             # get maximal set of nodes in subgraph, giving unrelated cases to keep
             unrelated_nodes += nx.maximal_independent_set(subgraph, unrelated_subcases)
         else:
