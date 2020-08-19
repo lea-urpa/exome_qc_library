@@ -180,26 +180,29 @@ def check_inputs(parsed_args):
         f1 = getattr(parsed_args, f)
 
         if f == 'samples_annotation_files':
-            files = getattr(parsed_args, f).strip().split(",")
+            files = getattr(parsed_args, f)
+            if files is not None:
+                files = files.strip().split(",")
         else:
             files = [f1]
 
-        for file in files:
-            if file is not None:
-                if file.endswith("/"):
-                    file = file.rstrip("/")
+        if files is not None:
+            for file in files:
+                if file is not None:
+                    if file.endswith("/"):
+                        file = file.rstrip("/")
 
-                if f == "mt":
-                    file = file + "/metadata.json.gz"
-                if f == "scripts_dir":
-                    file = file + "/exome_qc.py"
+                    if f == "mt":
+                        file = file + "/metadata.json.gz"
+                    if f == "scripts_dir":
+                        file = file + "/exome_qc.py"
 
-                stat_cmd = ['gsutil', '-q', 'stat', file]
-                status = subprocess.call(stat_cmd)
+                    stat_cmd = ['gsutil', '-q', 'stat', file]
+                    status = subprocess.call(stat_cmd)
 
-                if status != 0:
-                    logging.error(f"Error! Input file {file} does not exist!")
-                    exit(1)
+                    if status != 0:
+                        logging.error(f"Error! Input file {file} does not exist!")
+                        exit(1)
 
     ##################################################
     # Check that bucket for output directories exist #
