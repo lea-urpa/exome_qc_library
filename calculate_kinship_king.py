@@ -82,7 +82,7 @@ def create_edgelist(filestem, args):
                 if words[0] != "FID":
                     id1 = words[1]
                     id2 = words[2]
-                    kinship = words[8]
+                    kinship = float(words[8])
                     if kinship > args.kinship_cutoff:
                         edgelist.write("\t".join([id1, id2]) + "\n")
     kin_in.close()
