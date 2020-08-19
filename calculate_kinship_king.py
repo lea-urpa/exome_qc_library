@@ -245,6 +245,6 @@ if __name__ == "__main__":
     print('# of unrelated cases given king input: ' + str(num_ind_cases))
 
     print('Writing file with related individuals to remove from dataset:')
-    with open('related_to_remove.txt', 'w') as f:
+    with open(arguments.plink_data + '_related_to_remove.txt', 'w') as f:
         for item in related_to_remove:
             f.write("%s\n" % item)
