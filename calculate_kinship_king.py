@@ -26,7 +26,7 @@ def recode_bim(filestem):
     with open(old_bim) as old:
         for line in old:
             words = line.strip().split('\t')
-            new_chrom = words[1].replace("chr", "")
+            new_chrom = words[0].replace("chr", "")
             words[0] = new_chrom
 
             new_bim.write("\t".join(words) + "\n")
