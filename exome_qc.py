@@ -120,8 +120,9 @@ def parse_arguments(arguments):
 
     # Samples QC thresholds #
     samples_thresh = parser.add_argument_group("Samples QC thresholds.")
-    samples_thresh.add_argument("--sample_call_rate", default=0.8, type=float,
-                                help="Minimum genotype call rate per sample.")
+    samples_thresh.add_argument("--sample_call_rate", type=float,
+                                help="Minimum genotype call rate per sample. Default none- samples not filtered on "
+                                     "call rate.")
     samples_thresh.add_argument("--chimeras_col", required=True, type=str,
                                 help="Column in matrix table or annotation files giving sample chimera percentage")
     samples_thresh.add_argument("--chimeras_max", default=0.05, type=float, help="Max % of chimeras allowed for sample")
