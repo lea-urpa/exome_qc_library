@@ -288,6 +288,12 @@ if __name__ == "__main__":
     fh.setFormatter(formatter)
     root.addHandler(fh)
 
+    # Add streaming handler
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+    root.addHandler(ch)
+
     ##################################################
     # Pre-define checkpoint names to load data later #
     ##################################################
