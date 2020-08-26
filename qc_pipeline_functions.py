@@ -34,8 +34,9 @@ def load_data(args):
         mt = None
         return mt
 
-    datestr = time.strftime("%Y.%m.%d")
+    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
+    datestr = time.strftime("%Y.%m.%d")
     mt = hl.read_matrix_table(args.mt)
     mt.annotate_globals(original_mt_input={'file': args.mt, 'date': datestr})
 
@@ -94,14 +95,13 @@ def load_checkpoint(checkpoint, step, args):
     :param args: arguments namespace object
     :return: returns loaded matrix table
     """
-    '''
-    Loads a data file from a given checkpoint
-    '''
     step_info = getattr(args, step)
     if args.test:
         checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}_test.mt/"
     else:
         checkpoint_name = f"{step_info['prefix']}_{args.out_name}_{step_info['suffix']}.mt/"
+
+    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
 
     mt = hl.read_matrix_table(os.path.join(args.out_dir, checkpoint_name))
     logging.info(f"Starting at checkpoint {str(checkpoint)}. Loading data from after {step}.")
@@ -237,17 +237,11 @@ def low_pass_var_qc(mt, args):
     if args.checkpoint == args.cpcounter:
         mt = load_checkpoint(args.checkpoint, 'sample_removal', args)
 
-    # Add preemtible nodes
-    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
-
     ########################################################
     # Annotate variants and genotypes for those failing QC #
     ########################################################
     logging.info("Running low-pass variant QC and genotype QC before samples QC.")
     mt = vq.find_failing_variants(mt, args, mode='low_pass')
-
-    # Remove the preemptible nodes
-    h.remove_preemptibles(args.cluster_name)
 
     if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step, args)
@@ -280,8 +274,6 @@ def maf_ldprune_relatedness(mt, args):
     #######################################################
     mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=True, checkpoint=False)
 
-    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
-
     ###############################
     # Filter out low MAF variants #
     ###############################
@@ -300,7 +292,6 @@ def maf_ldprune_relatedness(mt, args):
     if args.overwrite_checkpoints:
         mt_ldpruned = save_checkpoint(mt_ldpruned, step, args)
 
-    h.remove_preemptibles(args.cluster_name)
     args.cpcounter += 1
     return mt, mt_ldpruned
 
@@ -402,11 +393,13 @@ def find_pop_outliers(mt, mt_ldpruned, args):
     ##########################################################################################
     # Find population outliers from filtered + LD pruned dataset, annotate unfiltered datset #
     ##########################################################################################
+    h.remove_preemptibles(args.cluster_name)
     mt = sq.find_pop_outliers(mt_ldpruned, mt_to_annotate=mt, args=args)
 
     if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step, args)
 
+    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
     args.cpcounter += 1
     return mt
 
@@ -510,8 +503,6 @@ def final_variant_qc(mt, args):
     if args.checkpoint == args.cpcounter:
         mt = load_checkpoint(args.checkpoint, 'impute_sex', args)
 
-    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
-
     logging.info('Running variant QC filtering.')
     mt = vq.find_failing_variants(mt, args, mode='final')
 
@@ -538,8 +529,6 @@ def find_failing_variants_by_pheno(mt, args):
     if args.checkpoint == args.cpcounter:
         mt = load_checkpoint(args.checkpoint, 'final_variant_qc', args)
 
-    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
-
     if args.pheno_col is not None:
         logging.info('Finding variants failing by phenotype.')
         mt = vq.find_variants_failing_by_pheno(mt, args)
@@ -550,8 +539,6 @@ def find_failing_variants_by_pheno(mt, args):
     if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step, args)
     args.cpcounter += 1
-
-    h.remove_preemptibles(args.cluster_name)
 
     return mt
 
@@ -592,7 +579,6 @@ def calculate_final_pcs(mt, args):
     h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
     mt_mafpruned = vq.maf_filter(mt_norelateds, 0.05)
     mt_mafpruned = save_checkpoint(mt_mafpruned, 'maf_filter_pcs', args)
-    h.remove_preemptibles(args.cluster_name)
 
     logging.info('LD pruning final dataset for PC calculation')
     mt_ldpruned = vq.ld_prune(mt_mafpruned, args)
@@ -601,6 +587,7 @@ def calculate_final_pcs(mt, args):
     ################################################
     # Calculate PCs and project to relatives, plot #
     ################################################
+    h.remove_preemptibles(args.cluster_name)
     mt = sq.project_pcs_relateds(mt_ldpruned, mt, args.pc_num)
     datestr = time.strftime("%Y.%m.%d")
     output_file(datestr + '_final_pcs_plot.html')
