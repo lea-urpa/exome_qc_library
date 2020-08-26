@@ -267,6 +267,7 @@ def samples_qc(mt, mt_to_annotate, args):
 
     batch_thresholds = {}
     for batch in batch_set:
+        logging.info(f"Performing sample QC for batch {batch}")
         batch_thresholds[batch] = {}
         for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
             defined_values = mt.aggregate_cols(hl.agg.count_where(hl.is_defined(mt.sample_qc[measure])))
