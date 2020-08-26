@@ -251,7 +251,7 @@ def samples_qc(mt, mt_to_annotate, args):
     # Find samples failing per-cohort on titv, het_homvar ratio, indel, and # singletons #
     ######################################################################################
     if args.batch_col_name is not None:
-        batch_none = mt.aggregate_cols(hl.agg.count_where(mt[args.batch_col_name] == None))
+        batch_none = mt.aggregate_cols(hl.agg.count_where(~(hl.is_defined(mt[args.batch_col_name]))))
         if batch_none > 0:
             logging.info(f"Warning- {batch_none} samples have batch undefined.")
         batch_set = mt.aggregate_cols(hl.agg.collect_as_set(mt[args.batch_col_name]))
