@@ -252,10 +252,12 @@ def samples_qc(mt, mt_to_annotate, args):
     ######################################################################################
     if args.batch_col_name is not None:
         batch_none = mt.aggregate_cols(hl.agg.count_where(~(hl.is_defined(mt[args.batch_col_name]))))
+        mt = mt.annotate_cols(**{args.batch_col_name: hl.or_else(mt[args.batch_col_name], "no_batch_info")})
+
         if batch_none > 0:
-            logging.info(f"Warning- {batch_none} samples have batch undefined.")
+            logging.info(f"Warning- {batch_none} samples have batch undefined. These samples will be grouped in one"
+                         f"batch for sample QC (named no_batch_info).")
         batch_set = mt.aggregate_cols(hl.agg.collect_as_set(mt[args.batch_col_name]))
-        batch_set = [x for x in batch_set if x is not None]
     else:
         args.batch_col_name = "mock_batch_col"
         mt = mt.annotate_cols(mock_batch_col="all")
