@@ -84,6 +84,9 @@ def save_checkpoint(mt, step, args):
     mt = mt.annotate_globals(**{step_name: datestr})
     mt = mt.checkpoint(os.path.join(args.out_dir, checkpoint_name), overwrite=True)
 
+    logging.info(f"Copying logs.")
+    h.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+
     return mt
 
 

@@ -274,7 +274,7 @@ if __name__ == "__main__":
     ####################
     datestr = time.strftime("%Y.%m.%d")  # Used for output folder
     timestr = time.strftime("%Y.%m.%d-%H.%M.%S")  # Used for output files, for more than one run per day
-    log_file = 'exome-qc_' + timestr + '.txt'
+    args.log_file = 'exome-qc_' + timestr + '.txt'
 
     # Create logger
     root = logging.getLogger()
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
     # Add file handler
-    fh = logging.FileHandler(log_file)
+    fh = logging.FileHandler(args.log_file)
     fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     root.addHandler(fh)
@@ -366,5 +366,5 @@ if __name__ == "__main__":
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
-    h.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
+    h.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
