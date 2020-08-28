@@ -127,12 +127,13 @@ def find_pop_outliers(mt_ldpruned, mt_to_annotate, args, plots=True, max_iter=8)
                 for annotation in pca_annotations:
                     scores = scores.annotate(**{annotation: coldata[scores.s][annotation]})
 
-            output_file(f"find_population_outliers_pcsplots_round{i}_{datestr}.html")
             if args.pca_plot_annotations is not None:
                 for annotation in pca_annotations:
+                    output_file(f"find_population_outliers_pcsplots_round{i}_{annotation}_{datestr}.html")
                     p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=scores[annotation])
                     save(p)
             else:
+                output_file(f"find_population_outliers_pcsplots_round{i}_{datestr}.html")
                 p = hl.plot.scatter(scores.scores[0], scores.scores[1])
                 save(p)
 
