@@ -21,6 +21,7 @@ def parse_arguments(arguments):
     # Pipeline parameters #
     params = parser.add_argument_group("Pipeline parameters")
     params.add_argument("--checkpoint", type=int, help="Checkpoint to start pipeline at, default start (0).", default=1)
+    params.add_argument("--stop_checkpoint", type=int, help="Checkpoint to stop pipeline at, for testing.")
     params.add_argument("--reference_genome", type=str, help="Reference_genome", choices=["GRCh37", "GRCh38"],
                         default="GRCh38")
     params.add_argument("--test", action='store_true', help="run test with just chrom 22?")

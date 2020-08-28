@@ -121,7 +121,7 @@ def annotate_samples(mt, args):
     :param args: arguments namespace object
     :return: returns matrix table + checkpoint counter
     """
-    if args.checkpoint > args.cpcounter:
+    if (args.checkpoint > args.cpcounter) | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt
 
@@ -185,7 +185,7 @@ def remove_samples(mt, args):
     :param args:
     :return:
     """
-    if args.checkpoint > args.cpcounter:
+    if (args.checkpoint > args.cpcounter) | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt
 
@@ -230,7 +230,7 @@ def low_pass_var_qc(mt, args):
     :return: returns matrix table with bad variants filtered out.
     """
 
-    if args.checkpoint > args.cpcounter:
+    if (args.checkpoint > args.cpcounter) | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt
 
@@ -261,7 +261,7 @@ def maf_ldprune_relatedness(mt, args):
     :param args:
     :return:
     """
-    if args.checkpoint > args.cpcounter:
+    if (args.checkpoint > args.cpcounter) | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         mt_ldpruned = None
         return mt, mt_ldpruned
@@ -309,7 +309,7 @@ def find_related_individuals(mt, mt_ldpruned, args):
     :return: returns mt, mt_ldpruned
     """
 
-    if args.checkpoint > args.cpcounter:
+    if (args.checkpoint > args.cpcounter) | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt, mt_ldpruned
 
@@ -383,7 +383,7 @@ def find_pop_outliers(mt, mt_ldpruned, args):
     :return: returns matrix table annotated with population outliers
     """
 
-    if (args.checkpoint > args.cpcounter) | args.run_king:
+    if (args.checkpoint > args.cpcounter) | args.run_king | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt, mt_ldpruned
 
@@ -415,7 +415,7 @@ def impute_sex(mt, args):
     :param args:
     :return:
     """
-    if (args.checkpoint > args.cpcounter) | args.run_king:
+    if (args.checkpoint > args.cpcounter) | args.run_king | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt
 
@@ -463,7 +463,7 @@ def samples_qc(mt, args):
     :param args:
     :return: returns matrix table annotated with samples failing analytical samples QC
     """
-    if (args.checkpoint > args.cpcounter) | args.run_king:
+    if (args.checkpoint > args.cpcounter) | args.run_king | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt
 
@@ -497,7 +497,7 @@ def final_variant_qc(mt, args):
     :param args:
     :return: returns matrix table with variants failing final QC annotated
     """
-    if (args.checkpoint > args.cpcounter) | args.run_king:
+    if (args.checkpoint > args.cpcounter) | args.run_king | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt
 
@@ -523,7 +523,7 @@ def find_failing_variants_by_pheno(mt, args):
     :param args:
     :return: matrix table with new row annotation for variants failing per-phenotype QC
     """
-    if (args.checkpoint > args.cpcounter) | args.run_king:
+    if (args.checkpoint > args.cpcounter) | args.run_king | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt
 
@@ -556,7 +556,7 @@ def calculate_final_pcs(mt, args):
     :return: matrix table annotate with principal components.
     """
 
-    if (args.checkpoint > args.cpcounter) | args.run_king:
+    if (args.checkpoint > args.cpcounter) | args.run_king | (args.checkpoint > args.stop_checkpoint):
         args.cpcounter += 1
         return mt
 
