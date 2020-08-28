@@ -237,7 +237,7 @@ def find_failing_genotypes_ab(mt, args, prefix):
     mt = mt.annotate_entries(**{failing_name: ab_cond_homref})
 
     homref_failing_ab = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_homref_ab")))
-    homref_failing_ab_perc = round(homref_failing_ab / gthomref * 100, 2)
+    homref_failing_ab_perc = round(homref_failing_ab / gthomref * 100, 4)
 
     ###############################################
     # Filter hom var genotypes on allelic balance #
@@ -267,7 +267,7 @@ def find_failing_genotypes_ab(mt, args, prefix):
     logging.info("\nGenotypes failing ab, after excluding low DP and low GQ genotypes:")
     logging.info(f"Number of het GTs failing ab: {hets_failing_ab}({het_failing_ab_perc}%)")
     logging.info(f"Number of hom ref GTs failing_ab: {homref_failing_ab} ({homref_failing_ab_perc}%)")
-    logging.info(f"Number of hom alt GTs failing_ab: {homalt_failing_ab} ({homalt_failing_ab_perc})")
+    logging.info(f"Number of hom alt GTs failing_ab: {homalt_failing_ab} ({homalt_failing_ab_perc})%")
 
     logging.info(f"Number of het GTs missing AD info: {missing_ad_het} "
                  f"({round(missing_ad_het/gthet*100, 2)}% of het GTs)")
