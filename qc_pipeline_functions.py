@@ -475,6 +475,7 @@ def samples_qc(mt, args):
     ######################################################
     # Filter failing variants + genotypes for samples QC #
     ######################################################
+    logging.info("Removing variants and genotypes failing low pass samples QC, and population outlier samples.")
     mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
 
     ##################
