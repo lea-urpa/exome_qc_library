@@ -3,7 +3,6 @@ Helper scripts for running Hail pipelines.
 
 Author: Lea Urpa, August 2020
 """
-import time
 import subprocess
 import logging
 import shlex
