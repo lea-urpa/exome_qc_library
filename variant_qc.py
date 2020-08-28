@@ -360,12 +360,14 @@ def annotate_variant_het_ab(mt, args, prefix):
     # Check annotations defined for all variants
     undefined_het_ct = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_gt_cnt]))))
     undefined_het_ab = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_ab]))))
+    undefined_het_ab_hets = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_ab])) & (mt[het_gt_cnt] > 0)))
 
     if undefined_het_ct > 0:
         logging.info(f"Warning- {undefined_het_ct} variants have undefined het GT count.")
 
     if undefined_het_ab > 0:
         logging.info(f"Warning- {undefined_het_ab} variants have undefined het GT allelic balance.")
+        logging.info(f"{undefined_het_ab_hets} variants have undefined het GT allelic balance, and het GT count > 0.")
 
     ################################################################################
     # Annotate het GT and het GT allelic balance for cases and controls separately #
