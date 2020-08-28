@@ -277,6 +277,8 @@ def samples_qc(mt, mt_to_annotate, args):
                 # Get mean and standard deviation for each measure, for each batch's samples
                 stats = mt.aggregate_cols(hl.agg.filter(mt[args.batch_col_name] == batch,
                                                         hl.agg.stats(mt.sample_qc[measure])))
+                logging.info(f"Statistics for measure {measure} in batch {batch}:")
+                logging.info(stats)
 
                 # Get cutoffs for each measure
                 cutoff_upper = stats.mean + (args.sampleqc_sd_threshold * stats.stdev)
