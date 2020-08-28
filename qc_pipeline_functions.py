@@ -576,7 +576,6 @@ def calculate_final_pcs(mt, args):
     # MAF prune and LD prune for calculating PCS #
     ##############################################
     logging.info("Filtering to common variants and LD pruning dataset.")
-    h.add_preemptibles(args.cluster_name, args.num_preemptible_workers)
     mt_mafpruned = vq.maf_filter(mt_norelateds, 0.05)
     mt_mafpruned = save_checkpoint(mt_mafpruned, 'maf_filter_pcs', args)
 
