@@ -3,6 +3,8 @@ Helper scripts for running Hail pipelines.
 
 Author: Lea Urpa, August 2020
 """
+import os
+import time
 import subprocess
 import logging
 import shlex
@@ -12,7 +14,11 @@ import hail as hl
 def copy_logs_output(log_dir, log_file, plot_dir):
     if not log_dir.endswith("/"):
         log_dir = log_dir + "/"
-    hl.copy_log(log_dir)
+
+    datestr = time.strftime("%Y.%m.%d")
+    hail_log_name = os.path.join(log_dir, datestr + "_hail_log.txt")
+    hl.copy_log(hail_log_name)
+
     cmd = ['gsutil', 'cp', log_file, log_dir]
     subprocess.call(cmd)
     cmd = ['gsutil', 'cp', '*.html', plot_dir]
