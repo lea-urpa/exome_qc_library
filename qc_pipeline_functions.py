@@ -596,11 +596,11 @@ def calculate_final_pcs(mt, args):
     if args.pca_plot_annotations is not None:
         pca_annotations = args.pca_plot_annotations.strip().split(",")
         for annotation in pca_annotations:
-            output_file(f"final_pcs_plot_{annotation}_{datestr}.html")
+            output_file(f"{datestr}_final_pcs_plot_{annotation}.html")
             p = hl.plot.scatter(mt.pc1, mt.pc2, label=mt[annotation])
             save(p)
     else:
-        output_file(f'final_pcs_plot_{datestr}.html')
+        output_file(f'{datestr}_final_pcs_plot.html')
         pcplot = hl.plot.scatter(mt.pc1, mt.pc2)
         save(pcplot)
 
