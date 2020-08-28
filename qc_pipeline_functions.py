@@ -592,9 +592,17 @@ def calculate_final_pcs(mt, args):
     h.remove_preemptibles(args.cluster_name)
     mt = sq.project_pcs_relateds(mt_ldpruned, mt, args.pc_num)
     datestr = time.strftime("%Y.%m.%d")
-    output_file(datestr + '_final_pcs_plot.html')
-    pcplot = hl.plot.scatter(mt.pc1, mt.pc2)
-    save(pcplot)
+
+    if args.pca_plot_annotations is not None:
+        pca_annotations = args.pca_plot_annotations.strip().split(",")
+        for annotation in pca_annotations:
+            output_file(f"final_pcs_plot_{annotation}_{datestr}.html")
+            p = hl.plot.scatter(mt.pc1, mt.pc2, label=mt[annotation])
+            save(p)
+    else:
+        output_file(f'final_pcs_plot_{datestr}.html')
+        pcplot = hl.plot.scatter(mt.pc1, mt.pc2)
+        save(pcplot)
 
     if args.overwrite_checkpoints:
         mt = save_checkpoint(mt, step, args)
