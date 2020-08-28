@@ -11,6 +11,8 @@ import hail as hl
 
 
 def copy_logs_output(log_dir, log_file, plot_dir):
+    if not log_dir.endswith("/"):
+        log_dir = log_dir + "/"
     hl.copy_log(log_dir)
     cmd = ['gsutil', 'cp', log_file, log_dir]
     subprocess.call(cmd)
