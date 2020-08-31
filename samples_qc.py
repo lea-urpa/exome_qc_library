@@ -271,23 +271,38 @@ def samples_qc(mt, mt_to_annotate, args):
         mt_cols = mt_cols.annotate(mock_batch_col="all")
         batch_set = ["all"]
 
-    # Instantiate box plot label
-    mt_cols = mt_cols.annotate(boxplot_label=mt_cols[args.batch_col_name])
+    # Convert batch strings to numeric values, create label for plotting
+    batch_set_numeric = list(range(len(batch_set)))
+    batch_key = list(zip(batch_set, batch_set_numeric))
+
+    mt_cols = mt_cols.annotate(plot_batch=0)
+    for batch in batch_key:
+        mt_cols = mt_cols.annotate(plot_batch=hl.cond(mt_cols[args.batch_col_name] == batch[0],
+                                                      batch[1], mt_cols.plot_batch))
+        mt_cols = mt_cols.annotate(plot_batch_jitter=mt_cols.plot_batch + hl.rand_unif(-0.3, 0.3))
 
     batch_thresholds = {}
     batch_statistics = {}
-    for batch in batch_set:
-        logging.info(f"Performing sample QC for batch {batch}")
-        batch_thresholds[batch] = {}
-        for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
+    for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
+        logging.info(f"Performing sample QC for measure {measure}")
+
+        # Instantiate/reset box plot label
+        mt_cols = mt_cols.annotate(boxplot_label=mt_cols[args.batch_col_name])
+
+        for batch in batch_set:
+            if batch not in batch_thresholds.keys():
+                batch_thresholds[batch] = {}
+
+            if batch not in batch_thresholds.keys():
+                batch_statistics[batch] = {}
+
+            # See if values exist at all for all values
             defined_values = mt_cols.aggregate(hl.agg.count_where(hl.is_defined(mt_cols.sample_qc[measure])))
-            batch_statistics[batch] = {}
 
             if defined_values > 0:
                 # Get mean and standard deviation for each measure, for each batch's samples
                 stats = mt_cols.aggregate(hl.agg.filter(mt_cols[args.batch_col_name] == batch,
                                                         hl.agg.stats(mt_cols.sample_qc[measure])))
-                batch_statistics[batch][measure] = stats
 
                 # Get cutoffs for each measure
                 cutoff_upper = stats.mean + (args.sampleqc_sd_threshold * stats.stdev)
@@ -297,12 +312,8 @@ def samples_qc(mt, mt_to_annotate, args):
                     logging.info(f"Max number of singletons for batch {batch}: {stats.max}")
 
                 mt_cols = mt_cols.annotate(failing_samples_qc=hl.cond(
-                    (mt_cols.sample_qc[measure] > cutoff_upper) & hl.is_defined(mt_cols.sample_qc[measure]),
-                    mt_cols.failing_samples_qc.append(f"failing_{measure}"),
-                    mt_cols.failing_samples_qc))
-
-                mt_cols = mt_cols.annotate(failing_samples_qc=hl.cond(
-                    (mt_cols.sample_qc[measure] < cutoff_lower) & hl.is_defined(mt_cols.sample_qc[measure]),
+                    ((mt_cols.sample_qc[measure] > cutoff_upper) | (mt_cols.sample_qc[measure] < cutoff_lower))
+                    & hl.is_defined(mt_cols.sample_qc[measure]),
                     mt_cols.failing_samples_qc.append(f"failing_{measure}"),
                     mt_cols.failing_samples_qc))
 
@@ -316,36 +327,23 @@ def samples_qc(mt, mt_to_annotate, args):
                     hl.is_defined(mt_cols.sample_qc[measure]),
                     "outlier", mt_cols.boxplot_label))
 
-                # Collect thresholds for each batch
+                # Collect thresholds and statistics for each batch
                 batch_thresholds[batch][measure] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
+                batch_statistics[batch][measure] = stats
+
+                # Create plot for measure for each batch
+                output_file(f"{datestr}_samples_qc_plots_{measure}.html")
+                p = hl.plot.scatter(mt_cols.plot_batch_jitter, mt_cols.sample_qc[measure],
+                                    label=mt_cols.boxplot_label,
+                                    title=f"{measure} values split by batch.")
+                save(p)
+
             else:
                 logging.error(f"Error- no defined values for measure {measure}. NAs can be introduced by division by "
                               f"zero. Samples not filtered on {measure}!")
 
     logging.info('Statistics by batch:')
     logging.info(pprint(batch_statistics))
-
-    ##########################################
-    # Create box plots for samples QC values #
-    ##########################################
-    # Convert batch strings to numeric values
-    batch_set_numeric = list(range(len(batch_set)))
-    batch_key = list(zip(batch_set, batch_set_numeric))
-
-    mt_cols = mt_cols.annotate(plot_batch=0)
-
-    for batch in batch_key:
-        mt_cols = mt_cols.annotate(plot_batch=hl.cond(mt_cols[args.batch_col_name] == batch[0],
-                                                      batch[1], mt_cols.plot_batch))
-        mt_cols = mt_cols.annotate(plot_batch_jitter=mt_cols.plot_batch + hl.rand_unif(-0.3, 0.3))
-
-    for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
-        output_file(f"{datestr}_samples_qc_plots_{measure}.html")
-        defined_values = mt_cols.aggregate(hl.agg.count_where(hl.is_defined(mt_cols.sample_qc[measure])))
-        if defined_values > 0:
-            p = hl.plot.scatter(mt_cols.plot_batch_jitter, mt_cols.sample_qc[measure], label=mt_cols.boxplot_label,
-                                title=f"{measure} values split by batch.")
-            save(p)
 
     ##########################
     # Report failing samples #
