@@ -7,6 +7,7 @@ import logging
 import time
 import hail as hl
 from bokeh.io import output_file, save
+from pprint import pprint
 
 
 def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, unfilter_entries=False, pheno_qc=False,
@@ -274,18 +275,19 @@ def samples_qc(mt, mt_to_annotate, args):
     mt_cols = mt_cols.annotate(boxplot_label=mt_cols[args.batch_col_name])
 
     batch_thresholds = {}
+    batch_statistics = {}
     for batch in batch_set:
         logging.info(f"Performing sample QC for batch {batch}")
         batch_thresholds[batch] = {}
         for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
             defined_values = mt_cols.aggregate(hl.agg.count_where(hl.is_defined(mt_cols.sample_qc[measure])))
+            batch_statistics[batch] = {}
 
             if defined_values > 0:
                 # Get mean and standard deviation for each measure, for each batch's samples
                 stats = mt_cols.aggregate(hl.agg.filter(mt_cols[args.batch_col_name] == batch,
                                                         hl.agg.stats(mt_cols.sample_qc[measure])))
-                logging.info(f"Statistics for measure {measure} in batch {batch}:")
-                logging.info(stats)
+                batch_statistics[batch][measure] = stats
 
                 # Get cutoffs for each measure
                 cutoff_upper = stats.mean + (args.sampleqc_sd_threshold * stats.stdev)
@@ -319,6 +321,9 @@ def samples_qc(mt, mt_to_annotate, args):
             else:
                 logging.error(f"Error- no defined values for measure {measure}. NAs can be introduced by division by "
                               f"zero. Samples not filtered on {measure}!")
+
+    logging.info('Statistics by batch:')
+    logging.info(pprint(batch_statistics))
 
     ##########################################
     # Create box plots for samples QC values #
