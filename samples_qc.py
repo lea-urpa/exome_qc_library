@@ -270,6 +270,9 @@ def samples_qc(mt, mt_to_annotate, args):
         mt_cols = mt_cols.annotate(mock_batch_col="all")
         batch_set = ["all"]
 
+    # Instantiate box plot label
+    mt_cols = mt_cols.annotate(boxplot_label=mt_cols[args.batch_col_name])
+
     batch_thresholds = {}
     for batch in batch_set:
         logging.info(f"Performing sample QC for batch {batch}")
@@ -306,6 +309,11 @@ def samples_qc(mt, mt_to_annotate, args):
                     mt_cols.failing_samples_qc.append(f"missing_{measure}"),
                     mt_cols.failing_samples_qc))
 
+                mt_cols = mt_cols.annotate(boxplot_label=hl.cond(
+                    ((mt_cols.sample_qc[measure] > cutoff_upper) | (mt_cols.sample_qc[measure] < cutoff_lower)) &
+                    hl.is_defined(mt_cols.sample_qc[measure]),
+                    "outlier", mt_cols.boxplot_label))
+
                 # Collect thresholds for each batch
                 batch_thresholds[batch][measure] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
             else:
@@ -330,7 +338,7 @@ def samples_qc(mt, mt_to_annotate, args):
         output_file(f"{datestr}_samples_qc_plots_{measure}.html")
         defined_values = mt_cols.aggregate(hl.agg.count_where(hl.is_defined(mt_cols.sample_qc[measure])))
         if defined_values > 0:
-            p = hl.plot.scatter(mt_cols.plot_batch_jitter, mt_cols.sample_qc[measure], label=mt_cols[args.batch_col_name],
+            p = hl.plot.scatter(mt_cols.plot_batch_jitter, mt_cols.sample_qc[measure], label=mt_cols.boxplot_label,
                                 title=f"{measure} values split by batch.")
             save(p)
 
