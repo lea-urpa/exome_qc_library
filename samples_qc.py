@@ -324,12 +324,13 @@ def samples_qc(mt, mt_to_annotate, args):
     for batch in batch_key:
         mt_cols = mt_cols.annotate(plot_batch=hl.cond(mt_cols[args.batch_col_name] == batch[0],
                                                       batch[1], mt_cols.plot_batch))
+        mt_cols = mt_cols.annotate(plot_batch_jitter=mt_cols.plot_batch + hl.rand_unif(-0.3, 0.3))
 
     for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
         output_file(f"{datestr}_samples_qc_plots_{measure}.html")
         defined_values = mt_cols.aggregate(hl.agg.count_where(hl.is_defined(mt_cols.sample_qc[measure])))
         if defined_values > 0:
-            p = hl.plot.scatter(mt_cols.plot_batch, mt_cols.sample_qc[measure], label=mt_cols[args.batch_col_name],
+            p = hl.plot.scatter(mt_cols.plot_batch_jitter, mt_cols.sample_qc[measure], label=mt_cols[args.batch_col_name],
                                 title=f"{measure} values split by batch.")
             save(p)
 
