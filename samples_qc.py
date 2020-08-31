@@ -373,6 +373,9 @@ def samples_qc(mt, mt_to_annotate, args):
     mt_to_annotate = mt_to_annotate.annotate_cols(sample_qc=mt_cols[mt_to_annotate.s].sample_qc)
     mt_to_annotate = mt_to_annotate.annotate_cols(failing_samples_qc=mt_cols[mt_to_annotate.s].failing_samples_qc)
 
+    mt_to_annotate = mt_to_annotate.annotate_globals(samples_qc_stats_batches=batch_statistics)
+    mt_to_annotate = mt_to_annotate.annotate_globals(samples_qc_stats_chim_cont={'chimeras': chim_stats,
+                                                                                 'contamination': cont_stats})
     mt_to_annotate = mt_to_annotate.annotate_globals(samples_qc_thresholds=
                                                      {'chimeras_max': str(args.chimeras_max),
                                                       'contamination_max': str(args.contamination_max),
