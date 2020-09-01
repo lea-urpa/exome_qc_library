@@ -248,6 +248,9 @@ def check_inputs(parsed_args):
 
             subprocess.call(cmd)
 
+    if args.stop_checkpoint is None:
+        args.stop_checkpoint = 99
+
 
 if __name__ == "__main__":
     ######################################
