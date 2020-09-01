@@ -328,16 +328,16 @@ def samples_qc(mt, mt_to_annotate, args):
                 batch_thresholds[measure][batch] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
                 batch_statistics[measure][batch] = stats
 
-                # Create plot for measure for each batch
-                output_file(f"{datestr}_samples_qc_plots_{measure}.html")
-                p = hl.plot.scatter(mt_cols.plot_batch_jitter, mt_cols.sample_qc[measure],
-                                    label=mt_cols.boxplot_label,
-                                    title=f"{measure} values split by batch.")
-                save(p)
-
             else:
                 logging.error(f"Error- no defined values for measure {measure}. NAs can be introduced by division by "
                               f"zero. Samples not filtered on {measure}!")
+
+        # Create plot for measure for each batch
+        output_file(f"{datestr}_samples_qc_plots_{measure}.html")
+        p = hl.plot.scatter(mt_cols.plot_batch_jitter, mt_cols.sample_qc[measure],
+                            label=mt_cols.boxplot_label,
+                            title=f"{measure} values split by batch.")
+        save(p)
 
     logging.info('Statistics by measure:')
     logging.info(pprint(batch_statistics))
