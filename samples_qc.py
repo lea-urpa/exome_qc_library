@@ -292,6 +292,11 @@ def samples_qc(mt, mt_to_annotate, args):
         batch_thresholds[measure] = {}
         batch_statistics[measure] = {}
 
+        mt_cols = mt_cols.annotate(failing_samples_qc=hl.cond(
+            ~(hl.is_defined(mt_cols.sample_qc[measure])),
+            mt_cols.failing_samples_qc.append(f"missing_{measure}"),
+            mt_cols.failing_samples_qc))
+
         for batch in batch_set:
             # See if values exist at all for all values
             defined_values = mt_cols.aggregate(hl.agg.count_where(hl.is_defined(mt_cols.sample_qc[measure])))
@@ -310,18 +315,13 @@ def samples_qc(mt, mt_to_annotate, args):
 
                 mt_cols = mt_cols.annotate(failing_samples_qc=hl.cond(
                     ((mt_cols.sample_qc[measure] > cutoff_upper) | (mt_cols.sample_qc[measure] < cutoff_lower))
-                    & hl.is_defined(mt_cols.sample_qc[measure]),
+                    & hl.is_defined(mt_cols.sample_qc[measure]) & (mt_cols[args.batch_col_name] == batch),
                     mt_cols.failing_samples_qc.append(f"failing_{measure}"),
-                    mt_cols.failing_samples_qc))
-
-                mt_cols = mt_cols.annotate(failing_samples_qc=hl.cond(
-                    ~(hl.is_defined(mt_cols.sample_qc[measure])),
-                    mt_cols.failing_samples_qc.append(f"missing_{measure}"),
                     mt_cols.failing_samples_qc))
 
                 mt_cols = mt_cols.annotate(boxplot_label=hl.cond(
                     ((mt_cols.sample_qc[measure] > cutoff_upper) | (mt_cols.sample_qc[measure] < cutoff_lower)) &
-                    hl.is_defined(mt_cols.sample_qc[measure]),
+                    hl.is_defined(mt_cols.sample_qc[measure]) & (mt_cols[args.batch_col_name] == batch),
                     "outlier", mt_cols.boxplot_label))
 
                 # Collect thresholds and statistics for each batch
