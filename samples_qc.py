@@ -293,7 +293,7 @@ def samples_qc(mt, mt_to_annotate, args):
             if batch not in batch_thresholds.keys():
                 batch_thresholds[batch] = {}
 
-            if batch not in batch_thresholds.keys():
+            if batch not in batch_statistics.keys():
                 batch_statistics[batch] = {}
 
             # See if values exist at all for all values
