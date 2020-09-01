@@ -289,13 +289,10 @@ def samples_qc(mt, mt_to_annotate, args):
         # Instantiate/reset box plot label
         mt_cols = mt_cols.annotate(boxplot_label=mt_cols[args.batch_col_name])
 
+        batch_thresholds[measure] = {}
+        batch_statistics[measure] = {}
+
         for batch in batch_set:
-            if batch not in batch_thresholds.keys():
-                batch_thresholds[batch] = {}
-
-            if batch not in batch_statistics.keys():
-                batch_statistics[batch] = {}
-
             # See if values exist at all for all values
             defined_values = mt_cols.aggregate(hl.agg.count_where(hl.is_defined(mt_cols.sample_qc[measure])))
 
@@ -328,8 +325,8 @@ def samples_qc(mt, mt_to_annotate, args):
                     "outlier", mt_cols.boxplot_label))
 
                 # Collect thresholds and statistics for each batch
-                batch_thresholds[batch][measure] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
-                batch_statistics[batch][measure] = stats
+                batch_thresholds[measure][batch] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
+                batch_statistics[measure][batch] = stats
 
                 # Create plot for measure for each batch
                 output_file(f"{datestr}_samples_qc_plots_{measure}.html")
@@ -342,8 +339,10 @@ def samples_qc(mt, mt_to_annotate, args):
                 logging.error(f"Error- no defined values for measure {measure}. NAs can be introduced by division by "
                               f"zero. Samples not filtered on {measure}!")
 
-    logging.info('Statistics by batch:')
+    logging.info('Statistics by measure:')
     logging.info(pprint(batch_statistics))
+    logging.info('Thresholds by measure:')
+    logging.info(pprint(batch_thresholds))
 
     ##########################
     # Report failing samples #
