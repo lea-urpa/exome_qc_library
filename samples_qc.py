@@ -339,10 +339,6 @@ def samples_qc(mt, mt_to_annotate, args):
                             title=f"{measure} values split by batch.")
         save(p)
 
-    logging.info('Statistics by measure:')
-    logging.info(pprint(batch_statistics))
-    logging.info('Thresholds by measure:')
-    logging.info(pprint(batch_thresholds))
 
     ##########################
     # Report failing samples #
