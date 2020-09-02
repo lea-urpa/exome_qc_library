@@ -16,7 +16,7 @@ def parse_arguments(arguments):
     :param arguments: command line arguments
     :return: args namespace object
     """
-    parser = argparse.ArgumentParser(description="v9 exome sequencing dataset quality control pipeline.")
+    parser = argparse.ArgumentParser(description="Exome sequencing dataset quality control pipeline.")
 
     # Pipeline parameters #
     params = parser.add_argument_group("Pipeline parameters")
