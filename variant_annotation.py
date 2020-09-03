@@ -265,3 +265,87 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
 
     return mt_to_annotate
 
+
+def annotate_variants_gnomad(mt, gnomad_ht):
+    """
+    Function to take variant information from Gnomad hail table and copy some (not all) annotations to matrix table
+    rows.
+    :param mt: matrix table to annotate
+    :param gnomad_ht: string with file location + name of gnomad hail table to load
+    :return: returns annotated matrix table
+    """
+
+    gnomad_sites = hl.read_table(gnomad_ht)
+
+    mt = mt.annotate_rows(gnomad_freq=gnomad_sites.index(mt.row_key).freq,
+                          gnomad_popmax=gnomad_sites.index(mt.row_key).popmax,
+                          gnomad_faf=gnomad_sites.index(mt.row_key).faf,
+                          gnomad_filters=gnomad_sites.index(mt.row_key).filters,
+                          gnomad_rsid=gnomad_sites.index(mt.row_key).rsid,
+                          gnomad_original_locus_37=gnomad_sites.index(mt.row_key).original_locus,
+                          gnomad_original_alleles_37=gnomad_sites.index(mt.row_key).original_alleles)
+
+    mt = mt.annotate_globals(gnomad_file=gnomad_ht)
+    mt = mt.annotate_globals(gnomad_popmax_index_dict=gnomad_sites.popmax_index_dict,
+                             gnomad_freq_index_dict=gnomad_sites.freq_index_dict,
+                             gnomad_faf_index_dict=gnomad_sites.faf_index_dict)
+
+    return mt
+
+
+def annotate_variants_gnomad_mismatch(mt, gnomad_mismatch_ht):
+    """
+    Imports a list of 'bad' variants that have significantly different frequencies between gnomad exomes and genomes
+    in NFE population.
+    :param mt: matrix table to annotate
+    :param gnomad_mismatch_ht: string with file location + name of gnomad mismatch variant file to load
+    :return: returns annotated matrix table
+    """
+    gnomad_mismatch_list = hl.read_table(gnomad_mismatch_ht)
+    gnomad_mismatch_list = gnomad_mismatch_list.annotate(gnomad_mismatch=True)
+
+    # gnomad_mismatch True/False boolean annotation
+    mt = mt.annotate_rows(gnomad_mismatch_pvalue=gnomad_mismatch_list.index(mt.row_key).p_value,
+                          gnomad_mismatch_variantid=gnomad_mismatch_list.index(mt.row_key).variant,
+                          gnomad_mismatch=gnomad_mismatch_list.index(mt.row_key).gnomad_mismatch)
+
+    # Fill in empty values for gnomad mismatch with False
+    mt = mt.annotate_rows(gnomad_mismatch=hl.or_else(mt.gnomad_mismatch, False))
+
+    return mt
+
+
+def annotate_variants_cadd(mt, cadd_ht):
+    """
+    Function to take the file name of a hail table containing CADD information per variant, and annotate a given matrix
+    table's variants with CADD information.
+
+    :param mt: matrix table to annotatate
+    :param cadd_ht: string with file name + location of hail table to read, containing CADD values.
+    :return: returns annotated matrix table
+    """
+    cadd_variants = hl.read_table(cadd_ht)
+
+    # Annotate variants with all CADD annotations, renaming them
+    mt = mt.annotate_rows(CADD_RawScore=cadd_variants.index_rows(mt.row_key).RawScore,
+                          CADD_PHRED=cadd_variants.index_rows(mt.row_key).PHRED)
+    mt = mt.annotate_globals(cadd_file=cadd_ht)
+
+    return mt
+
+
+def annotate_variants_mpc(mt, mpc_ht):
+    """
+    Function to take MPC values and annotate rows of a matrix table with MPC values and information.
+
+    :param mt: matrix table to annotate
+    :param mpc_ht: string with file name + location of hail table to read, containing MPC values.
+    :return: returns annotated matrix table
+    """
+    mpc_variants = hl.read_table(mpc_ht)
+
+    # Annotate variants with all MPC annotations
+    mt = mt.annotate_rows(**mpc_variants.index_rows(mt.row_key))
+    mt = mt.annotate_globals(mpc_file=mpc_ht)
+
+    return mt
