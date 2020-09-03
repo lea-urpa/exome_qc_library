@@ -160,8 +160,8 @@ def putative_causal_dominant(mt, args):
     # homozygote count > 0
     mt_dom = mt.filter_rows((hl.len(mt.gnomad_filters) == 0) & hl.is_defined(mt.gnomad_popmax[args.gnomad_idx]) &
                             (mt.gnomad_mismatch == False) &
-                            (mt.gnomad_popmax.AC[args.gnomad_idx] > args.max_allowed_carrier_dominant) &
-                            (mt.gnomad_popmax.homozygote_count[args.gnomad_idx] > 0), keep=False)
+                            (mt.gnomad_popmax[args.gnomad_idx].AC > args.max_allowed_carrier_dominant) &
+                            (mt.gnomad_popmax[args.gnomad_idx].homozygote_count > 0), keep=False)
 
     gnomad_filt_count = mt_dom.count_rows()
     logging.info(f"Number of variants after filtering on gnomad annotations: {gnomad_filt_count} "
@@ -209,8 +209,8 @@ def putative_causal_recessive(mt, args):
     # homozygote count/AF > threshold
     mt_rec = mt.filter_rows((hl.len(mt.gnomad_filters) == 0) & hl.is_defined(mt.gnomad_popmax[args.gnomad_idx]) &
                             (mt.gnomad_mismatch == False) &
-                            (mt.gnomad_popmax.homozygote_count[args.gnomad_idx] > args.max_allowed_homozygotes_recessive)
-                            & (mt.gnomad_popmax.AF[args.gnomad_idx] > args.gnomad_AF_cutoff_recessive), keep=False)
+                            (mt.gnomad_popmax[args.gnomad_idx].homozygote_count > args.max_allowed_homozygotes_recessive)
+                            & (mt.gnomad_popmax[args.gnomad_idx].AF > args.gnomad_AF_cutoff_recessive), keep=False)
 
     gnomad_filt_count = mt_rec.count_rows()
     logging.info(f"Number of variants after filtering on gnomad annotations: {gnomad_filt_count} "
