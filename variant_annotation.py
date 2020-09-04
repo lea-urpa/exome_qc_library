@@ -286,9 +286,14 @@ def annotate_variants_gnomad(mt, gnomad_ht):
                           gnomad_original_alleles_37=gnomad_sites.index(mt.row_key).original_alleles)
 
     mt = mt.annotate_globals(gnomad_file=gnomad_ht)
-    mt = mt.annotate_globals(gnomad_popmax_index_dict=gnomad_sites.popmax_index_dict,
-                             gnomad_freq_index_dict=gnomad_sites.freq_index_dict,
-                             gnomad_faf_index_dict=gnomad_sites.faf_index_dict)
+
+    popmax_index_dict = gnomad_sites.popmax_index_dict.take(1)[0]
+    freq_index_dict = gnomad_sites.freq_index_dict.take(1)[0]
+    faf_index_dict = gnomad_sites.faf_index_dict.take(1)[0]
+
+    mt = mt.annotate_globals(gnomad_popmax_index_dict=popmax_index_dict,
+                             gnomad_freq_index_dict=freq_index_dict,
+                             gnomad_faf_index_dict=faf_index_dict)
 
     return mt
 
@@ -311,6 +316,8 @@ def annotate_variants_gnomad_mismatch(mt, gnomad_mismatch_ht):
 
     # Fill in empty values for gnomad mismatch with False
     mt = mt.annotate_rows(gnomad_mismatch=hl.or_else(mt.gnomad_mismatch, False))
+
+    mt = mt.annotate_globals(gnomad_mismatch_file=gnomad_mismatch_ht)
 
     return mt
 
