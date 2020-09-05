@@ -287,13 +287,9 @@ def annotate_variants_gnomad(mt, gnomad_ht):
 
     mt = mt.annotate_globals(gnomad_file=gnomad_ht)
 
-    popmax_index_dict = gnomad_sites.popmax_index_dict.take(1)[0]
-    freq_index_dict = gnomad_sites.freq_index_dict.take(1)[0]
-    faf_index_dict = gnomad_sites.faf_index_dict.take(1)[0]
-
-    mt = mt.annotate_globals(gnomad_popmax_index_dict=popmax_index_dict,
-                             gnomad_freq_index_dict=freq_index_dict,
-                             gnomad_faf_index_dict=faf_index_dict)
+    mt = mt.annotate_globals(gnomad_popmax_index_dict=gnomad_sites.index_globals().popmax_index_dict,
+                             gnomad_freq_index_dict=gnomad_sites.index_globals().freq_index_dict,
+                             gnomad_faf_index_dict=gnomad_sites.index_globals().faf_index_dict)
 
     return mt
 
