@@ -261,6 +261,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="v9 exome sequencing dataset quality control pipeline.")
     parser.add_argument("-mt", type=str, help="Input matrix table to run analysis on")
     parser.add_argument("--pheno_col", required=True, type=str, help="Col annotation giving case status, true/false.")
+    parser.add_argument("--de_novo_col", type=str, help="Col annotation giving variant de novo status, true/false.")
+    parser.add_argument("--gene_list", type=str, help="Name of file containing gene set of interest")
+    parser.add_argument("--gene_set_name", default="gene_set_of_interest")
     parser.add_argument("--mpc_cutoff", type=float, default=2,
                         help="Threshold for damaging missense variants by MPC score, for dominant model.")
     parser.add_argument("--cadd_cutoff", type=float, default=20,
@@ -269,7 +272,9 @@ if __name__ == "__main__":
                         help="Maximum allowed number of carriers for a variant for dominant inheritance model.")
     parser.add_argument("--max_allowed_homozygotes_recessive", type=int, default=5, help="Maximum allowed number of "
                         "homozygous carriers for a variant in recessive inheritance model.")
-    parser.add_argument("--gnomad_AF_cutoff_recessive", type=float, default=0.1,
+    parser.add_argument("--gnomad_AF_cutoff_recessive", type=float, default=0.05,
+                        help="Max allele frequency in Gnomad to consider a variant damaging in recessive model.")
+    parser.add_argument("--gnomad_AF_cutoff_recessive_strict", type=float, default=0.01,
                         help="Max allele frequency in Gnomad to consider a variant damaging in recessive model.")
     parser.add_argument("--cadd_ht", required=True, type=str, help="File name of CADD hail table.")
     parser.add_argument("--mpc_ht", required=True, type=str, help="File name of MPC hail table.")
@@ -279,9 +284,6 @@ if __name__ == "__main__":
     parser.add_argument("--output_name", required=True, type=str, help="Output name for files.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for output files.")
     parser.add_argument("--log_dir", required=True, type=str, help="Output directory for logs.")
-    parser.add_argument("--gene_list", type=str,
-                        help="Name of file containing one gene name per line, for genes of interest.")
-    parser.add_argument("--gene_set_name", default="gene_of_interest")
     args = parser.parse_args()
 
     scripts = ["variant_annotation.py", "helper_scripts.py"]
