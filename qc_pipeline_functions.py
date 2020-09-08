@@ -282,15 +282,10 @@ def maf_ldprune_relatedness(mt, args):
     ###############################
     mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf)
 
-    ####################
-    # LD prune dataset #
-    ####################
-    mt_ldpruned = vq.ld_prune(mt_maffilt, args)
-
     ##########################################
     # Downsample variants if row count > 80k #
     ##########################################
-    mt_ldpruned = vq.downsample_variants(mt_ldpruned, 80000)
+    mt_ldpruned = vq.downsample_variants(mt_maffilt, 80000)
 
     if args.overwrite_checkpoints:
         mt_ldpruned = save_checkpoint(mt_ldpruned, step, args)
