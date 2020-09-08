@@ -53,8 +53,10 @@ def maf_filter(mt, maf, filter_ac0_after_pruning=False):
         logging.info('Removing variants with alt allele count = 0 (monomorphic variants).')
         mt = hl.variant_qc(mt)
         mt = mt.filter_rows(hl.sum(mt.row.variant_qc.AC) == hl.int(0), keep=False)
-
-    logging.info("MAF pruned mt count:" + str(mt.count()))
+        count = mt.count()
+        logging.info(f"MT count after removing monomorphic variants and MAF filtering: {count}")
+    else:
+        logging.info("MAF pruned mt count:" + str(mt.count()))
 
     return mt
 

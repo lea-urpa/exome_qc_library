@@ -280,7 +280,7 @@ def maf_prune_relatedness(mt, args):
     ###############################
     # Filter out low MAF variants #
     ###############################
-    mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf)
+    mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, filter_ac0_after_pruning=True)
 
     ##########################################
     # Downsample variants if row count > 80k #
