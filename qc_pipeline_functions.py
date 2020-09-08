@@ -253,7 +253,7 @@ def low_pass_var_qc(mt, args):
     return mt
 
 
-def maf_ldprune_relatedness(mt, args):
+def maf_prune_relatedness(mt, args):
     """
     MAF prunes dataset for relatedness calculations in King.
 

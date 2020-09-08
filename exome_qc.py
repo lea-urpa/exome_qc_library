@@ -340,7 +340,7 @@ if __name__ == "__main__":
     mt = qc.low_pass_var_qc(mt, args)
 
     # LD Prune and MAF filter dataset for relatedness
-    mt, md_ldpruned = qc.maf_ldprune_relatedness(mt, args)
+    mt, md_ldpruned = qc.maf_prune_relatedness(mt, args)
 
     # Export data to find related individuals in King, if necessary
     mt, mt_ldpruned = qc.find_related_individuals(mt, md_ldpruned, args)
