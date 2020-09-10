@@ -131,11 +131,12 @@ if __name__ == "__main__":
     parser.add_argument("--log_dir", required=True, type=str, help="Output directory for logs.")
     args = parser.parse_args()
 
-    scripts = ["variant_annotation.py"]
+    scripts = ["variant_annotation.py", "helper_scripts.py"]
     for script in scripts:
         hl.spark_context().addPyFile(os.path.join(args.scripts_dir, script))
 
     import variant_annotation as va
+    import helper_scripts as h
 
     args.output_stem = os.path.join(args.output_dir, args.output_name)
 
@@ -182,3 +183,9 @@ if __name__ == "__main__":
 
     denovo_table.write(args.output_stem + "_denovo_variants.ht", overwrite=True)
     denovo_table.export(args.output_stem + "_denovo_variants.txt", overwrite=True)
+
+    ########################
+    # Copy logs and finish #
+    ########################
+    logging.info("Denovo pipeline ran successfully. Copying logs and exiting.")
+    h.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.log_dir)
