@@ -127,6 +127,7 @@ if __name__ == "__main__":
     parser.add_argument("--gnomad_population", type=str, default="gnomad_fin",
                         choices=[])
     parser.add_argument("--output_name", required=True, type=str, help="Output name for files.")
+    parser.add_argument("--scripts_dir", required=True, type=str, help="Directory containing scripts for this library.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for output files.")
     parser.add_argument("--log_dir", required=True, type=str, help="Output directory for logs.")
     args = parser.parse_args()
