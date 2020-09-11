@@ -183,7 +183,7 @@ if __name__ == "__main__":
     denovo_table = get_denovos(validated_fam, qcd_mt, args)
 
     denovo_table.write(args.output_stem + "_denovo_variants.ht", overwrite=True)
-    denovo_table.export(args.output_stem + "_denovo_variants.txt", overwrite=True)
+    denovo_table.export(args.output_stem + "_denovo_variants.txt")
 
     ########################
     # Copy logs and finish #
