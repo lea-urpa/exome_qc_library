@@ -100,6 +100,48 @@ def annotate_variants(mt, args):
     return mt
 
 
+def annotate_geneset(mt, args):
+    """
+    Annotates gene set information, if disease geneset given.
+
+    :param mt: Matrix table to annotate gene set information to
+    :param args: arguments giving gene list, disease gene sep, gene col name, and output stem
+    :return: Returns matrix table with rows annotated with T/F column of whether variant in gene set of interest,
+    and column of allelic requirement strings.
+    """
+    logging.info("Annotating dataset with disease gene information.")
+
+    # Import gene list
+    gene_table = hl.import_table(args.gene_list, delimiter=args.disease_gene_sep)
+    gene_table = gene_table.transmute(gene=gene_table[args.gene_col_name])
+    gene_table = gene_table.key_by('gene')
+
+    # Pull MT rows, select only locus, alleles, and gene, checkpoint, explode
+    rows = mt.rows()
+    rows = rows.key_by()
+    rows = rows.select("locus", "alleles", "gene")
+    rows = rows.checkpoint(args.output_stem + "_rows_tmp.ht")
+    rows = rows.explode(rows.gene)
+    rows = rows.key_by(rows.gene)
+
+    # Add gene information as column, with True/False for presence in gene table
+    rows = rows.annotate(**gene_table[rows.gene])
+    rows = rows.annotate(**{args.gene_set_name: hl.cond(rows.gene.contains(gene_table.gene), True, False)})
+
+    # Group table by gene, checkpoint
+    rows = rows.group_by('locus', 'alleles').aggregate(
+        genes=hl.agg.collect_as_set(rows.gene),
+        ddd_genes=hl.agg.collect_as_set(rows[args.gene_set_name]),
+        allelic_requirement=hl.agg.collect_as_set(rows['allelic.requirement.final']))
+    rows = rows.key_by(mt.locus, mt.alleles)
+
+    # Annotate rows with rows ht
+    mt = mt.annotate_rows(allelic_requirement=rows[mt.locus, mt.alleles].allelic_requirement)
+    mt = mt.annotate_rows(**{args.gene_set_name: rows[mt.locus, mt.alleles][args.gene_set_name]})
+
+    return mt
+
+
 def putative_causal_geneset(mt, args):
     """
     Looks for LOF and damaging missense variants in a particular geneset, regardless of population frequencies.
@@ -262,8 +304,11 @@ if __name__ == "__main__":
     parser.add_argument("-mt", type=str, help="Input matrix table to run analysis on")
     parser.add_argument("--pheno_col", required=True, type=str, help="Col annotation giving case status, true/false.")
     parser.add_argument("--de_novo_col", type=str, help="Col annotation giving variant de novo status, true/false.")
-    parser.add_argument("--gene_list", type=str, help="Name of file containing gene set of interest")
-    parser.add_argument("--gene_set_name", default="gene_set_of_interest")
+    parser.add_argument("--disease_genes", type=str, help="Name of file containing genes implicated in the disease.")
+    parser.add_argument("--gene_col_name", type=str, default="gene.symbol")
+    parser.add_argument("--allelic_requirement_col", type=str, default="allelic.requirement.final")
+    parser.add_argument("--disease_gene_sep", type=str, default="\t")
+    parser.add_argument("--gene_set_name", type=str, help='Name of the disease gene set for annotation.')
     parser.add_argument("--mpc_cutoff", type=float, default=2,
                         help="Threshold for damaging missense variants by MPC score, for dominant model.")
     parser.add_argument("--cadd_cutoff", type=float, default=20,
@@ -285,6 +330,8 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for output files.")
     parser.add_argument("--log_dir", required=True, type=str, help="Output directory for logs.")
     args = parser.parse_args()
+
+    args.output_stem = os.path.join(args.output_dir, args.output_name)
 
     scripts = ["variant_annotation.py", "helper_scripts.py"]
     for script in scripts:
