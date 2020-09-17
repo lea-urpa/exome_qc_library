@@ -133,7 +133,7 @@ def annotate_population_thresholds(mt, args):
     :return: returns annotated matrix table
     """
     logging.info("Annotating with boolean columns for whether variant fulfills population threshold criteria.")
-    checkpoint_name = args.output_stem + "_annotation_tmp.mt"
+    checkpoint_name = args.output_stem + "_annotation_tmp2.mt"
 
     ############################
     # Pull rows and checkpoint #
