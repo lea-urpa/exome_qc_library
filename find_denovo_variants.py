@@ -8,6 +8,7 @@ import logging
 import sys
 from collections import OrderedDict
 
+
 def validate_pedigree(fam, kin, args):
     """
     Imports a fam file and kinship file (.kin king output), and looks for PO relationships as predicted in the data
@@ -42,7 +43,7 @@ def validate_pedigree(fam, kin, args):
                              IBS0=kinship.index(fam_ht.key).IBS0)
 
     # Export to tsv a file with the relationships and the kinship values side by side
-    print("Exporting kinship-annotated fam file")
+    logging.info("Exporting kinship-annotated fam file")
     fam_ht.export(args.output_stem + "_kinship_annotated_fam.txt")
 
     # Remove rows in fam ht that do not have kinship data
@@ -54,12 +55,12 @@ def validate_pedigree(fam, kin, args):
         True, False))
 
     failing_count = fam_ht.aggregate(hl.agg.count_where(fam_ht.incorrect_po == True))
-    print(f"Number of reported parent-offspring pairs unsupported by kinship or IBS0 values: {failing_count}")
+    logging.info(f"Number of reported parent-offspring pairs unsupported by kinship or IBS0 values: {failing_count}")
 
     # If there are PO relationships not supported by the data, write new fam file excluding those individuals
     if failing_count > 0:
         # Print offending lines
-        print(fam_ht.filter(fam_ht.incorrect_po == True).show(failing_count))
+        logging.info(fam_ht.filter(fam_ht.incorrect_po == True).show(failing_count))
 
         # Create key of family ID, MID, PID
         fam_ht = fam_ht.annotate(fid_iid_mid_pid=fam_ht.f0 + ":" + fam_ht.f1 + ":" + fam_ht.f2 + ":" + fam_ht.f3)
@@ -78,7 +79,7 @@ def validate_pedigree(fam, kin, args):
 
         # Write to new fam file
         count = fam_ht.count()
-        print(f"Number of lines in new fam file, without lines containing PO relationships unsupported by kinship: "
+        logging.info(f"Number of lines in new fam file, without lines containing PO relationships unsupported by kinship: "
               f"{count}")
         new_fam = fam.replace(".fam", "") + "_without_failing_PO_trios.fam"
         fam_ht.export(new_fam)
@@ -208,12 +209,12 @@ if __name__ == "__main__":
     ########################
     # Find denovo variants #
     ########################
-    denovo_table, denovo_per_person = get_denovos(validated_fam, qcd_mt, args)
+    denovo_table, denovo_aggregated = get_denovos(validated_fam, qcd_mt, args)
 
     denovo_table.write(args.output_stem + "_denovo_variants.ht", overwrite=True)
     denovo_table.export(args.output_stem + "_denovo_variants.txt")
 
-    denovo_per_person.export(args.output_stem + "_denovo_variants_aggregated_by_individual.txt")
+    denovo_aggregated.export(args.output_stem + "_denovo_variants_aggregated_by_individual.txt")
 
     ########################
     # Copy logs and finish #
