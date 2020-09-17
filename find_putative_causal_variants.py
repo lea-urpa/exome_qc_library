@@ -567,15 +567,16 @@ if __name__ == "__main__":
                         help="Maximum allowed number of carriers for a variant for dominant inheritance model.")
     parser.add_argument("--max_allowed_homozygotes_recessive", type=int, default=5, help="Maximum allowed number of "
                         "homozygous carriers for a variant in recessive inheritance model.")
-    parser.add_argument("--gnomad_AF_cutoff_recessive", type=float, default=0.05,
-                        help="Max allele frequency in Gnomad to consider a variant damaging in recessive model.")
-    parser.add_argument("--gnomad_AF_cutoff_recessive_strict", type=float, default=0.01,
+    parser.add_argument("--gnomad_AF_cutoff_recessive", type=float, default=0.01,
                         help="Max allele frequency in Gnomad to consider a variant damaging in recessive model.")
     parser.add_argument("--cadd_ht", required=True, type=str, help="File name of CADD hail table.")
     parser.add_argument("--mpc_ht", required=True, type=str, help="File name of MPC hail table.")
     parser.add_argument("--gnomad_ht", required=True, type=str, help="File name of gnomad hail table.")
     parser.add_argument("--gnomad_population", type=str, default="controls",
                         choices=['gnomad', 'non_topmed', 'non_neuro', 'non_cancer', 'controls'])
+    parser.add_argument("--gnomad_mismatch_ht", type=str,
+                        help="Hail table with list of Gnomad variants with significantly different AF between genomes"
+                             "and exomes.")
     parser.add_argument("--gnomad_gene_metrics", type=str, help='text file with gnomad gene metrics')
     parser.add_argument("--output_name", required=True, type=str, help="Output name for files.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for output files.")
