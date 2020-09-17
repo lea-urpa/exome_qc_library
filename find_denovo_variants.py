@@ -6,7 +6,7 @@ import os
 import time
 import logging
 import sys
-
+from collections import OrderedDict
 
 def validate_pedigree(fam, kin, args):
     """
@@ -96,19 +96,47 @@ def get_denovos(fam, mt, args):
     :param args: argument for gnomad population to pull from population frequency dictionary of annotations
     :return: returns table of de novo results
     """
-
-    # Read in trios with hl.Pedigree.read(file)
+    #########################################################
+    # Read in trios, filter to just samples in matrix table #
+    #########################################################
     pedigree = hl.Pedigree.read(fam)
+    mt_samples = mt.s.take(mt.count_cols())
+    pedigree = pedigree.filter_to(mt_samples)
 
-    # Annotate dataset with gnomad frequencies
-    # (Check gnomad freq index dictionary to see populations, pick Finns)
+    ####################################################
+    # Report number of trios, number of complete trios #
+    ####################################################
+    trios = len(pedigree.trios)
+    complete_trios = len(pedigree.complete_trios())
+    logging.info(f"Number of trios: {trios}")
+    logging.info(f"Number of complete trios: {complete_trios}")
+
+    ############################################
+    # Annotate dataset with gnomad frequencies #
+    ############################################
     mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
     fin_index = mt.gnomad_freq_index_dict.take(1)[0][args.gnomad_population]
 
-    # Get de novo mutations with
+    ########################################
+    # Get de novo mutations, report number #
+    ########################################
     de_novo_results = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.gnomad_freq[fin_index].AF)
 
-    return de_novo_results
+    denovo_count = de_novo_results.count()
+    denovo_per_person = de_novo_results.filter(de_novo_results.confidence == "HIGH")
+    denovo_per_person = denovo_per_person.group_by('id').aggregate(
+        de_novo_mutations=hl.agg.collect(denovo_per_person.locus + ":" + denovo_per_person.alleles)
+    )
+
+    denovo_per_count = denovo_per_person.aggregate(hl.agg.counter(hl.len(denovo_per_person.de_novo_mutations)))
+    denovo_per_count = OrderedDict(sorted(denovo_per_count.items()))
+
+    logging.info(f"Number of de novo mutations, total: {denovo_count}")
+    logging.info("Count of de high-confidence novo mutations per person:")
+    for key, value in denovo_per_count.items():
+        logging.info(f"{key} de novo mutations: {value} individuals")
+
+    return de_novo_results, denovo_per_person
 
 
 if __name__ == "__main__":
@@ -180,10 +208,12 @@ if __name__ == "__main__":
     ########################
     # Find denovo variants #
     ########################
-    denovo_table = get_denovos(validated_fam, qcd_mt, args)
+    denovo_table, denovo_per_person = get_denovos(validated_fam, qcd_mt, args)
 
     denovo_table.write(args.output_stem + "_denovo_variants.ht", overwrite=True)
     denovo_table.export(args.output_stem + "_denovo_variants.txt")
+
+    denovo_per_person.export(args.output_stem + "_denovo_variants_aggregated_by_individual.txt")
 
     ########################
     # Copy logs and finish #
