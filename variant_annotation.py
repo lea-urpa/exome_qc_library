@@ -330,8 +330,8 @@ def annotate_variants_cadd(mt, cadd_ht):
     cadd_variants = hl.read_table(cadd_ht)
 
     # Annotate variants with all CADD annotations, renaming them
-    mt = mt.annotate_rows(CADD_RawScore=cadd_variants.index_rows(mt.row_key).RawScore,
-                          CADD_PHRED=cadd_variants.index_rows(mt.row_key).PHRED)
+    mt = mt.annotate_rows(CADD_RawScore=cadd_variants.index(mt.row_key).RawScore,
+                          CADD_PHRED=cadd_variants.index(mt.row_key).PHRED)
     mt = mt.annotate_globals(cadd_file=cadd_ht)
 
     return mt
