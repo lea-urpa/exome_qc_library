@@ -239,7 +239,7 @@ def annotate_genes(mt, args):
     rows = mt.rows()
     rows = rows.key_by()
     rows = rows.select("locus", "alleles", "gene")
-    rows = rows.checkpoint(args.output_stem + "_rows_tmp.ht", overwrite=True)
+    rows = rows.checkpoint(args.output_stem + "_rows_tmp2.ht", overwrite=True)
     rows = rows.explode(rows.gene)
     rows = rows.key_by(rows.gene)
 
@@ -328,7 +328,7 @@ def find_putative_causal_variants(mt, args):
     # Pull rows and checkpoint #
     ############################
     rows = mt.rows()
-    rows = rows.checkpoint(args.output_stem+ "_rows_tmp.ht", overwrite=True)
+    rows = rows.checkpoint(args.output_stem + "_rows_tmp3.ht", overwrite=True)
 
     #################################
     # Annotate putative causal: LOF #
@@ -451,7 +451,7 @@ def find_putative_causal_variants(mt, args):
     mt = mt.write(args.output_stem + "_putative_causal_final.mt", overwrite=True)
 
     rows = mt.rows()
-    rows = rows.checkpoint(args.output_stem + "_rows_tmp.ht", overwrite=True)
+    rows = rows.checkpoint(args.output_stem + "_rows_tmp4.ht", overwrite=True)
     counter = rows.aggregate(hl.agg.counter(hl.len(rows.putative_causal)))
     logging.info(f"Counter of number of putative causal annotations per variant: {counter}")
 
