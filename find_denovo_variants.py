@@ -126,7 +126,7 @@ def get_denovos(fam, mt, args):
     denovo_count = de_novo_results.count()
     denovo_per_person = de_novo_results.filter(de_novo_results.confidence == "HIGH")
     denovo_per_person = denovo_per_person.group_by('id').aggregate(
-        de_novo_mutations=hl.agg.collect(denovo_per_person.locus + ":" + denovo_per_person.alleles)
+        de_novo_mutations=hl.agg.collect(hl.struct(locus=denovo_per_person.locus, alleles=denovo_per_person.alleles))
     )
 
     denovo_per_count = denovo_per_person.aggregate(hl.agg.counter(hl.len(denovo_per_person.de_novo_mutations)))
