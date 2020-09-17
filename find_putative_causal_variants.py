@@ -551,7 +551,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="v9 exome sequencing dataset quality control pipeline.")
     parser.add_argument("-mt", type=str, help="Input matrix table to run analysis on")
     parser.add_argument("--pheno_col", required=True, type=str, help="Col annotation giving case status, true/false.")
-    parser.add_argument("--sex_col", required=True, type=str, help="Col annotation giving female status, true/false.",
+    parser.add_argument("--sex_col", type=str, help="Col annotation giving female status, true/false.",
                         default="is_female_imputed")
     parser.add_argument("--de_novo_ht", type=str, help="Hail table output from hl.de_novo")
     parser.add_argument("--disease_genes", type=str, help="Name of file containing genes implicated in the disease.")
@@ -580,6 +580,7 @@ if __name__ == "__main__":
     parser.add_argument("--gnomad_gene_metrics", type=str, help='text file with gnomad gene metrics')
     parser.add_argument("--output_name", required=True, type=str, help="Output name for files.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for output files.")
+    parser.add_argument("--scripts_dir", required=True, type=str, help="Directory with scripts from this library")
     parser.add_argument("--log_dir", required=True, type=str, help="Output directory for logs.")
     args = parser.parse_args()
 
