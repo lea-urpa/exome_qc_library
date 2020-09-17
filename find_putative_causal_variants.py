@@ -21,7 +21,7 @@ def remove_monomorphic(mt, args):
     mt = mt.annotate_rows(non_ref_gt_count=hl.agg.count_where(mt.GT.is_non_ref()))
     mt = mt.filter_rows(mt.non_ref_gt_count > 0, keep=True)
 
-    mt = mt.checkpoint(args.output_stem + "_non_monomorphic_tmp.mt")
+    mt = mt.checkpoint(args.output_stem + "_non_monomorphic_tmp.mt", overwrite=True)
 
     args.start_count = mt.count_rows()
     logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count} "
@@ -239,7 +239,7 @@ def annotate_genes(mt, args):
     rows = mt.rows()
     rows = rows.key_by()
     rows = rows.select("locus", "alleles", "gene")
-    rows = rows.checkpoint(args.output_stem + "_rows_tmp.ht")
+    rows = rows.checkpoint(args.output_stem + "_rows_tmp.ht", overwrite=True)
     rows = rows.explode(rows.gene)
     rows = rows.key_by(rows.gene)
 
