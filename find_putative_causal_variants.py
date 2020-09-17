@@ -243,9 +243,9 @@ def annotate_genes(mt, args):
     rows = rows.explode(rows.gene)
     rows = rows.key_by(rows.gene)
 
-    if args.gene_list is not None:
+    if args.disease_genes is not None:
         logging.info("Annotating dataset with disease gene information.")
-        gene_table = hl.import_table(args.gene_list, delimiter=args.disease_gene_sep)
+        gene_table = hl.import_table(args.disease_genes, delimiter=args.disease_gene_sep)
         gene_table = gene_table.transmute(gene=gene_table[args.gene_col_name])
         gene_table = gene_table.key_by('gene')
 
