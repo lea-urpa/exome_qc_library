@@ -348,7 +348,7 @@ def annotate_variants_mpc(mt, mpc_ht):
     mpc_variants = hl.read_table(mpc_ht)
 
     # Annotate variants with all MPC annotations
-    mt = mt.annotate_rows(**mpc_variants.index_rows(mt.row_key))
+    mt = mt.annotate_rows(**mpc_variants.index(mt.row_key))
     mt = mt.annotate_globals(mpc_file=mpc_ht)
 
     return mt
