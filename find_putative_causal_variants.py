@@ -540,6 +540,7 @@ def annotate_denovos(rows, args):
                      causal_vars.putative_causal), 'moderately_suggestive')
         .when(hl.any(lambda x: (x['consequence'] == 'lof') & (x['gene_set'] == args.gene_set_name),
                      causal_vars.putative_causal), 'strongly_suggestive')
+        .or_missing()
                            ))
 
     counter = causal_vars.aggregate(hl.agg.counter(causal_vars.putative_category))
