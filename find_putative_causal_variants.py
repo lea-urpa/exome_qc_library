@@ -452,8 +452,9 @@ def find_putative_causal_variants(mt, args):
                               hl.agg.collect(mt.s)),
                           homvar_female_carriers=hl.agg.filter(
                               mt.GT.is_hom_var() & hl.is_defined(mt.GT) & (mt[args.female_col] == True),
-                              hl.agg.collect(mt.s)),
-                          hemizygous_carriers=hl.flatten(mt.het_male_carriers.append(mt.homvar_female_carriers)))
+                              hl.agg.collect(mt.s)))
+
+    mt = mt.annotate_rows(hemizygous_carriers=hl.flatten(mt.het_male_carriers.append(mt.homvar_female_carriers)))
 
     mt = mt.write(args.output_stem + "_putative_causal_final.mt", overwrite=True)
 
