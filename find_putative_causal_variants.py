@@ -337,7 +337,8 @@ def find_putative_causal_variants(mt, args):
     #################################
     # Annotate putative causal: LOF #
     #################################
-    rows = rows.annotate(putative_causal=[{'null': 'null'}])
+    rows = rows.annotate(putative_causal=[{'inheritance': '__none__', 'consequence': '__none__',
+                                           'gene_set': '__none__'}])
 
     inheritances = ['dominant', 'recessive', 'hemizygous']
     gene_sets = [args.gene_set_name, 'high_pLI']
@@ -540,8 +541,7 @@ def annotate_denovos(rows, args):
                      causal_vars.putative_causal), 'moderately_suggestive')
         .when(hl.any(lambda x: (x['consequence'] == 'lof') & (x['gene_set'] == args.gene_set_name),
                      causal_vars.putative_causal), 'strongly_suggestive')
-        .or_missing()
-                           ))
+        .or_missing()))
 
     counter = causal_vars.aggregate(hl.agg.counter(causal_vars.putative_category))
     logging.info(f"Number of causal variants per individual in each putative category: {counter}")
