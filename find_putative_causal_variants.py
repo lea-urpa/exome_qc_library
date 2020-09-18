@@ -105,6 +105,8 @@ def annotate_variants(mt, args):
     logging.info("Annotating matrix table with CADD, MPC and Gnomad.")
     checkpoint_name = args.output_stem + "_annotation_tmp.mt"
 
+    h.add_preemptibles(args.cluster_name, args.num_preemptibles)
+
     #####################################
     # Annotate variants with CADD + MPC #
     #####################################
@@ -119,6 +121,8 @@ def annotate_variants(mt, args):
     mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
 
     mt = mt.checkpoint(checkpoint_name, overwrite=True)
+
+    h.remove_preemptibles(args.cluster_name)
 
     return mt
 
@@ -585,6 +589,8 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for output files.")
     parser.add_argument("--scripts_dir", required=True, type=str, help="Directory with scripts from this library")
     parser.add_argument("--log_dir", required=True, type=str, help="Output directory for logs.")
+    parser.add_argument("--cluster_name", required=True, type=str, help="Cluster name for adding preemptibles.")
+    parser.add_argument("--num_preemptibles", required=True, type=int, help="Number of preemptible nodes to add.")
     args = parser.parse_args()
 
     args.output_stem = os.path.join(args.output_dir, args.output_name)
