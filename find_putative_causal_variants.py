@@ -489,8 +489,8 @@ def annotate_denovos(rows, args):
     ##############################
     # Annotate de novo mutations #
     ##############################
-    if args.denovo_ht is not None:
-        de_novos = hl.read_table(args.denovo_ht)
+    if args.de_novo_ht is not None:
+        de_novos = hl.read_table(args.de_novo_ht)
 
         dominant = dominant.key_by('locus', 'alleles', 'id')
         dominant = dominant.annotate(p_de_novo=de_novos[de_novos.locus, de_novos.alleles, de_novos.id].p_de_novo,
@@ -506,7 +506,7 @@ def annotate_denovos(rows, args):
 
     causal_vars = dominant.union(recessive, hemizygous, unify=True)
 
-    if args.denovo_ht is None:
+    if args.de_novo_ht is None:
         causal_vars = causal_vars.annotate(p_de_novo=hl.null(hl.tfloat64), denovo_confidence=hl.null(hl.tstr))
 
     ##############################
