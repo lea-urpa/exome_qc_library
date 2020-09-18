@@ -443,10 +443,13 @@ def find_putative_causal_variants(mt, args):
     # Annotate carriers now that there should be not too many
     mt = mt.annotate_rows(het_carriers=hl.agg.filter(mt.GT.is_het() & hl.is_defined(mt.GT), hl.agg.collect(mt.s)),
                           homvar_carriers=hl.agg.filter(mt.GT.is_hom_var() & hl.is_defined(mt.GT), hl.agg.collect(mt.s)),
-                          hemizygous_carriers=hl.cond(
-                              mt[args.female_col] == True, # If female, collect homvar carriers, else collect hets
-                              hl.agg.filter(mt.GT.is_hom_var() & hl.is_defined(mt.GT), hl.agg.collect(mt.s)),
-                              hl.agg.filter(mt.GT.is_het() & hl.is_defined(mt.GT), hl.agg.collect(mt.s))))
+                          het_male_carriers=hl.agg.filter(
+                              mt.GT.is_het() & hl.is_defined(mt.GT) & (mt[args.female_col] == False),
+                              hl.agg.collect(mt.s)),
+                          homvar_female_carriers=hl.agg.filter(
+                              mt.GT.is_hom_var() & hl.is_defined(mt.GT) & (mt[args.female_col] == True),
+                              hl.agg.collect(mt.s)),
+                          hemizygous_carriers=hl.flatten(mt.het_male_carriers.append(mt.homvar_female_carriers)))
 
     mt = mt.write(args.output_stem + "_putative_causal_final.mt", overwrite=True)
 
