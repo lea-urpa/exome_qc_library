@@ -456,7 +456,7 @@ def find_putative_causal_variants(mt, args):
 
     mt = mt.annotate_rows(hemizygous_carriers=hl.flatten([mt.het_male_carriers, mt.homvar_female_carriers]))
 
-    mt = mt.write(args.output_stem + "_putative_causal_final.mt", overwrite=True)
+    mt.write(args.output_stem + "_putative_causal_final.mt", overwrite=True)
 
     rows = mt.rows()
     rows = rows.checkpoint(args.output_stem + "_rows_tmp4.ht", overwrite=True)
