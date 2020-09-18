@@ -366,7 +366,10 @@ if __name__ == "__main__":
     # Export matrix table columns for optmatch
     if not args.run_king:
         mtcols = mt.cols()
-        mtcols.export(args.output_stem + '_final_dataset_cols_passingQC.tsv')
+        mtcols.export(args.output_stem + '_final_dataset_cols.tsv')
+
+        mtrows = mt.rows()
+        mtrows.export(args.output_stem + '_final_dataset_rows.tsv')
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
