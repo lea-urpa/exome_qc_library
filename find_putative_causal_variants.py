@@ -333,7 +333,7 @@ def find_putative_causal_variants(mt, args):
     #################################
     # Annotate putative causal: LOF #
     #################################
-    rows = rows.annotate(putative_causal=hl.empty_array(hl.tstruct))
+    rows = rows.annotate(putative_causal=[{'null': 'null'}])
 
     inheritances = ['dominant', 'recessive', 'hemizygous']
     gene_sets = [args.gene_set_name, 'high_pLI']
@@ -438,7 +438,7 @@ def find_putative_causal_variants(mt, args):
     # Annotate putative causal to matrix table, filter, get carriers #
     ##################################################################
     mt = mt.annotate_rows(putative_causal=rows[mt.locus, mt.alleles].putative_causal)
-    mt = mt.filter_rows(hl.len(mt.putative_causal) > 0, keep=True)
+    mt = mt.filter_rows(hl.len(mt.putative_causal) > 1, keep=True)
 
     # Annotate carriers now that there should be not too many
     mt = mt.annotate_rows(het_carriers=hl.agg.filter(mt.GT.is_het() & hl.is_defined(mt.GT), hl.agg.collect(mt.s)),
