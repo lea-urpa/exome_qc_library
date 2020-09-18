@@ -493,16 +493,19 @@ def annotate_denovos(rows, args):
         de_novos = hl.read_table(args.de_novo_ht)
 
         dominant = dominant.key_by('locus', 'alleles', 'id')
-        dominant = dominant.annotate(p_de_novo=de_novos[de_novos.locus, de_novos.alleles, de_novos.id].p_de_novo,
-                                     denovo_confidence=de_novos[de_novos.locus, de_novos.alleles, de_novos.id].confidence)
+        dominant = dominant.annotate(
+            p_de_novo=de_novos[dominant.locus, dominant.alleles, dominant.id].p_de_novo,
+            denovo_confidence=de_novos[dominant.locus, dominant.alleles, dominant.id].confidence)
 
         recessive = recessive.key_by('locus', 'alleles', 'id')
-        recessive = recessive.annotate(p_de_novo=de_novos[de_novos.locus, de_novos.alleles, de_novos.id].p_de_novo,
-                                       denovo_confidence=de_novos[de_novos.locus, de_novos.alleles, de_novos.id].confidence)
+        recessive = recessive.annotate\
+            (p_de_novo=de_novos[recessive.locus, recessive.alleles, recessive.id].p_de_novo,
+             denovo_confidence=de_novos[recessive.locus, recessive.alleles, recessive.id].confidence)
 
         hemizygous = hemizygous.key_by('locus', 'alleles', 'id')
-        hemizygous = hemizygous.annotate(p_de_novo=de_novos[de_novos.locus, de_novos.alleles, de_novos.id].p_de_novo,
-                                         denovo_confidence=de_novos[de_novos.locus, de_novos.alleles, de_novos.id].confidence)
+        hemizygous = hemizygous.annotate(
+            p_de_novo=de_novos[hemizygous.locus, hemizygous.alleles, hemizygous.id].p_de_novo,
+            denovo_confidence=de_novos[hemizygous.locus, hemizygous.alleles, hemizygous.id].confidence)
 
     causal_vars = dominant.union(recessive, hemizygous, unify=True)
 
