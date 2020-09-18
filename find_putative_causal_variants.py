@@ -522,7 +522,7 @@ def annotate_denovos(rows, args):
 
     # Start with weakly suggestive, stronger evidence overwrites if variant on multiple genes
     causal_vars = causal_vars.annotate(
-        putative_category=hl.case()
+        putative_category=(hl.case()
         .when(hl.any(lambda x: (x['consequence'] == 'noncoding') & (x['gene_set'] == args.gene_set_name) &
                                (causal_vars.de_novo == True),
                      causal_vars.putative_causal), 'weakly_suggestive')
@@ -540,7 +540,7 @@ def annotate_denovos(rows, args):
                      causal_vars.putative_causal), 'moderately_suggestive')
         .when(hl.any(lambda x: (x['consequence'] == 'lof') & (x['gene_set'] == args.gene_set_name),
                      causal_vars.putative_causal), 'strongly_suggestive')
-        )
+                           ))
 
     counter = causal_vars.aggregate(hl.agg.counter(causal_vars.putative_category))
     logging.info(f"Number of causal variants per individual in each putative category: {counter}")
