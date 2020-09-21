@@ -225,6 +225,21 @@ def annotate_population_thresholds(mt, args):
 
     mt = mt.checkpoint(checkpoint_name, overwrite=True)
 
+    dominant_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.dominant_rare_gnomad))
+    recessive_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.recessive_rare_gnomad))
+    hemizygous_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.hemizygous_rare_gnomad))
+    dominant_rare_controls = mt.aggregate_rows(hl.agg.counter(mt.dominant_rare_controls))
+    recessive_rare_controls = mt.aggregate_rows(hl.agg.counter(mt.recessive_rare_controls))
+    hemizygous_rare_controls = mt.aggregate_rows(hl.agg.counter(mt.hemizygous_rare_controls))
+
+    logging.info(f"Number of variants that are dominant rare in gnomad: {dominant_rare_gnomad}")
+    logging.info(f"Number of variants that are recessive rare in gnomad: {recessive_rare_gnomad}")
+    logging.info(f"Number of variants that are hemizygous rare in gnomad: {hemizygous_rare_gnomad}")
+
+    logging.info(f"Number of variants that are dominant rare in controls: {dominant_rare_controls}")
+    logging.info(f"Number of variants that are recessive rare in controls: {recessive_rare_controls}")
+    logging.info(f"Number of variants that are hemizygous rare in controls: {hemizygous_rare_controls}")
+
     return mt
 
 
