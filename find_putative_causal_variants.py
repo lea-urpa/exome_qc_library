@@ -103,7 +103,6 @@ def annotate_variants(mt, args):
     :return: returns annotated matrix table
     """
     logging.info("Annotating matrix table with CADD, MPC and Gnomad.")
-    checkpoint_name = args.output_stem + "_annotation_tmp.mt"
 
     h.add_preemptibles(args.cluster_name, args.num_preemptibles)
 
@@ -120,7 +119,7 @@ def annotate_variants(mt, args):
     args.gnomad_idx = mt.gnomad_popmax_index_dict.take(1)[0][args.gnomad_population]
     mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
 
-    mt = mt.checkpoint(checkpoint_name, overwrite=True)
+    mt = mt.checkpoint(args.output_stem + "_annotation_tmp.mt", overwrite=True)
 
     h.remove_preemptibles(args.cluster_name)
 
@@ -137,7 +136,6 @@ def annotate_population_thresholds(mt, args):
     :return: returns annotated matrix table
     """
     logging.info("Annotating with boolean columns for whether variant fulfills population threshold criteria.")
-    checkpoint_name = args.output_stem + "_annotation_tmp2.mt"
 
     ############################
     # Pull rows and checkpoint #
@@ -223,7 +221,7 @@ def annotate_population_thresholds(mt, args):
                           recessive_rare_controls=rows[mt.locus, mt.alleles].recessive_rare_controls,
                           hemizygous_rare_controls=rows[mt.locus, mt.alleles].hemizygous_rare_controls)
 
-    mt = mt.checkpoint(checkpoint_name, overwrite=True)
+    mt = mt.checkpoint(args.output_stem + "_annotation_tmp2.mt", overwrite=True)
 
     dominant_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.dominant_rare_gnomad))
     recessive_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.recessive_rare_gnomad))
@@ -330,6 +328,8 @@ def annotate_genes(mt, args):
         mt = mt.annotate_rows(pLI=gene_metrics[mt.locus, mt.alleles].pLI)
     else:
         mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr))
+
+    mt = mt.checkpoint(args.output_stem + "_annotation_tmp3.mt")
 
     return mt
 
