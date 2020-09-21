@@ -306,7 +306,7 @@ def annotate_genes(mt, args):
         ###################################
         # Group table by gene, checkpoint #
         ###################################
-        gene_metrics = rows.group_by('locus', 'alleles').aggregate(pLI=hl.agg.collect(rows.pLI))
+        gene_metrics = rows.group_by('locus', 'alleles').aggregate(pLI=hl.array(hl.agg.collect_as_set(rows.pLI)))
         gene_metrics = gene_metrics.key_by(gene_metrics.locus, gene_metrics.alleles)
 
         ###########################################
