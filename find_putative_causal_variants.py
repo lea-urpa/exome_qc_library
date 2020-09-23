@@ -465,6 +465,10 @@ def find_putative_causal_variants(mt, args):
                 ###########################################################################
                 # Query each variant for consequence, gene set, and inheritance > causal? #
                 ###########################################################################
+                query = rows.aggregate(hl.agg.count_where(consequence_bool & gene_set_bool & inheritance_bool))
+                logging.info(f"Number of variants that are {consequence} in {gene_set} genes with "
+                             f"{inheritance} inheritance: {query}")
+
                 rows = rows.annotate(putative_causal=hl.cond(
                     consequence_bool & gene_set_bool & inheritance_bool,
                     rows.putative_causal.append(annotation), rows.putative_causal))
