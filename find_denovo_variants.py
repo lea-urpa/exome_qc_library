@@ -125,26 +125,41 @@ def get_denovos(fam, mt, args):
     check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
     logging.info(f"Count of defined values for denovo prior AF (true should be 0): {check}")
 
-    ########################################
-    # Get de novo mutations, report number #
-    ########################################
-    de_novo_results = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior)
+    #####################################################
+    # Get de novo mutations, annotate with variant info #
+    #####################################################
+    denovos = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior)
+    denovos = denovos.key_by(denovos.locus, denovos.alleles)
 
-    denovo_count = de_novo_results.count()
-    denovo_per_person = de_novo_results.filter(de_novo_results.confidence == "HIGH")
-    denovo_per_person = denovo_per_person.group_by('id').aggregate(
-        de_novo_mutations=hl.agg.collect(hl.struct(locus=denovo_per_person.locus, alleles=denovo_per_person.alleles))
+    mtrows = mt.rows()
+
+    denovos = denovos.annotate(
+        final_failing_variant_qc=mtrows[denovos.locus, denovos.alleles].final_failing_variant_qc,
+        final_no_failing_samples_varqc=mtrows[denovos.locus, denovos.alleles].final_no_failing_samples_varqc,
+        gene=mtrows[denovos.locus, denovos.alleles].gene,
+        LOF=mtrows[denovos.locus, denovos.alleles].LOF,
+        missense=mtrows[denovos.locus, denovos.alleles].missense
+    )
+
+
+    ###################################
+    # Summarize # of de novo variants #
+    ###################################
+    denovo_count = denovos.count()
+    high_confidence = denovos.filter((denovos.confidence == "HIGH") & (denovos.prior < 0.01))
+    denovo_per_person = high_confidence.group_by('id').aggregate(
+        de_novo_mutations=hl.agg.collect(hl.struct(locus=high_confidence.locus, alleles=high_confidence.alleles))
     )
 
     denovo_per_count = denovo_per_person.aggregate(hl.agg.counter(hl.len(denovo_per_person.de_novo_mutations)))
     denovo_per_count = OrderedDict(sorted(denovo_per_count.items()))
 
     logging.info(f"Number of de novo mutations, total: {denovo_count}")
-    logging.info("Count of de high-confidence novo mutations per person:")
+    logging.info("Count of de high-confidence novo mutations (with AF < 1%) per person:")
     for key, value in denovo_per_count.items():
         logging.info(f"{key} de novo mutations: {value} individuals")
 
-    return de_novo_results, denovo_per_person
+    return denovos, denovo_per_person
 
 
 if __name__ == "__main__":
@@ -219,6 +234,7 @@ if __name__ == "__main__":
     denovo_table, denovo_aggregated = get_denovos(validated_fam, qcd_mt, args)
 
     denovo_table.write(args.output_stem + "_denovo_variants.ht", overwrite=True)
+    denovo_table = denovo_table.flatten()
     denovo_table.export(args.output_stem + "_denovo_variants.txt")
 
     denovo_aggregated.export(args.output_stem + "_denovo_variants_aggregated_by_individual.txt")
