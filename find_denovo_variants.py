@@ -116,12 +116,19 @@ def get_denovos(fam, mt, args):
     # Annotate dataset with gnomad frequencies #
     ############################################
     mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
-    fin_index = mt.gnomad_freq_index_dict.take(1)[0][args.gnomad_population]
+    pop_index = mt.gnomad_freq_index_dict.take(1)[0][args.gnomad_population]
+    # If gnomad data does not exist, use minor allele frequency calculated in final variant QC
+    mt = mt.annotate_rows(denovo_prior=hl.cond(
+        (hl.len(mt.gnomad_filters) == 0) & hl.is_defined(mt.gnomad_freq[pop_index]),
+        mt.gnomad_freq[pop_index].AF, mt.final_no_failing_samples_varqc.AF[1]))
+
+    check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
+    logging.info(f"Count of defined values for denovo prior AF (true should be 0): {check}")
 
     ########################################
     # Get de novo mutations, report number #
     ########################################
-    de_novo_results = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.gnomad_freq[fin_index].AF)
+    de_novo_results = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior)
 
     denovo_count = de_novo_results.count()
     denovo_per_person = de_novo_results.filter(de_novo_results.confidence == "HIGH")
