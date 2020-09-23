@@ -75,6 +75,7 @@ def create_edgelist(filestem, args):
     #####################################################
     # Get pairs of related individuals from .kin output #
     #####################################################
+    # filter out kinship errors from kin file!
     if os.path.isfile(filestem + ".kin"):
         with open(filestem+ ".kin") as kin_in:
             for line in kin_in:
