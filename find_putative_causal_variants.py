@@ -322,14 +322,23 @@ def annotate_genes(mt, args):
         gene_metrics = rows.group_by('locus', 'alleles').aggregate(pLI=hl.array(hl.agg.collect_as_set(rows.pLI)))
         gene_metrics = gene_metrics.key_by(gene_metrics.locus, gene_metrics.alleles)
 
-        ###########################################
-        # Annotate matrix table with gene metrics #
-        ###########################################
+        #################################################################################
+        # Annotate matrix table with gene metrics, make boolean column of high pLI gene #
+        #################################################################################
         mt = mt.annotate_rows(pLI=gene_metrics[mt.locus, mt.alleles].pLI)
+        mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x > args.pLI_cutoff, rows.pLI), True, False))
     else:
-        mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr))
+        mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr), high_pLI=hl.null(hl.tbool))
 
     mt = mt.checkpoint(args.output_stem + "_annotation_tmp3.mt")
+
+    if args.disease_genes is not None:
+        gene_count = mt.aggregate_rows(hl.agg.counter(mt[args.gene_set_name]))
+        logging.info(f"Number of variants in given disease gene set: {gene_count}")
+
+    if args.gnomad_gene_metrics is not None:
+        pLI_count = mt.aggregate_rows(hl.agg.counter(mt.high_pLI))
+        logging.info(f"Number of variants in high pLI genes (>0.9): {pLI_count}")
 
     return mt
 
@@ -395,7 +404,7 @@ def find_putative_causal_variants(mt, args):
                     annotation['gene_set'] = args.gene_set_name
                 elif gene_set is 'high_pLI':
                     gene_set_bool = (
-                            hl.any(lambda x: x > 0.9, rows.pLI) & hl.is_defined(rows.pLI) &  # variant is high pLI
+                            hl.any(lambda x: x > args.pLI_cutoff, rows.pLI) & hl.is_defined(rows.pLI) &  # variant is high pLI
                             ~hl.any(lambda x: x == True, rows[args.gene_set_name]))  # variant is not in gene set
                     annotation['gene_set'] = 'high_pLI'
 
@@ -585,6 +594,7 @@ if __name__ == "__main__":
     parser.add_argument("--allelic_requirement_col", type=str, default="allelic.requirement.final")
     parser.add_argument("--disease_gene_sep", type=str, default="\t")
     parser.add_argument("--gene_set_name", type=str, help='Name of the disease gene set for annotation.')
+    parser.add_argument("--pLI_cutoff", type=float, help="Cutoff for high pLI genes", default=0.9)
     parser.add_argument("--mpc_cutoff", type=float, default=2,
                         help="Threshold for damaging missense variants by MPC score, for dominant model.")
     parser.add_argument("--cadd_cutoff", type=float, default=20,
