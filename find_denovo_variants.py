@@ -97,6 +97,7 @@ def get_denovos(fam, mt, args):
     :param args: argument for gnomad population to pull from population frequency dictionary of annotations
     :return: returns table of de novo results
     """
+    h.add_preemptibles(args.cluster_name, args.num_2nd_workers)
     #########################################################
     # Read in trios, filter to just samples in matrix table #
     #########################################################
@@ -152,6 +153,7 @@ def get_denovos(fam, mt, args):
     # Get de novo mutations, annotate with variant info #
     #####################################################
     denovos = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior)
+    h.remove_preemptibles(args.cluster_name)
     denovos = denovos.key_by(denovos.locus, denovos.alleles)
 
     mtrows = mt.rows()
@@ -204,6 +206,8 @@ if __name__ == "__main__":
     parser.add_argument("--scripts_dir", required=True, type=str, help="Directory containing scripts for this library.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for output files.")
     parser.add_argument("--log_dir", required=True, type=str, help="Output directory for logs.")
+    parser.add_argument("--cluster_name", required=True, type=str, help="Name of cluster for adding secondary workers")
+    parser.add_argument("--num_2nd_workers", type=int, default=20, help="Number of secondary workers to add")
     args = parser.parse_args()
 
     scripts = ["variant_annotation.py", "helper_scripts.py"]
