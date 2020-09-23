@@ -130,7 +130,7 @@ def get_denovos(fam, mt, args):
     # If it's missing in gnomad, then use variant QC AF
     mt = mt.annotate_rows(denovo_prior=hl.or_else(mt.denovo_prior, mt.final_no_failing_samples_varqc.AF[1]))
     mt = mt.annotate_rows(denovo_prior_source=hl.cond(
-        (mt.denovo_prior_source != "gnomad") & ~(hl.is_defined(mt.denovo_prior_source)),
+        (hl.is_defined(mt.denovo_prior)) & (mt.denovo_prior_source != "gnomad"),
         "varqc_AF", hl.null(hl.tstr)))
 
     check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
