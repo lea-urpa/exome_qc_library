@@ -584,6 +584,7 @@ def annotate_denovos(rows, args):
     # Export table + tsv file #
     ###########################
     causal_vars.write(args.output_dir + "_causal_vars_table_final.ht", overwrite=True)
+    causal_vars = causal_vars.flatten()
     causal_vars.export(args.output_dir + "_causal_vars_table_final.txt")
 
 
