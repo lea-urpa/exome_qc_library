@@ -117,13 +117,36 @@ def get_denovos(fam, mt, args):
     ############################################
     mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
     pop_index = mt.gnomad_freq_index_dict.take(1)[0][args.gnomad_population]
-    # If gnomad data does not exist, use minor allele frequency calculated in final variant QC
+
+    # First of all, use prior AF if it exists in Gnomad
     mt = mt.annotate_rows(denovo_prior=hl.cond(
         (hl.len(mt.gnomad_filters) == 0) & hl.is_defined(mt.gnomad_freq[pop_index]),
-        mt.gnomad_freq[pop_index].AF, mt.final_no_failing_samples_varqc.AF[1]))
+        mt.gnomad_freq[pop_index].AF, hl.null(hl.tfloat64)))
+    mt = mt.annotate_rows(denovo_prior_source=hl.cond(hl.is_defined(mt.denovo_prior), "gnomad", hl.null(hl.tstr)))
 
     check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
+    logging.info(f"Missing AFs after adding gnomad AFs: {check}")
+
+    # If it's missing in gnomad, then use variant QC AF
+    mt = mt.annotate_rows(denovo_prior=hl.or_else(mt.denovo_prior, mt.final_no_failing_samples_varqc.AF[1]))
+    mt = mt.annotate_rows(denovo_prior_source=hl.cond(
+        (mt.denovo_prior_source != "gnomad") & ~(hl.is_defined(mt.denovo_prior_source)),
+        "varqc_AF", hl.null(hl.tstr)))
+
+    check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
+    logging.info(f"Missing AFs after adding variant QC AFs: {check}")
+
+    # If still missing, set to 0
+    mt = mt.annotate_rows(denovo_prior=hl.or_else(mt.denovo_prior, 0))
+    mt = mt.annotate_rows(denovo_prior_source=hl.or_else(mt.denovo_prior_source, "set_to_zero"))
+
+    prior_stats = mt.aggregate_rows(hl.agg.stats(mt.denovo_prior))
+
+    check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
+    check2 = mt.aggregate_rows(hl.agg.counter(mt.denovo_prior_source))
     logging.info(f"Count of defined values for denovo prior AF (true should be 0): {check}")
+    logging.info(f"Source of de novo prior AFs: {check2}")
+    logging.info(f"De novo prior AF stats: {prior_stats}")
 
     #####################################################
     # Get de novo mutations, annotate with variant info #

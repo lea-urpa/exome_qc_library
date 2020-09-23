@@ -230,13 +230,19 @@ def annotate_population_thresholds(mt, args):
     recessive_rare_controls = mt.aggregate_rows(hl.agg.counter(mt.recessive_rare_controls))
     hemizygous_rare_controls = mt.aggregate_rows(hl.agg.counter(mt.hemizygous_rare_controls))
 
-    logging.info(f"Number of variants that are dominant rare in gnomad: {dominant_rare_gnomad}")
-    logging.info(f"Number of variants that are recessive rare in gnomad: {recessive_rare_gnomad}")
-    logging.info(f"Number of variants that are hemizygous rare in gnomad: {hemizygous_rare_gnomad}")
+    logging.info(f"Number of variants that are dominant rare in gnomad: {dominant_rare_gnomad} "
+                 f"({round(dominant_rare_gnomad/args.start_count, 2)}%)")
+    logging.info(f"Number of variants that are recessive rare in gnomad: {recessive_rare_gnomad} "
+                 f"({round(recessive_rare_gnomad/args.start_count, 2)}%)")
+    logging.info(f"Number of variants that are hemizygous rare in gnomad: {hemizygous_rare_gnomad} "
+                 f"({round(hemizygous_rare_gnomad/args.start_count, 2)}%)")
 
-    logging.info(f"Number of variants that are dominant rare in controls: {dominant_rare_controls}")
-    logging.info(f"Number of variants that are recessive rare in controls: {recessive_rare_controls}")
-    logging.info(f"Number of variants that are hemizygous rare in controls: {hemizygous_rare_controls}")
+    logging.info(f"Number of variants that are dominant rare in controls: {dominant_rare_controls} "
+                 f"({round(dominant_rare_controls/args.start_count, 2)}%)")
+    logging.info(f"Number of variants that are recessive rare in controls: {recessive_rare_controls} "
+                 f"({round(recessive_rare_controls/args.start_count, 2)}%)")
+    logging.info(f"Number of variants that are hemizygous rare in controls: {hemizygous_rare_controls} "
+                 f"({round(hemizygous_rare_controls/args.start_count, 2)}%)")
 
     return mt
 
@@ -270,7 +276,6 @@ def annotate_genes(mt, args):
         # Add disease gene information as column, split allelic requirements and explode #
         ##################################################################################
         rows = rows.annotate(**gene_table[rows.gene])
-        rows = rows.annotate(**{args.gene_set_name: hl.cond(hl.is_defined(rows[args.allelic_requirement_col]), True, False)})
 
         rows = rows.annotate(allelic_requirement=rows[args.allelic_requirement_col].split(","))
         rows = rows.explode(rows.allelic_requirement)
@@ -290,21 +295,20 @@ def annotate_genes(mt, args):
         # Group table by gene, checkpoint #
         ###################################
         disease_genes = rows.group_by('locus', 'alleles').aggregate(
-                            **{'gene': hl.array(hl.agg.collect_as_set(rows.gene)),
-                               args.gene_set_name: hl.array(hl.agg.collect_as_set(rows[args.gene_set_name])),
-                               'allelic_requirement': hl.array(hl.agg.collect_as_set(rows.allelic_requirement)),
-                               'inheritance': hl.array(hl.agg.collect_as_set(rows.inheritance))})
+            gene=hl.array(hl.agg.collect_as_set(rows.gene)),
+            allelic_requirement=hl.array(hl.agg.collect_as_set(rows.allelic_requirement)),
+            inheritance=hl.array(hl.agg.collect_as_set(rows.inheritance)))
         disease_genes = disease_genes.key_by(disease_genes.locus, disease_genes.alleles)
 
         #######################################
         # Annotate rows with disease genes ht #
         #######################################
-        mt = mt.annotate_rows(allelic_requirement=disease_genes[mt.locus, mt.alleles].allelic_requirement)
-        mt = mt.annotate_rows(**{args.gene_set_name: disease_genes[mt.locus, mt.alleles][args.gene_set_name]})
-        mt = mt.annotate_rows(inheritance=disease_genes[mt.locus, mt.alleles].inheritance)
+        mt = mt.annotate_rows(allelic_requirement=disease_genes[mt.locus, mt.alleles].allelic_requirement,
+                              inheritance=disease_genes[mt.locus, mt.alleles].inheritance)
+        mt = mt.annotate_rows(**{args.gene_set_name: hl.cond(hl.is_defined(mt.allelic_requirement, True, False))})
     else:
         mt = mt.annotate_rows(allelic_requirement=hl.empty_array(hl.tstr))
-        mt = mt.annotate_rows(**{args.gene_set_name: hl.empty_array(hl.tset)})
+        mt = mt.annotate_rows(**{args.gene_set_name: hl.null(hl.tbool)})
         mt = mt.annotate_rows(inheritance=hl.empty_array(hl.tstr))
 
     if args.gnomad_gene_metrics is not None:
@@ -335,6 +339,9 @@ def annotate_genes(mt, args):
     if args.disease_genes is not None:
         gene_count = mt.aggregate_rows(hl.agg.counter(mt[args.gene_set_name]))
         logging.info(f"Number of variants in given disease gene set: {gene_count}")
+
+        inheritance_count = mt.aggregate_rows(hl.agg.counter(mt.inheritance))
+        logging.info(f"Count of different inheritance combinations per variant: {inheritance_count}")
 
     if args.gnomad_gene_metrics is not None:
         pLI_count = mt.aggregate_rows(hl.agg.counter(mt.high_pLI))
@@ -400,12 +407,12 @@ def find_putative_causal_variants(mt, args):
                 # Create boolean for gene sets #
                 ################################
                 if gene_set is args.gene_set_name:
-                    gene_set_bool = hl.any(lambda x: x == True, rows[args.gene_set_name])  # variant is in gene set
+                    gene_set_bool = rows[args.gene_set_name] == True  # variant is in gene set
                     annotation['gene_set'] = args.gene_set_name
                 elif gene_set is 'high_pLI':
                     gene_set_bool = (
-                            hl.any(lambda x: x > args.pLI_cutoff, rows.pLI) & hl.is_defined(rows.pLI) &  # variant is high pLI
-                            ~hl.any(lambda x: x == True, rows[args.gene_set_name]))  # variant is not in gene set
+                            (mt.high_pLI == True) &  # variant is high pLI
+                            (rows[args.gene_set_name] == False))  # variant is not in gene set
                     annotation['gene_set'] = 'high_pLI'
 
                 ###################################
