@@ -144,7 +144,7 @@ def get_denovos(fam, mt, args):
 
     check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
     check2 = mt.aggregate_rows(hl.agg.counter(mt.denovo_prior_source))
-    logging.info(f"Count of defined values for denovo prior AF (true should be 0): {check}")
+    logging.info(f"Count of defined values for denovo prior AF (false should be 0): {check}")
     logging.info(f"Source of de novo prior AFs: {check2}")
     logging.info(f"De novo prior AF stats: {prior_stats}")
 
