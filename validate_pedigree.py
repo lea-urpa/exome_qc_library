@@ -137,6 +137,9 @@ def parse_kin0_errors(kin0_file, cohorts, args):
 
                 error_report.write(line)
 
+        error_report.close()
+        in_kin0.close()
+
 
 def count_families(edgelist_name):
     """
@@ -186,6 +189,8 @@ def count_families(edgelist_name):
             for id, num_connections in connections_ordered.items():
                 out_f.write(f"{id}\t{num_connections}\n")
 
+            out_f.close()
+
     families_count = OrderedDict(sorted(families_count.items()))
     for family_size, count in families_count.items():
         print(f"{count} families with {family_size} individuals.")
@@ -225,6 +230,7 @@ def count_families_kin(kin_file, cohorts):
                     edgelist.write("\t".join([id1, id2]) + "\n")
 
         kin_in.close()
+        edgelist.close()
 
         ###################################################################
         # Read in the edgelist and count the number of independent graphs #
@@ -232,15 +238,85 @@ def count_families_kin(kin_file, cohorts):
         count_families(edgelist_name)
 
 
-def count_trios(kin_file, fam_file,args):
-    pass
+def count_trios(kin_file, fam_file, cohorts, args):
+
+    if "all" not in cohorts:
+        cohorts.append("all")
+
     ############################################################################
     # Read in kin + fam file and count the number of complete, validated trios #
     ############################################################################
+    for cohort in cohorts:
+        if cohort == "all":
+            print("Finding trios in whole dataset")
+        else:
+            print(f"Finding trios in cohort {cohort}")
 
-    ####################################################
-    # Read in fam file and collect dictionary of trios #
-    ####################################################
+        ##########################################
+        # Read in fam file to get supposed trios #
+        ##########################################
+        raw_trios = []
+        delim1 = utils.check_delimiter(fam_file)
+        with open(fam_file) as fam_in:
+            for line in fam_in:
+                fid, iid, pid, mid, sex, pheno = line.strip().split(delim1)
+                if (pid != "0") and (mid != "0"):
+                    raw_trios.append({'proband': iid, 'mother': mid, 'father': pid})
+
+        fam_in.close()
+        print(f"Number of expected trios from pedigree: {len(raw_trios)} (file {fam_file}")
+
+        #################################################################################
+        # Collect sample IDs in kinship file as set, filter raw trios to complete trios #
+        #################################################################################
+        present_ids = set()
+        delim2 = utils.check_delimiter(kin_file)
+        with open(kin_file) as kin_in:
+            for line in kin_in:
+                fid, id1, id2, n_snp, z0, phi, hethet, ibs0, kinship, error = line.strip().split(delim2)
+
+                if fid != "FID":
+                    present_ids.add(id1)
+                    present_ids.add(id2)
+
+        kin_in.close()
+
+        complete_trios = []
+        for trio in raw_trios:
+            if (trio['mother'] in present_ids) and (trio['father'] in present_ids) and (trio['proband'] in present_ids):
+                trio['m_valid'] = False
+                trio['p_valid'] = False
+                complete_trios.append(trio)
+
+        print(f"Number of complete trios from pedigree: {len(raw_trios)} (sample in kinship data)")
+
+        ###################################################################################
+        # Loop through kinship file and see if matching PO in trios exists, annotate trio #
+        ###################################################################################
+        # This might take a long time, but it should work
+        with open(kin_file) as kin_in:
+            for line in kin_in:
+                fid, id1, id2, n_snp, z0, phi, hethet, ibs0, kinship, error = line.strip().split(delim2)
+
+                for trio in complete_trios:
+                    if ((id1 == trio['proband']) and (id2 == trio['mother'])) or \
+                       ((id2 == trio['proband']) and (id1 == trio['mother'])):
+                        relationship = infer_relationship(ibs0, kinship)
+                        if relationship == "parent-offspring":
+                            trio['m_valid'] == True
+
+                    if ((id1 == trio['proband']) and (id2 == trio['father'])) or \
+                       ((id2 == trio['proband']) and (id1 == trio['father'])):
+                        relationship = infer_relationship(ibs0, kinship)
+                        if relationship == "parent-offspring":
+                            trio['p_valid'] == True
+
+        valid_trios = []
+        for trio in complete_trios:
+            if (trio['m_valid'] == True) and (trio['p_valid'] == True):
+                valid_trios.append(trio)
+
+        print(f"Number of valid trios: {len(valid_trios)}")
 
 
 
