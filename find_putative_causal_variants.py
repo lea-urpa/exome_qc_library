@@ -16,6 +16,8 @@ def remove_monomorphic(mt, args):
     :param args: arguments for checkpoint output location and name
     :return: returns filtered matrix table
     """
+    h.add_preemptibles(args.cluster_name, args.num_preemptibles)
+
     start0_count = mt.count_rows()
     logging.info(f"Starting number of variants: {start0_count}")
     mt = mt.annotate_rows(non_ref_gt_count=hl.agg.count_where(mt.GT.is_non_ref()))
@@ -26,6 +28,8 @@ def remove_monomorphic(mt, args):
     args.start_count = mt.count_rows()
     logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count} "
                  f"({round(args.start_count/start0_count*100, 2)}% of all variants)")
+
+    h.remove_preemptibles(args.cluster_name)
 
     return mt
 
