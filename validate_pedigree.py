@@ -12,6 +12,7 @@ import os
 import networkx as nx
 from collections import OrderedDict
 import utils
+import shutil
 
 
 def infer_relationship(ibs0, kinship):
@@ -95,8 +96,16 @@ def parse_kin_errors(kin_file, cohorts, args):
                         # Infer actual relationships from ibs0 and kinship #
                         ####################################################
                         actual = infer_relationship(ibs0, kinship)
+                        if error == "0.5":
+                            error_type = "warning"
+                        elif error == "1":
+                            error_type = "error"
+                        else:
+                            print(f"Error- unexpected error type: {error}")
+                            print(f"line: {line}")
+                            exit()
 
-                        line = f"Kinship error in family {fid} between samples {id1} and {id2}." \
+                        line = f"Kinship {error_type} in family {fid} between samples {id1} and {id2}." \
                             f"Expected relationship: {expected} Kinship supports: {actual}. "\
                             f"IBS0: {ibs0}. Kinship: {kinship} \n"
                         error_report.write(line)
@@ -154,7 +163,10 @@ def count_families(edgelist_name):
     g = nx.read_edgelist(edgelist_name)
 
     num_families = nx.number_connected_components(g)
-    print(f"Number of families detected from edgelist {edgelist_name}: {num_families}")
+    print(f"Number of families detected from edgelist: {num_families} (file {edgelist_name})")
+
+    # TODO add check for the number of connections each individual has- if it's greater than X, write that in a
+    #  report too
 
     #######################################################
     # Collect dictionary of # of families by size, report #
@@ -199,7 +211,6 @@ def count_families(edgelist_name):
 def count_families_kin(kin_file, cohorts):
     """
     Create edgelist from kin file without errors and report # of families, and size of families
-
     :param kin_file: Kinship output file from King
     :param cohorts: Cohort substrings to subset report to.
     :return:
@@ -209,9 +220,9 @@ def count_families_kin(kin_file, cohorts):
 
     for cohort in cohorts:
         if cohort == "all":
-            print(f"Looking for # families in all individuals.")
+            print(f"Looking for # families in all individuals, only in reported, validated families.")
         else:
-            print(f"Looking for # of families for sample pairs with at least one ID containing the string {cohort}" )
+            print(f"Looking for # of families in cohort {cohort}, only in reported, validated families." )
         ##############################################################################
         # Create an edgelist containing just the expected families, minus the errors #
         ##############################################################################
@@ -222,7 +233,7 @@ def count_families_kin(kin_file, cohorts):
         delim = utils.check_delimiter(kin_file)
         with open(kin_file) as kin_in:
             for line in kin_in:
-                if not ((cohort == "all") | (cohort in line)):
+                if not ((cohort == "all") or (cohort in line)):
                     continue
 
                 fid, id1, id2, n_snp, z0, phi, hethet, ibs0, kinship, error = line.strip().split(delim)
@@ -238,7 +249,48 @@ def count_families_kin(kin_file, cohorts):
         count_families(edgelist_name)
 
 
-def count_trios(kin_file, fam_file, cohorts, args):
+def count_families_kin0(kin0_file, cohorts):
+    # Create edgelist from kin file without errors and kin0 file and report # of families, and size of families
+    # (subtracting individuals who are related to too many other individuasl > likely mixups)
+
+    if "all" not in cohorts:
+        cohorts.append("all")
+
+    for cohort in cohorts:
+        if cohort == "all":
+            print(f"Looking for # families in all individuals, including unexpected relationships")
+        else:
+            print(f"Looking for # of families in cohort {cohort}, including unexpected relationships.")
+
+        #####################################################################
+        # Copy old edgelist to new file, append unexpected kinships to that #
+        #####################################################################
+        filestem = os.path.splitext(kin0_file)
+        edgelist_name = f"{filestem}_{cohort}.edgelist.kin"
+        new_edgelist_name = edgelist_name + "0"
+
+        shutil.copy(edgelist_name, new_edgelist_name)
+        new_edgelist = open(new_edgelist_name, "a")
+
+        delim = utils.check_delimiter(kin0_file)
+        with open(kin0_file) as kin0_in:
+            for line in kin0_in:
+                if not ((cohort == "all") or (cohort in line)):
+                    continue
+
+                fid1, id1, fid2, id2, n_snp, hethet, ibs0, kinship = line.strip().split(delim)
+                if fid1 != "FID1":
+                    new_edgelist.write("\t".join([id1, id2]) + "\n")
+
+        kin0_in.close()
+        new_edgelist.close()
+
+        ###############################################################
+        # Read in edgelist and count hte number of independent graphs #
+        ###############################################################
+        count_families(new_edgelist_name)
+
+def count_trios(kin_file, fam_file, cohorts):
 
     if "all" not in cohorts:
         cohorts.append("all")
@@ -319,8 +371,4 @@ def count_trios(kin_file, fam_file, cohorts, args):
         print(f"Number of valid trios: {len(valid_trios)}")
 
 
-
-# Create edgelist from kin file without errors and kin0 file and report # of families, and size of families (subtracting
-
-# individuals who are related to too many other individuasl > likely mixups)
-
+# Arguments and file main goes here
