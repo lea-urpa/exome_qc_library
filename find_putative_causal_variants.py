@@ -338,8 +338,12 @@ def annotate_genes(mt, args):
         gene_count = mt.aggregate_rows(hl.agg.counter(mt[args.gene_set_name]))
         logging.info(f"Number of variants in given disease gene set: {gene_count}")
 
-        inheritance_count = mt.aggregate_rows(hl.agg.counter(mt.inheritance))
-        logging.info(f"Count of different inheritance combinations per variant: {inheritance_count}")
+        dominant_count = mt.aggregate_rows(hl.agg.counter(hl.any(lambda x: x == 'dominant', mt.inheritance)))
+        recessive_count = mt.aggregate_rows(hl.agg.counter(hl.any(lambda x: x == 'recessive', mt.inheritance)))
+        hemizygous_count = mt.aggregate_rows(hl.agg.counter(hl.any(lambda x: x == 'hemizygous', mt.inheritance)))
+        logging.info(f"Count of variants in genes with dominant disease inheritance: {dominant_count}")
+        logging.info(f"Count of variants in genes with recessive disease inheritance: {recessive_count}")
+        logging.info(f"Count of variants in genes with hemizygous disease inheritance: {hemizygous_count}")
 
     if args.gnomad_gene_metrics is not None:
         pLI_count = mt.aggregate_rows(hl.agg.counter(mt.high_pLI))

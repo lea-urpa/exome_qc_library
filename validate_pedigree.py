@@ -9,6 +9,7 @@ a report of the errors and the number of families/sizes of families in the datas
 
 import time
 import os
+import networkx as nx
 from calculate_kinship_king import create_edgelist
 
 
@@ -134,16 +135,36 @@ def parse_kin0_errors(kin0_file, delim, cohorts, args):
 
                 error_report.write(line)
 
-def count_families_kin(kin_file, delim, args):
-    # Create edgelist from kin file without errors and report # of families, and size of families
-    filestem = os.path.splitext(kin_file)
-    edgelist = open(filestem + ".edgelist_kin", "w")
 
-    with open(kin_file) as kin_in:
-        for line in kin_in:
-            fid, id1, id2, n_snp, z0, phi, hethet, ibs0, kinship, error = line.strip().split(delim)
-            if fid != "FID":
-                if
+def count_families_kin(kin_file, delim, cohorts, args):
+    # Create edgelist from kin file without errors and report # of families, and size of families
+    if "all" not in cohorts:
+        cohorts.append("all")
+
+    for cohort in cohorts:
+        ##############################################################################
+        # Create an edgelist containing just the expected families, minus the errors #
+        ##############################################################################
+        filestem = os.path.splitext(kin_file)
+        edgelist_name = f"{filestem}_{cohort}.edgelist_kin"
+        edgelist = open(edgelist_name, "w")
+
+        with open(kin_file) as kin_in:
+            for line in kin_in:
+                if not ((cohort == "all") | (cohort in line)):
+                    continue
+
+                fid, id1, id2, n_snp, z0, phi, hethet, ibs0, kinship, error = line.strip().split(delim)
+                if fid != "FID":
+                    if error == "0":
+                        edgelist.write("\t".join([id1, id2]) + "\n")
+
+        ###################################################################
+        # Read in the edgelist and count the number of independent graphs #
+        ###################################################################
+        g = nx.read_edgelist(edgelist_name)
+
+
 
 
 
