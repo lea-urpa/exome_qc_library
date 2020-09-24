@@ -328,7 +328,7 @@ def annotate_genes(mt, args):
         # Annotate matrix table with gene metrics, make boolean column of high pLI gene #
         #################################################################################
         mt = mt.annotate_rows(pLI=gene_metrics[mt.locus, mt.alleles].pLI)
-        mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x > args.pLI_cutoff, rows.pLI), True, False))
+        mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x >= args.pLI_cutoff, mt.pLI), True, False))
     else:
         mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr), high_pLI=hl.null(hl.tbool))
 

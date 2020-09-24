@@ -2,11 +2,15 @@
 Scripts to take King genetic relatedness information + the pedigree/fam file that went into King, and creates
 a report of the errors and the number of families/sizes of families in the dataset.
 """
-import time
 # Needed args
 # cohort_subset_string
 # output_stem (containing output name)
 # cohorts = args.cohort_subset_string.strip().split(",")
+
+import time
+import os
+from calculate_kinship_king import create_edgelist
+
 
 def infer_relationship(ibs0, kinship):
     """
@@ -130,9 +134,20 @@ def parse_kin0_errors(kin0_file, delim, cohorts, args):
 
                 error_report.write(line)
 
+def count_families_kin(kin_file, delim, args):
+    # Create edgelist from kin file without errors and report # of families, and size of families
+    filestem = os.path.splitext(kin_file)
+    edgelist = open(filestem + ".edgelist_kin", "w")
 
-# Create edgelist from kin file without errors and report # of families, and size of families
+    with open(kin_file) as kin_in:
+        for line in kin_in:
+            fid, id1, id2, n_snp, z0, phi, hethet, ibs0, kinship, error = line.strip().split(delim)
+            if fid != "FID":
+                if
+
+
 
 # Create edgelist from kin file without errors and kin0 file and report # of families, and size of families (subtracting
+
 # individuals who are related to too many other individuasl > likely mixups)
 
