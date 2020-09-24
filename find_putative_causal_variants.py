@@ -332,7 +332,7 @@ def annotate_genes(mt, args):
     else:
         mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr), high_pLI=hl.null(hl.tbool))
 
-    mt = mt.checkpoint(args.output_stem + "_annotation_tmp3.mt")
+    mt = mt.checkpoint(args.output_stem + "_annotation_tmp3.mt", overwrite=True)
 
     if args.disease_genes is not None:
         gene_count = mt.aggregate_rows(hl.agg.counter(mt[args.gene_set_name]))
