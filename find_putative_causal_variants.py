@@ -299,7 +299,7 @@ def annotate_genes(mt, args):
         #######################################
         mt = mt.annotate_rows(allelic_requirement=disease_genes[mt.locus, mt.alleles].allelic_requirement,
                               inheritance=disease_genes[mt.locus, mt.alleles].inheritance)
-        mt = mt.annotate_rows(**{args.gene_set_name: hl.cond(hl.is_defined(mt.allelic_requirement, True, False))})
+        mt = mt.annotate_rows(**{args.gene_set_name: hl.cond(hl.is_defined(mt.allelic_requirement), True, False)})
     else:
         mt = mt.annotate_rows(allelic_requirement=hl.empty_array(hl.tstr))
         mt = mt.annotate_rows(**{args.gene_set_name: hl.null(hl.tbool)})
