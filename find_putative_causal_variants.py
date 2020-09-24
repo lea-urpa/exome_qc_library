@@ -532,6 +532,7 @@ def annotate_denovos(rows, args):
     ##############################
     if args.de_novo_ht is not None:
         de_novos = hl.read_table(args.de_novo_ht)
+        de_novos = de_novos.key_by('locus', 'alleles', 'id')
 
         dominant = dominant.key_by('locus', 'alleles', 'id')
         dominant = dominant.annotate(
