@@ -138,6 +138,59 @@ def parse_kin0_errors(kin0_file, cohorts, args):
                 error_report.write(line)
 
 
+def count_families(edgelist_name):
+    """
+    Given an edgelist (list of pairs of relatives), counts the number of independent graphs (families) and the number
+    of nodes in each graph (number of individuals in each family). Also reports unusually large families.
+    :param edgelist_name: File name of edgelist ot read
+    :return:
+    """
+    ############################################
+    # Read in edgelist, get number of families #
+    ############################################
+    g = nx.read_edgelist(edgelist_name)
+
+    num_families = nx.number_connected_components(g)
+    print(f"Number of families detected from edgelist {edgelist_name}: {num_families}")
+
+    #######################################################
+    # Collect dictionary of # of families by size, report #
+    #######################################################
+    families_count = {}
+    for c in nx.connected_components(g):
+        node_count = len(c)
+        if node_count not in families_count.keys():
+            families_count[node_count] = 1
+        else:
+            families_count[node_count] += 1
+
+        ######################################################
+        # If the node count is too high, write names to file #
+        ######################################################
+        if node_count > 50:
+            print("Problematic family detected- finding individuals connected to too many others and writing "
+                  "names to file.")
+            problem_graph = g.subgraph(c)
+            most_connected = max(dict(problem_graph.degre()).items(), key=lambda x: x[1])
+
+            filename = f"family_{node_count}_members"
+            while os.path.isfile(filename):
+                filename = filename + "-1"
+            filename = filename + ".txt"
+            out_f = open(filename, "w")
+            out_f.write("ID\tnum_connections\n")
+
+            connections = dict(problem_graph.degree())
+            connections_ordered = OrderedDict(sorted(connections.items(), key=lambda kv: kv[1], reverse=True))
+
+            for id, num_connections in connections_ordered.items():
+                out_f.write(f"{id}\t{num_connections}\n")
+
+    families_count = OrderedDict(sorted(families_count.items()))
+    for family_size, count in families_count.items():
+        print(f"{count} families with {family_size} individuals.")
+
+
 def count_families_kin(kin_file, cohorts, kinship_cutoff):
     # Create edgelist from kin file without errors and report # of families, and size of families
     if "all" not in cohorts:
@@ -166,40 +219,7 @@ def count_families_kin(kin_file, cohorts, kinship_cutoff):
         ###################################################################
         # Read in the edgelist and count the number of independent graphs #
         ###################################################################
-        g = nx.read_edgelist(edgelist_name)
-
-        num_families = nx.number_connected_components(g)
-
-        families_count = {}
-        for c in nx.connected_components(g):
-            node_count = len(c)
-            if node_count not in families_count.keys():
-                families_count[node_count] = 1
-            else:
-                families_count[node_count] += 1
-            # If the node count is too high, write names to file
-            if node_count > 50:
-                print("Problematic family detected- finding individuals connected to too many others and writing "
-                      "names to file.")
-                problem_graph = g.subgraph(c)
-                most_connected = max(dict(problem_graph.degre()).items(), key=lambda x: x[1])
-
-                filename = f"family_{node_count}_members"
-                while os.path.isfile(filename):
-                    filename = filename + "-1"
-                filename = filename + ".txt"
-                out_f = open(filename, "w")
-                out_f.write("ID\tnum_connections\n")
-
-                connections = dict(problem_graph.degree())
-                connections_ordered = OrderedDict(sorted(connections.items(), key=lambda kv: kv[1], reverse=True))
-
-                for id, num_connections in connections_ordered.items():
-                    out_f.write(f"{id}\t{num_connections}\n")
-
-        families_count = OrderedDict(sorted(families_count.items()))
-        for family_size, count in families_count.items():
-            print(f"{count} families with {family_size} individuals.")
+        count_families(edgelist_name)
 
 
 def count_trios(kin_file, fam_file,args):
