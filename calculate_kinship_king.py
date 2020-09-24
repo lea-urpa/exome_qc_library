@@ -63,7 +63,7 @@ def run_king(args):
     subprocess.call(cmd.split())
 
 
-def create_edgelist(filestem, args):
+def create_edgelist(filestem, kinship_cutoff):
     """
     Takes king output and creates list of related couples
     :param filestem: filestem of .kin/.kin0 output
@@ -84,7 +84,7 @@ def create_edgelist(filestem, args):
                         id1 = words[1]
                         id2 = words[2]
                         kinship = float(words[8])
-                        if kinship > args.kinship_cutoff:
+                        if kinship > kinship_cutoff:
                             edgelist.write("\t".join([id1, id2]) + "\n")
     kin_in.close()
 
@@ -99,7 +99,7 @@ def create_edgelist(filestem, args):
                     id1 = words[1]
                     id2 = words[3]
                     kinship = float(words[7])
-                    if kinship > args.kinship_cutoff:
+                    if kinship > kinship_cutoff:
                         edgelist.write("\t".join([id1, id2]) + "\n")
 
     kin0_in.close()
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     #########################################################
     # Format kin output to edgelist, get list of cases only #
     #########################################################
-    create_edgelist(arguments.plink_data, arguments)
+    create_edgelist(arguments.plink_data, arguments.kinship_cutoff)
     case_list = create_case_list(arguments.plink_data)
 
     ##################################################
