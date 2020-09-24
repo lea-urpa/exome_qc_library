@@ -191,12 +191,22 @@ def count_families(edgelist_name):
         print(f"{count} families with {family_size} individuals.")
 
 
-def count_families_kin(kin_file, cohorts, kinship_cutoff):
-    # Create edgelist from kin file without errors and report # of families, and size of families
+def count_families_kin(kin_file, cohorts):
+    """
+    Create edgelist from kin file without errors and report # of families, and size of families
+
+    :param kin_file: Kinship output file from King
+    :param cohorts: Cohort substrings to subset report to.
+    :return:
+    """
     if "all" not in cohorts:
         cohorts.append("all")
 
     for cohort in cohorts:
+        if cohort == "all":
+            print(f"Looking for # families in all individuals.")
+        else:
+            print(f"Looking for # of families for sample pairs with at least one ID containing the string {cohort}" )
         ##############################################################################
         # Create an edgelist containing just the expected families, minus the errors #
         ##############################################################################
