@@ -75,17 +75,17 @@ def create_edgelist(filestem, args):
     #####################################################
     # Get pairs of related individuals from .kin output #
     #####################################################
-    # filter out kinship errors from kin file!
     if os.path.isfile(filestem + ".kin"):
         with open(filestem+ ".kin") as kin_in:
             for line in kin_in:
                 words = line.strip().split('\t')
                 if words[0] != "FID":
-                    id1 = words[1]
-                    id2 = words[2]
-                    kinship = float(words[8])
-                    if kinship > args.kinship_cutoff:
-                        edgelist.write("\t".join([id1, id2]) + "\n")
+                    if words[9] == "0":
+                        id1 = words[1]
+                        id2 = words[2]
+                        kinship = float(words[8])
+                        if kinship > args.kinship_cutoff:
+                            edgelist.write("\t".join([id1, id2]) + "\n")
     kin_in.close()
 
     ######################################################
