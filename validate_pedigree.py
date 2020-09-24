@@ -355,13 +355,13 @@ def count_trios(kin_file, fam_file, cohorts):
                        ((id2 == trio['proband']) and (id1 == trio['mother'])):
                         relationship = infer_relationship(ibs0, kinship)
                         if relationship == "parent-offspring":
-                            trio['m_valid'] == True
+                            trio['m_valid'] = True
 
                     if ((id1 == trio['proband']) and (id2 == trio['father'])) or \
                        ((id2 == trio['proband']) and (id1 == trio['father'])):
                         relationship = infer_relationship(ibs0, kinship)
                         if relationship == "parent-offspring":
-                            trio['p_valid'] == True
+                            trio['p_valid'] = True
 
         valid_trios = []
         for trio in complete_trios:
