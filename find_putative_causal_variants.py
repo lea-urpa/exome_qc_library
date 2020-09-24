@@ -320,7 +320,7 @@ def annotate_genes(mt, args):
 
         genes = rows.group_by("gene").aggregate(pLI=hl.agg.mean(rows.pLI))
         missing_pLI = genes.aggregate(hl.agg.counter(hl.is_defined(genes.pLI)))
-        logging.info(f"Number of genes where pLI is missing: {missing_pLI}")
+        logging.info(f"Count of genes where pLI values are missing (False) or not (True): {missing_pLI}")
 
         ###################################
         # Group table by gene, checkpoint #
