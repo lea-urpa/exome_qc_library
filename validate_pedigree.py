@@ -2,7 +2,7 @@
 Scripts to take King genetic relatedness information + the pedigree/fam file that went into King, and creates
 a report of the errors and the number of families/sizes of families in the dataset.
 """
-
+import time
 # Needed args
 # cohort_subset_string
 # output_stem (containing output name)
@@ -48,6 +48,8 @@ def parse_kin_errors(kin_file, delim, cohorts, args):
     ########################
     for cohort in cohorts:
         error_report = open(f"{args.output_stem}_{cohort}_kin_errors.txt", "w")
+        error_report.write(f"#Input kinship file: {kin_file}\n")
+        error_report.write(f"#Date and time: {time.asctime()}\n")
         kinship_errors = 0
         with open(kin_file) as in_kin:
             for line in in_kin:
@@ -98,11 +100,21 @@ def parse_kin_errors(kin_file, delim, cohorts, args):
 
 
 def parse_kin0_errors(kin0_file, delim, cohorts, args):
+    """
+    Read in .kin0 file and report errors in readable way
+    :param kin0_file: .kin0 file output from King
+    :param delim: delimiter for .kin0 file
+    :param cohorts: cohorts to subset reports to
+    :param args: arguments
+    :return:
+    """
     if "all" not in cohorts:
         cohorts.append("all")
 
     for cohort in cohorts:
         error_report = open(f"{args.output_stem}_{cohort}_kin0_errors.txt", "w")
+        error_report.write(f"#Input kinship file: {kin0_file}\n")
+        error_report.write(f"#Date and time: {time.asctime()}\n")
 
         with open(kin0_file) as in_kin0:
             for line in in_kin0:
@@ -117,9 +129,6 @@ def parse_kin0_errors(kin0_file, delim, cohorts, args):
                     f"supports {actual}. IBS0: {ibs0}. Kinship: {kinship}"
 
                 error_report.write(line)
-
-# Read in .kin0 file and report errors in readable way
-
 
 
 # Create edgelist from kin file without errors and report # of families, and size of families
