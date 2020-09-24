@@ -413,7 +413,7 @@ def find_putative_causal_variants(mt, args):
                     annotation['gene_set'] = args.gene_set_name
                 elif gene_set is 'high_pLI':
                     gene_set_bool = (
-                            (mt.high_pLI == True) &  # variant is high pLI
+                            (rows.high_pLI == True) &  # variant is high pLI
                             (rows[args.gene_set_name] == False))  # variant is not in gene set
                     annotation['gene_set'] = 'high_pLI'
 
