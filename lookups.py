@@ -55,14 +55,14 @@ def get_variant_carriers(mt, variant, args):
     ##########################################################################
     if args.reference_genome == "GRCh38":
         try:
-            hail_locus = hl.locus('chr' + variant[0], int(variant[1]) )
+            hail_locus = hl.locus('chr' + variant[0], int(variant[1]), reference_genome="GRCh38")
         except Exception as e:
             print(f"Error converting variant to Hail locus! Variant chromosome: {variant[0]} position: {variant[1]}")
             print(e)
             return
     elif args.reference_genome == "GRCh37":
         try:
-            hail_locus = hl.locus(variant[0], int(variant[1]))
+            hail_locus = hl.locus(variant[0], int(variant[1]), reference_genome="GRCh37")
         except Exception as e:
             print(f"Error converting variant to Hail locus! Variant chromosome: {variant[0]} position: {variant[1]}")
             print(e)
