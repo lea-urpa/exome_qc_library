@@ -225,7 +225,6 @@ if __name__ == "__main__":
             exit()
 
         variants_mt = fullmt.filter_rows(hail_loci.contains(fullmt.locus))
-        variants_mt = variants_mt.checkpoint(args.output_stem + "_varmt_tmp.mt", overwrite=True)
 
         ######################################################################
         # Annotate intermediate matrix table with annotation files, if given #
@@ -247,5 +246,5 @@ if __name__ == "__main__":
         # Loop through variants and find carriers, export separate file #
         #################################################################
         for variant in variants:
-            get_variant_carriers(variants_mt, variant, args.reference_genome)
+            get_variant_carriers(variants_mt, variant, args)
 
