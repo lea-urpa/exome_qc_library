@@ -61,12 +61,19 @@ if __name__ == "__main__":
     parser.add_argument("-mt", help="Matrix table to search for damaging variants in genes and/or specific variants.")
     parser.add_argument("--output_name", required=True, type=str, help="Output name stem for results.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for results.")
-    parser.add_argument("--genes", required=True, type=str,
+    parser.add_argument("--genes", type=str,
                         help="comma-separated genes or single gene in which to search for damaging variants.")
+    parser.add_argument("--variants", type=str, help="comma-separated variants or single variant to report carriers.")
+    parser.add_argument("--variant_list", type=str,
+                        help="file containing list of variants, one per line, to report carriers.")
     parser.add_argument("--scripts_dir", required=True, help="Directory for exome qc library scripts")
     parser.add_argument("--reference_genome", default="GRCh38", choices=["GRCh37",  "GRCh38"])
 
     args = parser.parse_args()
+
+    if (args.genes is None) and (args.variants is None) and (args.variant_list is None):
+        print("Error! One of --genes, --variants, or --variant_list must be given!")
+        exit()
 
     args.output_stem = os.path.join(args.output_dir, args.output_name)
 
