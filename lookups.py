@@ -202,11 +202,8 @@ if __name__ == "__main__":
         ##############################################################
         variants = []
         if args.variant_list is not None:
-            with open(args.variant_list) as in_f:
-                for line in in_f:
-                    variant = line.strip()
-                    variants.append(variant)
-            in_f.close()
+            variant_table = hl.import_table(args.variant_list)
+            variants = variant_table.f0.take(variant_table.count())
 
         if args.variants is not None:
             vars = args.variants.strip().split(",")
