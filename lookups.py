@@ -202,7 +202,7 @@ if __name__ == "__main__":
         ##############################################################
         variants = []
         if args.variant_list is not None:
-            variant_table = hl.import_table(args.variant_list)
+            variant_table = hl.import_table(args.variant_list, no_header=True)
             variants = variant_table.f0.take(variant_table.count())
 
         if args.variants is not None:
