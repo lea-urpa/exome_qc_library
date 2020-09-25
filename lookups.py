@@ -204,10 +204,12 @@ if __name__ == "__main__":
         if args.variant_list is not None:
             variant_table = hl.import_table(args.variant_list, no_header=True)
             variants = variant_table.f0.take(variant_table.count())
+            variants = [x.split(args.variant_sep) for x in variants]
 
         if args.variants is not None:
-            vars = args.variants.strip().split(",")
-            variants.extend(vars)
+            args_vars = args.variants.strip().split(",")
+            args_vars = [x.split(args.variant_sep) for x in args_vars]
+            variants.extend(args_vars)
         print(f"Number of variants to find carriers for: {len(variants)}")
 
         ##################################################################################
@@ -245,11 +247,5 @@ if __name__ == "__main__":
         # Loop through variants and find carriers, export separate file #
         #################################################################
         for variant in variants:
-            var_split = variant.split(args.variant_sep)
-            if len(var_split) != 4:
-                print("Error! Variant not split correctly. Did you give the right variant sep? Skipping this variant.")
-                print(variant)
-                continue
-
-            get_variant_carriers(variants_mt, var_split, args.reference_genome)
+            get_variant_carriers(variants_mt, variant, args.reference_genome)
 
