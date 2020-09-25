@@ -93,7 +93,17 @@ def get_variant_carriers(mt, variant, args):
         # Pull variants to rows, checkpoint
         rows = var_mt.rows()
         rows = rows.checkpoint(args.output_stem + "_rows_tmp.mt", overwrite=True)
-        rows.write(f"{args.output_stem}_{'-'.join(variant)}_carriers.ht/")
+        rows.write(f"{args.output_stem}_{'-'.join(variant)}_carriers.ht/", overwrite=True)
+
+        rows = rows.annotate(popmax_population=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['gnomad']].pop)
+        rows = rows.annotate(gnomad_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['gnomad_fin']],
+                             gnomad_controls_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['controls_fin']],
+                             gnomad_nonneuro_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['non_neuro_fin']],
+                             gnomad_popmax_gnomad=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['gnomad']],
+                             gnomad_popmax_controls=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['controls']],
+                             gnomad_popmax_nonneuro=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['non_neuro']])
+
+        rows = rows.drop('gnomad_freq', 'gnomad_popmax', 'vep')
 
         # Drop hom alt carriers and explode by het carriers, flatten, write to file
         het_carriers = rows.drop("hom_alt_carriers")
@@ -105,8 +115,9 @@ def get_variant_carriers(mt, variant, args):
         homalt_carriers = rows.drop("het_carriers")
         homalt_carriers = homalt_carriers.explode(homalt_carriers.hom_alt_carriers)
         homalt_carriers = homalt_carriers.flatten()
+        homalt_carriers.describe()
         homalt_carriers.export(f"{args.output_stem}_{'-'.join(variant)}_homalt_carriers.txt")
-
+        exit()
 
 if __name__ == "__main__":
     ######################################
