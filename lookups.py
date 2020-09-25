@@ -171,7 +171,7 @@ if __name__ == "__main__":
             print(e)
             exit()
 
-    if args.gene is not None:
+    if args.genes is not None:
         #################################
         # Filter MT to gene of interest #
         #################################
