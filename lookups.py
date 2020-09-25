@@ -237,7 +237,7 @@ if __name__ == "__main__":
         if args.mpc_ht is not None:
             print("Annotating variants with MPC info")
             variants_mt = va.annotate_variants_mpc(variants_mt, args.mpc_ht)
-        if args.gnoomad_ht is not None:
+        if args.gnomad_ht is not None:
             print("Annotating variants with gnomad info")
             variants_mt = va.annotate_variants_gnomad(variants_mt, args.gnomad_ht)
         if args.gnomad_mismatch_ht is not None:
