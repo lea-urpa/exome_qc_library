@@ -216,9 +216,9 @@ if __name__ == "__main__":
         # Get array of loci in Hail format, do an intermediate filter to just those loci #
         ##################################################################################
         if args.reference_genome == "GRCh37":
-            hail_loci = hl.array([hl.locus(x[0], int(x[1])) for x in variants])
+            hail_loci = hl.array([hl.locus(x[0], int(x[1])) for x in variants], reference_genome="GRCh37")
         elif args.reference_genome == "GRCh38":
-            hail_loci = hl.array([hl.locus('chr' + x[0], int(x[1])) for x in variants])
+            hail_loci = hl.array([hl.locus('chr' + x[0], int(x[1])) for x in variants], reference_genome="GRCh38")
         else:
             print("Incorrect reference genome given! How did we get here?")
             print(args.reference_genome)
