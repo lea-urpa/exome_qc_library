@@ -6,6 +6,7 @@ import os
 import logging
 import argparse
 import sys
+import hail as hl
 
 
 def remove_monomorphic(mt, args):
