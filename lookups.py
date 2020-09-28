@@ -53,12 +53,19 @@ def get_variant_carriers(mt, args):
     #################################################
     # Find carriers for variant if it is in dataset #
     #################################################
-    rowct = mt.row_count()
+    rowct = mt.count_rows()
     if rowct == 0:
         print(f"No variants in list in dataset.")
         exit()
 
-    # Pull variants to rows, checkpoint
+    ############################
+    # Calculate carrier counts #
+    ############################
+    mt = calculate_carrier_counts_ids(mt)
+
+    #####################################
+    # Pull variants to rows, checkpoint #
+    #####################################
     rows = mt.rows()
     rows = rows.checkpoint(args.output_stem + "_rows_tmp.mt", overwrite=True)
     rows.write(f"{args.output_stem}_carriers.ht/", overwrite=True)
@@ -75,19 +82,25 @@ def get_variant_carriers(mt, args):
 
     rows = rows.drop('gnomad_freq', 'gnomad_popmax', 'vep')
 
-    # Drop hom alt carriers and explode by het carriers, flatten, write to file
+    #############################################################################
+    # Drop hom alt carriers and explode by het carriers, flatten, write to file #
+    #############################################################################
     het_carriers = rows.drop("hom_alt_carriers")
     het_carriers = het_carriers.explode(het_carriers.het_carriers)
     het_carriers = het_carriers.flatten()
     het_carriers.export(f"{args.output_stem}_het_carriers.txt")
 
-    # Drop het carriers and explode by hom alt carriers, flatten, write to file
+    #############################################################################
+    # Drop het carriers and explode by hom alt carriers, flatten, write to file #
+    #############################################################################
     homalt_carriers = rows.drop("het_carriers")
     homalt_carriers = homalt_carriers.explode(homalt_carriers.hom_alt_carriers)
     homalt_carriers = homalt_carriers.flatten()
     homalt_carriers.export(f"{args.output_stem}_homalt_carriers.txt")
 
-    # Export columns for the individuals in the hail table
+    ########################################################
+    # Export columns for the individuals in the hail table #
+    ########################################################
     cols = cols.flatten()
     cols.export(f"{args.output_stem}_carrier_info.txt")
 
@@ -201,10 +214,10 @@ if __name__ == "__main__":
         ##################################################################################
         if args.reference_genome == "GRCh37":
             hail_loci = hl.array([hl.struct(locus=hl.locus(x[0], int(x[1]), reference_genome="GRCh37"),
-                                            alleles=hl.array(x[2], x[3])) for x in variants])
+                                            alleles=hl.array([x[2], x[3]])) for x in variants])
         elif args.reference_genome == "GRCh38":
             hail_loci = hl.array([hl.struct(locus=hl.locus('chr' + x[0], int(x[1]), reference_genome="GRCh38"),
-                                            alleles=hl.array(x[2], x[3])) for x in variants])
+                                            alleles=hl.array([x[2], x[3]])) for x in variants])
         else:
             print("Incorrect reference genome given! How did we get here?")
             print(args.reference_genome)
