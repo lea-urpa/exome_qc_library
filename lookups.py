@@ -3,6 +3,7 @@ Contains functions to look up variants, samples, and genes from matrix tables.
 
 Author: Lea Urpa, August 2020
 """
+from find_putative_causal_variants import count_case_control_carriers
 
 
 def calculate_carrier_counts_ids(mt):
@@ -62,6 +63,8 @@ def get_variant_carriers(mt, args):
     # Calculate carrier counts #
     ############################
     mt = calculate_carrier_counts_ids(mt)
+    if args.pheno_col is not None:
+        mt = count_case_control_carriers(mt, args)
 
     #####################################
     # Pull variants to rows, checkpoint #
@@ -116,6 +119,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Lookups for damaging variants in genes from exome sequencing data.")
     parser.add_argument("-mt", help="Matrix table to search for damaging variants in genes and/or specific variants.")
+    parser.add_argument("--pheno_col", type=str, help="Col annotation giving true/false for case phenotype")
+    parser.add_argument("--female_col", type=str, help="Col annotation giving true/false for female status.")
     parser.add_argument("--output_name", required=True, type=str, help="Output name stem for results.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for results.")
     parser.add_argument("--genes", type=str,
@@ -136,6 +141,9 @@ if __name__ == "__main__":
     if (args.genes is None) and (args.variants is None) and (args.variant_list is None):
         print("Error! One of --genes, --variants, or --variant_list must be given!")
         exit()
+
+    if (args.pheno_col is not None) and (args.female_col is None):
+        print("Error! if giving --pheno_col, --female_col must also be given")
 
     args.output_stem = os.path.join(args.output_dir, args.output_name)
 

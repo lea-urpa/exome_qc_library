@@ -34,7 +34,7 @@ def remove_monomorphic(mt, args):
     return mt
 
 
-def annotate_control_carriers(mt, args):
+def count_case_control_carriers(mt, args):
     """
     Annotate het and hom var carriers for variants in matrix table.
 
@@ -482,7 +482,14 @@ def find_putative_causal_variants(mt, args):
     ##################################################################
     # Annotate putative causal to matrix table, filter, get carriers #
     ##################################################################
-    mt = mt.annotate_rows(putative_causal=rows[mt.locus, mt.alleles].putative_causal)
+    mt = mt.annotate_rows(putative_causal=rows[mt.locus, mt.alleles].putative_causal,
+                          dominant_rare_gnomad=rows[mt.locus, mt.alleles].dominant_rare_gnomad,
+                          recessive_rare_gnomad=rows[mt.locus, mt.alleles].recessive_rare_gnomad,
+                          hemizygous_rare_gnomad=rows[mt.locus, mt.alleles].hemizygous_rare_gnomad,
+                          dominant_rare_controls=rows[mt.locus, mt.alleles].dominant_rare_controls,
+                          recessive_rare_controls=rows[mt.locus, mt.alleles].recessive_rare_controls,
+                          hemizygous_rare_controls=rows[mt.locus, mt.alleles].hemizygous_rare_controls)
+
     mt = mt.filter_rows(hl.len(mt.putative_causal) > 0, keep=True)
 
     # Annotate carriers now that there should be not too many
@@ -687,7 +694,7 @@ if __name__ == "__main__":
     ##################################################
     # Annotate matrix table with various annotations #
     ##################################################
-    var_mt = annotate_control_carriers(var_mt, args)
+    var_mt = count_case_control_carriers(var_mt, args)
     var_mt = annotate_variants(var_mt, args)
     var_mt = annotate_population_thresholds(var_mt, args)
     var_mt = annotate_genes(var_mt, args)
