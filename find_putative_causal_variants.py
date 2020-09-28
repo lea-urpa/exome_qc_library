@@ -599,7 +599,20 @@ def annotate_denovos(rows, args):
     # Export table + tsv file #
     ###########################
     causal_vars.write(args.output_dir + "_causal_vars_table_final.ht", overwrite=True)
+
+    # Pull out relevant gnomad population information, drop large structs, and flatten
+    causal_vars = causal_vars.annotate(
+        popmax_population=causal_vars.gnomad_popmax[causal_vars.gnomad_popmax_index_dict['gnomad']].pop)
+    causal_vars = causal_vars.annotate(
+        gnomad_fin_freq=causal_vars.gnomad_freq[causal_vars.gnomad_freq_index_dict['gnomad_fin']],
+        gnomad_controls_fin_freq=causal_vars.gnomad_freq[causal_vars.gnomad_freq_index_dict['controls_fin']],
+        gnomad_nonneuro_fin_freq=causal_vars.gnomad_freq[causal_vars.gnomad_freq_index_dict['non_neuro_fin']],
+        gnomad_popmax_gnomad=causal_vars.gnomad_popmax[causal_vars.gnomad_popmax_index_dict['gnomad']],
+        gnomad_popmax_controls=causal_vars.gnomad_popmax[causal_vars.gnomad_popmax_index_dict['controls']],
+        gnomad_popmax_nonneuro=causal_vars.gnomad_popmax[causal_vars.gnomad_popmax_index_dict['non_neuro']])
+    causal_vars = causal_vars.drop('gnomad_freq', 'gnomad_popmax', 'vep')
     causal_vars = causal_vars.flatten()
+
     causal_vars.export(args.output_dir + "_causal_vars_table_final.txt")
 
 
