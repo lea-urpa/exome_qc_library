@@ -48,76 +48,49 @@ def get_lof_carriers(mt, args):
         print(f"No LOF variant carriers found in gene {gene}")
 
 
-def get_variant_carriers(mt, variant, args):
-
-    ##########################################################################
-    # Convert the variant and position to a hail locus, get alleles as array #
-    ##########################################################################
-    if args.reference_genome == "GRCh38":
-        try:
-            hail_locus = hl.locus('chr' + variant[0], int(variant[1]), reference_genome="GRCh38")
-        except Exception as e:
-            print(f"Error converting variant to Hail locus! Variant chromosome: {variant[0]} position: {variant[1]}")
-            print(e)
-            return
-    elif args.reference_genome == "GRCh37":
-        try:
-            hail_locus = hl.locus(variant[0], int(variant[1]), reference_genome="GRCh37")
-        except Exception as e:
-            print(f"Error converting variant to Hail locus! Variant chromosome: {variant[0]} position: {variant[1]}")
-            print(e)
-            return
-    else:
-        print("Error! Incorrect reference genome given. How did we get here?")
-        exit()
-
-    alleles = [variant[2], variant[3]]
-
-    ################################################
-    # Filter the matrix table to just this variant #
-    ################################################
-    var_mt = mt.filter_rows((mt.locus == hail_locus) & (mt.alleles == alleles))
-    var_mt = var_mt.checkpoint(args.output_stem + "_varmt_tmp.mt", overwrite=True)
-
-    rowct = var_mt.count_rows()
+def get_variant_carriers(mt, args):
 
     #################################################
     # Find carriers for variant if it is in dataset #
     #################################################
+    rowct = mt.row_count()
     if rowct == 0:
-        print(f"{':'.join(variant)} not in dataset.")
-    else:
-        print(f"Finding carriers for variant {':'.join(variant)}")
-        var_mt = calculate_carrier_counts_ids(var_mt)
-
-        # Pull variants to rows, checkpoint
-        rows = var_mt.rows()
-        rows = rows.checkpoint(args.output_stem + "_rows_tmp.mt", overwrite=True)
-        rows.write(f"{args.output_stem}_{'-'.join(variant)}_carriers.ht/", overwrite=True)
-
-        rows = rows.annotate(popmax_population=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['gnomad']].pop)
-        rows = rows.annotate(gnomad_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['gnomad_fin']],
-                             gnomad_controls_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['controls_fin']],
-                             gnomad_nonneuro_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['non_neuro_fin']],
-                             gnomad_popmax_gnomad=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['gnomad']],
-                             gnomad_popmax_controls=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['controls']],
-                             gnomad_popmax_nonneuro=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['non_neuro']])
-
-        rows = rows.drop('gnomad_freq', 'gnomad_popmax', 'vep')
-
-        # Drop hom alt carriers and explode by het carriers, flatten, write to file
-        het_carriers = rows.drop("hom_alt_carriers")
-        het_carriers = het_carriers.explode(het_carriers.het_carriers)
-        het_carriers = het_carriers.flatten()
-        het_carriers.export(f"{args.output_stem}_{'-'.join(variant)}_het_carriers.txt")
-
-        # Drop het carriers and explode by hom alt carriers, flatten, write to file
-        homalt_carriers = rows.drop("het_carriers")
-        homalt_carriers = homalt_carriers.explode(homalt_carriers.hom_alt_carriers)
-        homalt_carriers = homalt_carriers.flatten()
-        homalt_carriers.describe()
-        homalt_carriers.export(f"{args.output_stem}_{'-'.join(variant)}_homalt_carriers.txt")
+        print(f"No variants in list in dataset.")
         exit()
+
+    # Pull variants to rows, checkpoint
+    rows = mt.rows()
+    rows = rows.checkpoint(args.output_stem + "_rows_tmp.mt", overwrite=True)
+    rows.write(f"{args.output_stem}_carriers.ht/", overwrite=True)
+
+    cols = mt.cols()
+
+    rows = rows.annotate(popmax_population=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['gnomad']].pop)
+    rows = rows.annotate(gnomad_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['gnomad_fin']],
+                         gnomad_controls_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['controls_fin']],
+                         gnomad_nonneuro_fin_freq=rows.gnomad_freq[rows.gnomad_freq_index_dict['non_neuro_fin']],
+                         gnomad_popmax_gnomad=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['gnomad']],
+                         gnomad_popmax_controls=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['controls']],
+                         gnomad_popmax_nonneuro=rows.gnomad_popmax[rows.gnomad_popmax_index_dict['non_neuro']])
+
+    rows = rows.drop('gnomad_freq', 'gnomad_popmax', 'vep')
+
+    # Drop hom alt carriers and explode by het carriers, flatten, write to file
+    het_carriers = rows.drop("hom_alt_carriers")
+    het_carriers = het_carriers.explode(het_carriers.het_carriers)
+    het_carriers = het_carriers.flatten()
+    het_carriers.export(f"{args.output_stem}_het_carriers.txt")
+
+    # Drop het carriers and explode by hom alt carriers, flatten, write to file
+    homalt_carriers = rows.drop("het_carriers")
+    homalt_carriers = homalt_carriers.explode(homalt_carriers.hom_alt_carriers)
+    homalt_carriers = homalt_carriers.flatten()
+    homalt_carriers.export(f"{args.output_stem}_homalt_carriers.txt")
+
+    # Export columns for the individuals in the hail table
+    cols = cols.flatten()
+    cols.export(f"{args.output_stem}_carrier_info.txt")
+
 
 if __name__ == "__main__":
     ######################################
@@ -227,15 +200,17 @@ if __name__ == "__main__":
         # Get array of loci in Hail format, do an intermediate filter to just those loci #
         ##################################################################################
         if args.reference_genome == "GRCh37":
-            hail_loci = hl.array([hl.locus(x[0], int(x[1]), reference_genome="GRCh37") for x in variants])
+            hail_loci = hl.array([hl.struct(locus=hl.locus(x[0], int(x[1]), reference_genome="GRCh37"),
+                                            alleles=hl.array(x[2], x[3])) for x in variants])
         elif args.reference_genome == "GRCh38":
-            hail_loci = hl.array([hl.locus('chr' + x[0], int(x[1]), reference_genome="GRCh38") for x in variants])
+            hail_loci = hl.array([hl.struct(locus=hl.locus('chr' + x[0], int(x[1]), reference_genome="GRCh38"),
+                                            alleles=hl.array(x[2], x[3])) for x in variants])
         else:
             print("Incorrect reference genome given! How did we get here?")
             print(args.reference_genome)
             exit()
 
-        variants_mt = fullmt.filter_rows(hail_loci.contains(fullmt.locus))
+        variants_mt = fullmt.filter_rows(hail_loci.contains(hl.struct(locus=fullmt.locus, alleles=fullmt.alleles)))
 
         ######################################################################
         # Annotate intermediate matrix table with annotation files, if given #
@@ -256,6 +231,5 @@ if __name__ == "__main__":
         #################################################################
         # Loop through variants and find carriers, export separate file #
         #################################################################
-        for variant in variants:
-            get_variant_carriers(variants_mt, variant, args)
+        get_variant_carriers(variants_mt, args)
 
