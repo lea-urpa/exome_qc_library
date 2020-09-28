@@ -318,10 +318,10 @@ def annotate_genes(mt, args):
         # Add pLI information as column #
         #################################
         genes = genes.annotate(pLI=gene_metrics[genes.gene].pLI)
-        vars_missing_pLI = rows.aggregate(hl.agg.counter(hl.is_defined(genes.pLI)))
+        vars_missing_pLI = genes.aggregate(hl.agg.counter(hl.is_defined(genes.pLI)))
         logging.info(f"Count of variants where pLI values are missing (False) or not (True): {vars_missing_pLI}")
 
-        gene_count = rows.group_by("gene").aggregate(pLI=hl.agg.mean(rows.pLI))
+        gene_count = genes.group_by("gene").aggregate(pLI=hl.agg.mean(genes.pLI))
         missing_pLI = gene_count.aggregate(hl.agg.counter(hl.is_defined(gene_count.pLI)))
         logging.info(f"Count of genes where pLI values are missing (False) or not (True): {missing_pLI}")
 
@@ -337,6 +337,11 @@ def annotate_genes(mt, args):
         mt = mt.annotate_rows(pLI=pli_genes[mt.locus, mt.alleles].pLI)
         mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x >= args.pLI_cutoff, mt.pLI), True, False))
 
+        test = mt.filter_rows(mt.LOF == True)
+        test = test.filter_rows(mt.gene.contains("INTS6"))
+        test.pLI.show()
+        test.high_pLI.show()
+        test.gene.show()
     else:
         mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr), high_pLI=hl.null(hl.tbool))
 
