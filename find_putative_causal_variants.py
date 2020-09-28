@@ -491,6 +491,8 @@ def find_putative_causal_variants(mt, args):
                           recessive_rare_controls=rows[mt.locus, mt.alleles].recessive_rare_controls,
                           hemizygous_rare_controls=rows[mt.locus, mt.alleles].hemizygous_rare_controls)
 
+    mt.write(args.output_stem + "_putative_causal_allvariants.mt", overwrite=True)
+
     mt = mt.filter_rows(hl.len(mt.putative_causal) > 0, keep=True)
 
     # Annotate carriers now that there should be not too many
