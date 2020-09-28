@@ -336,6 +336,7 @@ def annotate_genes(mt, args):
         #################################################################################
         mt = mt.annotate_rows(pLI=pli_genes[mt.locus, mt.alleles].pLI)
         mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x >= args.pLI_cutoff, mt.pLI), True, False))
+
     else:
         mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr), high_pLI=hl.null(hl.tbool))
 
@@ -617,7 +618,7 @@ def annotate_denovos(rows, args):
     causal_vars = causal_vars.drop('gnomad_freq', 'gnomad_popmax', 'vep')
     causal_vars = causal_vars.flatten()
 
-    causal_vars.export(args.output_dir + "_causal_vars_table_final.txt")
+    causal_vars.export(args.output_stem + "_causal_vars_table_final.txt")
 
 
 if __name__ == "__main__":
