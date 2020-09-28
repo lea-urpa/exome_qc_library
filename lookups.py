@@ -3,7 +3,6 @@ Contains functions to look up variants, samples, and genes from matrix tables.
 
 Author: Lea Urpa, August 2020
 """
-from find_putative_causal_variants import count_case_control_carriers
 
 
 def calculate_carrier_counts_ids(mt):
@@ -150,11 +149,12 @@ if __name__ == "__main__":
     ##########################
     # Import python scripts  #
     ##########################
-    scripts = ["variant_annotation.py"]
+    scripts = ["variant_annotation.py", "find_putative_causal_variants.py"]
     for script in scripts:
         hl.spark_context().addPyFile(os.path.join(args.scripts_dir, script))
 
     import variant_annotation as va
+    from find_putative_causal_variants import count_case_control_carriers
 
     ########################
     # Load in matrix table #
