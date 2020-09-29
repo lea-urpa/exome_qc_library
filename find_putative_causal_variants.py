@@ -68,7 +68,7 @@ def count_case_control_carriers(mt, args):
     temp_filename = args.output_stem + "_carriers_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
-    if exists == 0 and (args.force is False):
+    if (exists == 0) and (args.force is False):
         logging.info(f"Detected file with carriers annotated exists: {temp_filename}. Loading this file.")
         mt = hl.read_matrix_table(temp_filename)
 
@@ -153,7 +153,7 @@ def annotate_variants(mt, args):
     temp_filename = args.output_stem + "_cadd_mpc_gnomad_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
-    if exists == 0 and (args.force == False):
+    if (exists == 0) and (args.force == False):
         logging.info(f"Detected that matrix table annotated with CADD, MPC and Gnomad exist: {temp_filename}. "
                      f"Loading this.")
         mt = hl.read_matrix_table(temp_filename)
@@ -195,7 +195,7 @@ def annotate_population_thresholds(mt, args):
     temp_filename = args.output_stem + "_gnomad_control_thresholds_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
-    if exists == 0 and (args.force == False):
+    if (exists == 0) and (args.force == False):
         logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {temp_filename}. "
                      f"Loading this file.")
     else:
@@ -318,7 +318,7 @@ def annotate_genes(mt, args):
     temp_filename = args.output_stem + "_genes_annotated.mt"
     exists = check_if_object_exists(temp_filename)
 
-    if exists == 0 and (args.force == False):
+    if (exists == 0) and (args.force == False):
         logging.info(f"Detected matrix table with gene information annotated exists: {temp_filename}. Loading this.")
         mt = hl.read_matrix_table(temp_filename)
 
@@ -576,6 +576,8 @@ def find_putative_causal_variants(mt, args):
                               hl.agg.collect(mt.s)))
 
     mt = mt.annotate_rows(hemizygous_carriers=hl.flatten([mt.het_male_carriers, mt.homvar_female_carriers]))
+    mt = mt.annotate_rows(genotype_filters=hl.agg.collect_as_set(hl.struct(
+        id=mt.s, final_failing_depth_quality=mt.final_failing_depth_quality, final_failing_ab=mt.final_failing_ab)))
 
     mt.write(args.output_stem + "_putative_causal_final.mt", overwrite=True)
 
