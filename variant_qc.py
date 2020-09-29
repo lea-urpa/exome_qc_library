@@ -570,29 +570,29 @@ def find_failing_variants(mt, args, mode):
     # Failing GSQR filters #
     ########################
     # Define filter condition
-    logging.info("Marking variants with GQSR filters not empty")
+    logging.info("Marking variants with VQSR filters not empty")
     gqse_filter = hl.cond((hl.len(mt_filt.filters) != 0) & hl.is_defined(mt_filt.filters),
-                          mt_filt[failing_name].append("failing_GQSR_filters"),
+                          mt_filt[failing_name].append("failing_VQSR_filters"),
                           mt_filt[failing_name])
     # Annotate rows
     mt_filt = mt_filt.annotate_rows(**{failing_name: gqse_filter})
     # Get number of failing variants
-    failing_gqsr = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("failing_GQSR_filters")))
-    failing_gqsr_perc = round(failing_gqsr / total_variants * 100, 2)
-    filter_dict["failing_GSQR"] = failing_gqsr
+    failing_vqsr = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("failing_VQSR_filters")))
+    failing_vqsr_perc = round(failing_vqsr / total_variants * 100, 2)
+    filter_dict["failing_GSQR"] = failing_vqsr
     # Report if variant annotation undefined
-    gqsr_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt.filters)))
-    if gqsr_defined == 0:
+    vqsr_defined = mt_filt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt_filt.filters)))
+    if vqsr_defined == 0:
         logging.error(f"Note! mt.filters annotation undefined for all variants! Not filtering variants on this measure.")
     else:
-        gqse_miss = hl.cond(~hl.is_defined(mt_filt.filters), mt_filt[failing_name].append("missing_GQSR_filters"),
+        gqse_miss = hl.cond(~hl.is_defined(mt_filt.filters), mt_filt[failing_name].append("missing_VQSR_filters"),
                             mt_filt[failing_name])
 
         mt_filt = mt_filt.annotate_rows(**{failing_name: gqse_miss})
 
-        missing_gqsr = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("missing_GQSR_filters")))
-        filter_dict['missing_GQSR'] = missing_gqsr
-        missing_gqsr_perc = round(missing_gqsr / total_variants * 100, 2)
+        missing_vqsr = mt_filt.aggregate_rows(hl.agg.count_where(mt_filt[failing_name].contains("missing_VQSR_filters")))
+        filter_dict['missing_vqsr'] = missing_vqsr
+        missing_vqsr_perc = round(missing_vqsr / total_variants * 100, 2)
 
     #####################################################################
     # Find variants that are snps or indels with QD less than threshold #
@@ -704,7 +704,7 @@ def find_failing_variants(mt, args, mode):
     # Annotate failing counts to globals, report to logs #
     ######################################################
     # Report exclusion numbers to logs
-    logging.info(f"\nVariants with length mt.row.filters != 0: {failing_gqsr}, {failing_gqsr_perc}%"
+    logging.info(f"\nVariants with length mt.row.filters != 0: {failing_vqsr}, {failing_vqsr_perc}%"
                  f"\nsnp QD < {args.snp_qd} or indel QD < {args.indel_qd}: {failing_qd}, {failing_qd_perc}%"
                  f"\n>{args.ab_allowed_dev_het*100}% of het genotypes out of allelic balance: "
                  f"{failing_ab}, {failing_ab_perc}%"
