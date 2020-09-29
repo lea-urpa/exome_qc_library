@@ -331,7 +331,7 @@ def annotate_genes(mt, args):
             genes = genes.annotate(**gene_table[genes.gene])
 
             genes = genes.annotate(allelic_requirement=genes[args.allelic_requirement_col].split(","))
-            genes = genes.explode(genes.allelic_requirement)
+            allelic_req = genes.explode(genes.allelic_requirement)
 
             ######################################################
             # Annotate inheritance based on allelic requirements #
@@ -339,18 +339,18 @@ def annotate_genes(mt, args):
             dominant_terms = ['biallelic', 'uncertain', 'digenic']
             recessive_terms = ['monoallelic', 'imprinted', 'x-linked dominant', 'x-linked over-dominance', 'uncertain',
                                'digenic', 'mosaic']
-            genes = genes.annotate(inheritance=hl.case()
-                                   .when(hl.array(dominant_terms).contains(genes.allelic_requirement), 'dominant')
-                                   .when(hl.array(recessive_terms).contains(genes.allelic_requirement), 'recessive')
-                                   .when(genes.allelic_requirement == 'hemizygous', 'hemizygous')
+            allelic_req = allelic_req.annotate(inheritance=hl.case()
+                                   .when(hl.array(dominant_terms).contains(allelic_req.allelic_requirement), 'dominant')
+                                   .when(hl.array(recessive_terms).contains(allelic_req.allelic_requirement), 'recessive')
+                                   .when(allelic_req.allelic_requirement == 'hemizygous', 'hemizygous')
                                    .or_missing())
             ###################################
             # Group table by gene, checkpoint #
             ###################################
-            disease_genes = genes.group_by('locus', 'alleles').aggregate(
-                gene=hl.array(hl.agg.collect_as_set(genes.gene)),
-                allelic_requirement=hl.array(hl.agg.collect_as_set(genes.allelic_requirement)),
-                inheritance=hl.array(hl.agg.collect_as_set(genes.inheritance)))
+            disease_genes = allelic_req.group_by('locus', 'alleles').aggregate(
+                gene=hl.array(hl.agg.collect_as_set(allelic_req.gene)),
+                allelic_requirement=hl.array(hl.agg.collect_as_set(allelic_req.allelic_requirement)),
+                inheritance=hl.array(hl.agg.collect_as_set(allelic_req.inheritance)))
             disease_genes = disease_genes.key_by(disease_genes.locus, disease_genes.alleles)
 
             #######################################
