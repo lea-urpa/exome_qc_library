@@ -6,6 +6,7 @@ import os
 import logging
 import argparse
 import sys
+import subprocess
 import hail as hl
 
 
@@ -17,20 +18,31 @@ def remove_monomorphic(mt, args):
     :param args: arguments for checkpoint output location and name
     :return: returns filtered matrix table
     """
-    h.add_preemptibles(args.cluster_name, args.num_preemptibles)
+    filename = args.output_stem + "_non_monomorphic_tmp.mt"
+    qstat_cmd = ['gsutil', '-q', 'stat', filename]
+    exists = subprocess.call(qstat_cmd)
 
-    start0_count = mt.count_rows()
-    logging.info(f"Starting number of variants: {start0_count}")
-    mt = mt.annotate_rows(non_ref_gt_count=hl.agg.count_where(mt.GT.is_non_ref()))
-    mt = mt.filter_rows(mt.non_ref_gt_count > 0, keep=True)
+    if exists == 0:
+        logging.info(f"Detected file with monomorphic variants filtered out: {filename}. Loading this file.")
+        mt = hl.read_matrix_table(filename)
+        args.start_count = mt.count_rows()
+        logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count}")
+    else:
+        h.add_preemptibles(args.cluster_name, args.num_preemptibles)
 
-    mt = mt.checkpoint(args.output_stem + "_non_monomorphic_tmp.mt", overwrite=True)
+        start0_count = mt.count_rows()
+        logging.info(f"Starting number of variants: {start0_count}")
+        mt = mt.annotate_rows(non_ref_gt_count=hl.agg.count_where(mt.GT.is_non_ref()))
+        mt = mt.filter_rows(mt.non_ref_gt_count > 0, keep=True)
 
-    args.start_count = mt.count_rows()
-    logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count} "
-                 f"({round(args.start_count/start0_count*100, 2)}% of all variants)")
+        mt = mt.checkpoint(filename, overwrite=True)
 
-    h.remove_preemptibles(args.cluster_name)
+        args.start_count = mt.count_rows()
+        logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count} "
+                     f"({round(args.start_count / start0_count * 100, 2)}% of all variants)")
+
+        h.remove_preemptibles(args.cluster_name)
+
 
     return mt
 
@@ -338,7 +350,7 @@ def annotate_genes(mt, args):
         mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x >= args.pLI_cutoff, mt.pLI), True, False))
 
         test = mt.filter_rows(mt.LOF == True)
-        test = test.filter_rows(mt.gene.contains("INTS6"))
+        test = test.filter_rows(test.gene.contains("INTS6"))
         test.pLI.show()
         test.high_pLI.show()
         test.gene.show()
