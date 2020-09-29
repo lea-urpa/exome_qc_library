@@ -424,13 +424,6 @@ def annotate_genes(mt, args):
     if args.gnomad_gene_metrics is not None:
         pLI_count = mt.aggregate_rows(hl.agg.counter(mt.high_pLI))
         logging.info(f"Number of variants in high pLI genes (>0.9): {pLI_count}")
-
-        test = mt.filter_rows(mt.LOF == True)
-        test = test.filter_rows(test.gene.contains("INTS6"))
-        test.pLI.show()
-        test.high_pLI.show()
-        test.gene.show()
-
     return mt
 
 
