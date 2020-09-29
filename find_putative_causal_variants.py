@@ -300,97 +300,100 @@ def annotate_genes(mt, args):
     :return: Returns matrix table with rows annotated with T/F column of whether variant in gene set of interest,
     and column of allelic requirement strings.
     """
-    ###########################################################################
-    # Pull MT rows, select only locus, alleles, and gene, checkpoint, explode #
-    ###########################################################################
-    rows = mt.rows()
-    rows = rows.key_by()
-    rows = rows.select("locus", "alleles", "gene")
-    rows = rows.checkpoint(args.output_stem + "_rows_tmp2.ht", overwrite=True)
-    genes = rows.explode(rows.gene)
-    genes = genes.key_by(genes.gene)
+    temp_filename = args.output_stem + "_annotation_tmp3.mt"
+    qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
+    exists = subprocess.call(qstat_cmd)
 
-    if args.disease_genes is not None:
-        logging.info("Annotating dataset with disease gene information.")
-        gene_table = hl.import_table(args.disease_genes, delimiter=args.disease_gene_sep)
-        gene_table = gene_table.transmute(gene=gene_table[args.gene_col_name])
-        gene_table = gene_table.key_by('gene')
+    if exists == 0:
+        logging.info(f"Detected matrix table with gene information annotated exists: {temp_filename}. Loading this.")
+        mt = hl.read_matrix_table(temp_filename)
 
-        ##################################################################################
-        # Add disease gene information as column, split allelic requirements and explode #
-        ##################################################################################
-        genes = genes.annotate(**gene_table[genes.gene])
-
-        genes = genes.annotate(allelic_requirement=genes[args.allelic_requirement_col].split(","))
-        genes = genes.explode(genes.allelic_requirement)
-
-        ######################################################
-        # Annotate inheritance based on allelic requirements #
-        ######################################################
-        dominant_terms = ['biallelic', 'uncertain', 'digenic']
-        recessive_terms = ['monoallelic', 'imprinted', 'x-linked dominant', 'x-linked over-dominance', 'uncertain',
-                           'digenic', 'mosaic']
-        genes = genes.annotate(inheritance=hl.case()
-                               .when(hl.array(dominant_terms).contains(genes.allelic_requirement), 'dominant')
-                               .when(hl.array(recessive_terms).contains(genes.allelic_requirement), 'recessive')
-                               .when(genes.allelic_requirement == 'hemizygous', 'hemizygous')
-                               .or_missing())
-        ###################################
-        # Group table by gene, checkpoint #
-        ###################################
-        disease_genes = genes.group_by('locus', 'alleles').aggregate(
-            gene=hl.array(hl.agg.collect_as_set(genes.gene)),
-            allelic_requirement=hl.array(hl.agg.collect_as_set(genes.allelic_requirement)),
-            inheritance=hl.array(hl.agg.collect_as_set(genes.inheritance)))
-        disease_genes = disease_genes.key_by(disease_genes.locus, disease_genes.alleles)
-
-        #######################################
-        # Annotate rows with disease genes ht #
-        #######################################
-        mt = mt.annotate_rows(allelic_requirement=disease_genes[mt.locus, mt.alleles].allelic_requirement,
-                              inheritance=disease_genes[mt.locus, mt.alleles].inheritance)
-        mt = mt.annotate_rows(**{args.gene_set_name: hl.cond(hl.is_defined(mt.allelic_requirement), True, False)})
     else:
-        mt = mt.annotate_rows(allelic_requirement=hl.empty_array(hl.tstr))
-        mt = mt.annotate_rows(**{args.gene_set_name: hl.null(hl.tbool)})
-        mt = mt.annotate_rows(inheritance=hl.empty_array(hl.tstr))
+        ###########################################################################
+        # Pull MT rows, select only locus, alleles, and gene, checkpoint, explode #
+        ###########################################################################
+        rows = mt.rows()
+        rows = rows.key_by()
+        rows = rows.select("locus", "alleles", "gene")
+        genes = rows.explode(rows.gene)
+        genes = genes.key_by(genes.gene)
+        genes = genes.checkpoint(args.output_stem + "_rows_tmp2.ht", overwrite=True)
 
-    if args.gnomad_gene_metrics is not None:
-        logging.info("Annotating genes with pLI metrics.")
-        gene_metrics = hl.import_table(args.gnomad_gene_metrics, types={'pLI': hl.tfloat64}, key='gene')
+        if args.disease_genes is not None:
+            logging.info("Annotating dataset with disease gene information.")
+            gene_table = hl.import_table(args.disease_genes, delimiter=args.disease_gene_sep)
+            gene_table = gene_table.transmute(gene=gene_table[args.gene_col_name])
+            gene_table = gene_table.key_by('gene')
 
-        #################################
-        # Add pLI information as column #
-        #################################
-        genes = genes.annotate(pLI=gene_metrics[genes.gene].pLI)
-        vars_missing_pLI = genes.aggregate(hl.agg.counter(hl.is_defined(genes.pLI)))
-        logging.info(f"Count of variants where pLI values are missing (False) or not (True): {vars_missing_pLI}")
+            ##################################################################################
+            # Add disease gene information as column, split allelic requirements and explode #
+            ##################################################################################
+            genes = genes.annotate(**gene_table[genes.gene])
 
-        gene_count = genes.group_by("gene").aggregate(pLI=hl.agg.mean(genes.pLI))
-        missing_pLI = gene_count.aggregate(hl.agg.counter(hl.is_defined(gene_count.pLI)))
-        logging.info(f"Count of genes where pLI values are missing (False) or not (True): {missing_pLI}")
+            genes = genes.annotate(allelic_requirement=genes[args.allelic_requirement_col].split(","))
+            genes = genes.explode(genes.allelic_requirement)
 
-        ###################################
-        # Group table by gene, checkpoint #
-        ###################################
-        pli_genes = genes.group_by('locus', 'alleles').aggregate(pLI=hl.array(hl.agg.collect_as_set(genes.pLI)))
-        pli_genes = pli_genes.key_by(pli_genes.locus, pli_genes.alleles)
+            ######################################################
+            # Annotate inheritance based on allelic requirements #
+            ######################################################
+            dominant_terms = ['biallelic', 'uncertain', 'digenic']
+            recessive_terms = ['monoallelic', 'imprinted', 'x-linked dominant', 'x-linked over-dominance', 'uncertain',
+                               'digenic', 'mosaic']
+            genes = genes.annotate(inheritance=hl.case()
+                                   .when(hl.array(dominant_terms).contains(genes.allelic_requirement), 'dominant')
+                                   .when(hl.array(recessive_terms).contains(genes.allelic_requirement), 'recessive')
+                                   .when(genes.allelic_requirement == 'hemizygous', 'hemizygous')
+                                   .or_missing())
+            ###################################
+            # Group table by gene, checkpoint #
+            ###################################
+            disease_genes = genes.group_by('locus', 'alleles').aggregate(
+                gene=hl.array(hl.agg.collect_as_set(genes.gene)),
+                allelic_requirement=hl.array(hl.agg.collect_as_set(genes.allelic_requirement)),
+                inheritance=hl.array(hl.agg.collect_as_set(genes.inheritance)))
+            disease_genes = disease_genes.key_by(disease_genes.locus, disease_genes.alleles)
 
-        #################################################################################
-        # Annotate matrix table with gene metrics, make boolean column of high pLI gene #
-        #################################################################################
-        mt = mt.annotate_rows(pLI=pli_genes[mt.locus, mt.alleles].pLI)
-        mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x >= args.pLI_cutoff, mt.pLI), True, False))
+            #######################################
+            # Annotate rows with disease genes ht #
+            #######################################
+            mt = mt.annotate_rows(allelic_requirement=disease_genes[mt.locus, mt.alleles].allelic_requirement,
+                                  inheritance=disease_genes[mt.locus, mt.alleles].inheritance)
+            mt = mt.annotate_rows(**{args.gene_set_name: hl.cond(hl.is_defined(mt.allelic_requirement), True, False)})
+        else:
+            mt = mt.annotate_rows(allelic_requirement=hl.empty_array(hl.tstr))
+            mt = mt.annotate_rows(**{args.gene_set_name: hl.null(hl.tbool)})
+            mt = mt.annotate_rows(inheritance=hl.empty_array(hl.tstr))
 
-        test = mt.filter_rows(mt.LOF == True)
-        test = test.filter_rows(test.gene.contains("INTS6"))
-        test.pLI.show()
-        test.high_pLI.show()
-        test.gene.show()
-    else:
-        mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr), high_pLI=hl.null(hl.tbool))
+        if args.gnomad_gene_metrics is not None:
+            logging.info("Annotating genes with pLI metrics.")
+            gene_metrics = hl.import_table(args.gnomad_gene_metrics, types={'pLI': hl.tfloat64}, key='gene')
 
-    mt = mt.checkpoint(args.output_stem + "_annotation_tmp3.mt", overwrite=True)
+            #################################
+            # Add pLI information as column #
+            #################################
+            genes = genes.annotate(pLI=gene_metrics[genes.gene].pLI)
+            vars_missing_pLI = genes.aggregate(hl.agg.counter(hl.is_defined(genes.pLI)))
+            logging.info(f"Count of variants where pLI values are missing (False) or not (True): {vars_missing_pLI}")
+
+            gene_count = genes.group_by("gene").aggregate(pLI=hl.agg.mean(genes.pLI))
+            missing_pLI = gene_count.aggregate(hl.agg.counter(hl.is_defined(gene_count.pLI)))
+            logging.info(f"Count of genes where pLI values are missing (False) or not (True): {missing_pLI}")
+
+            ###################################
+            # Group table by gene, checkpoint #
+            ###################################
+            pli_genes = genes.group_by('locus', 'alleles').aggregate(pLI=hl.array(hl.agg.collect_as_set(genes.pLI)))
+            pli_genes = pli_genes.key_by(pli_genes.locus, pli_genes.alleles)
+
+            #################################################################################
+            # Annotate matrix table with gene metrics, make boolean column of high pLI gene #
+            #################################################################################
+            mt = mt.annotate_rows(pLI=pli_genes[mt.locus, mt.alleles].pLI)
+            mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x >= args.pLI_cutoff, mt.pLI), True, False))
+        else:
+            mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr), high_pLI=hl.null(hl.tbool))
+
+        mt = mt.checkpoint(args.output_stem + "_annotation_tmp3.mt", overwrite=True)
 
     if args.disease_genes is not None:
         gene_count = mt.aggregate_rows(hl.agg.counter(mt[args.gene_set_name]))
@@ -406,6 +409,12 @@ def annotate_genes(mt, args):
     if args.gnomad_gene_metrics is not None:
         pLI_count = mt.aggregate_rows(hl.agg.counter(mt.high_pLI))
         logging.info(f"Number of variants in high pLI genes (>0.9): {pLI_count}")
+
+        test = mt.filter_rows(mt.LOF == True)
+        test = test.filter_rows(test.gene.contains("INTS6"))
+        test.pLI.show()
+        test.high_pLI.show()
+        test.gene.show()
 
     return mt
 
