@@ -55,59 +55,80 @@ def count_case_control_carriers(mt, args):
     :param args: arguments for pheno column, etc
     :return: returns annotated matrix table
     """
-    ############################################################
-    # Get count of samples that are cases and controls, report #
-    ############################################################
-    logging.info("Annotating het and hom var carrier counts in controls to variants.")
+    temp_filename = args.output_stem + "_carriers_annotated_tmp.mt"
+    qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
+    exists = subprocess.call(qstat_cmd)
 
-    case_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == True))
-    control_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == False))
-    missing = mt.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt[args.pheno_col])))
+    if exists == 0:
+        logging.info(f"Detected file with carriers annotated exists: {temp_filename}. Loading this file.")
+        mt = hl.read_matrix_table(temp_filename)
 
-    logging.info(f"Number of controls in dataset: {control_count}")
-    logging.info(f"Number of cases in dataset: {case_count}")
-    logging.info(f"Samples missing case/control information: {missing}")
-    if missing > 0:
-        logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
+        case_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == True))
+        control_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == False))
+        missing = mt.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt[args.pheno_col])))
 
-    ##################################################
-    # Annotate control/case het count + homvar count #
-    ##################################################
-    mt = mt.annotate_rows(control_het_count=
-                          hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]),
-                                        hl.agg.count_where(mt.GT.is_het())))
-    mt = mt.annotate_rows(control_homvar_count=
-                          hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]),
-                                        hl.agg.count_where(mt.GT.is_hom_var())))
-    mt = mt.annotate_rows(case_het_count=
-                          hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]),
-                                        hl.agg.count_where(mt.GT.is_het())))
-    mt = mt.annotate_rows(case_homvar_count=
-                          hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]),
-                                        hl.agg.count_where(mt.GT.is_hom_var())))
+        logging.info(f"Number of controls in dataset: {control_count}")
+        logging.info(f"Number of cases in dataset: {case_count}")
+        logging.info(f"Samples missing case/control information: {missing}")
+        if missing > 0:
+            logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
+    else:
 
-    ################################################################################
-    # Count control homvar females and het males for hemizygous mutations on X chr #
-    ################################################################################
-    mt = mt.annotate_rows(control_homvar_count_female=
-                          hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]) &
-                                        (mt[args.female_col] == True) & hl.is_defined(mt[args.female_col]),
-                                        hl.agg.count_where(mt.GT.is_hom_var())))
+        ############################################################
+        # Get count of samples that are cases and controls, report #
+        ############################################################
+        logging.info("Annotating het and hom var carrier counts in controls to variants.")
 
-    mt = mt.annotate_rows(control_het_count_male=
-                          hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]) &
-                                        (mt[args.female_col] == False) & hl.is_defined(mt[args.female_col]),
-                                        hl.agg.count_where(mt.GT.is_het())))
+        case_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == True))
+        control_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == False))
+        missing = mt.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt[args.pheno_col])))
 
-    mt = mt.annotate_rows(case_homvar_count_female=
-                          hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]) &
-                                        (mt[args.female_col] == True) & hl.is_defined(mt[args.female_col]),
-                                        hl.agg.count_where(mt.GT.is_hom_var())))
+        logging.info(f"Number of controls in dataset: {control_count}")
+        logging.info(f"Number of cases in dataset: {case_count}")
+        logging.info(f"Samples missing case/control information: {missing}")
+        if missing > 0:
+            logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
 
-    mt = mt.annotate_rows(case_het_count_male=
-                          hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]) &
-                                        (mt[args.female_col] == False) & hl.is_defined(mt[args.female_col]),
-                                        hl.agg.count_where(mt.GT.is_het())))
+        ##################################################
+        # Annotate control/case het count + homvar count #
+        ##################################################
+        mt = mt.annotate_rows(control_het_count=
+                              hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]),
+                                            hl.agg.count_where(mt.GT.is_het())))
+        mt = mt.annotate_rows(control_homvar_count=
+                              hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]),
+                                            hl.agg.count_where(mt.GT.is_hom_var())))
+        mt = mt.annotate_rows(case_het_count=
+                              hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]),
+                                            hl.agg.count_where(mt.GT.is_het())))
+        mt = mt.annotate_rows(case_homvar_count=
+                              hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]),
+                                            hl.agg.count_where(mt.GT.is_hom_var())))
+
+        ################################################################################
+        # Count control homvar females and het males for hemizygous mutations on X chr #
+        ################################################################################
+        mt = mt.annotate_rows(control_homvar_count_female=
+                              hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]) &
+                                            (mt[args.female_col] == True) & hl.is_defined(mt[args.female_col]),
+                                            hl.agg.count_where(mt.GT.is_hom_var())))
+
+        mt = mt.annotate_rows(control_het_count_male=
+                              hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]) &
+                                            (mt[args.female_col] == False) & hl.is_defined(mt[args.female_col]),
+                                            hl.agg.count_where(mt.GT.is_het())))
+
+        mt = mt.annotate_rows(case_homvar_count_female=
+                              hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]) &
+                                            (mt[args.female_col] == True) & hl.is_defined(mt[args.female_col]),
+                                            hl.agg.count_where(mt.GT.is_hom_var())))
+
+        mt = mt.annotate_rows(case_het_count_male=
+                              hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]) &
+                                            (mt[args.female_col] == False) & hl.is_defined(mt[args.female_col]),
+                                            hl.agg.count_where(mt.GT.is_het())))
+
+        mt = mt.checkpoint(temp_filename, overwrite=True)
 
     return mt
 
@@ -119,26 +140,35 @@ def annotate_variants(mt, args):
     :param args: arguments for cadd, mpc, and gnomad hail table locations
     :return: returns annotated matrix table
     """
-    logging.info("Annotating matrix table with CADD, MPC and Gnomad.")
+    temp_filename = args.output_stem + "_annotation_tmp.mt"  #TODO rename this later to something more semantic
+    qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
+    exists = subprocess.call(qstat_cmd)
 
-    h.add_preemptibles(args.cluster_name, args.num_preemptibles)
+    if exists == 0:
+        logging.info(f"Detected that matrix table annotated with CADD, MPC and Gnomad exist: {temp_filename}. "
+                     f"Loading this.")
+        mt = hl.read_matrix_table(temp_filename)
+    else:
+        logging.info("Annotating matrix table with CADD, MPC and Gnomad.")
 
-    #####################################
-    # Annotate variants with CADD + MPC #
-    #####################################
-    mt = va.annotate_variants_cadd(mt, args.cadd_ht)
-    mt = va.annotate_variants_mpc(mt, args.mpc_ht)
+        h.add_preemptibles(args.cluster_name, args.num_preemptibles)
 
-    #######################################################
-    # Annotate variants with Gnomad population + mismatch #
-    #######################################################
-    mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
-    args.gnomad_idx = mt.gnomad_popmax_index_dict.take(1)[0][args.gnomad_population]
-    mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
+        #####################################
+        # Annotate variants with CADD + MPC #
+        #####################################
+        mt = va.annotate_variants_cadd(mt, args.cadd_ht)
+        mt = va.annotate_variants_mpc(mt, args.mpc_ht)
 
-    mt = mt.checkpoint(args.output_stem + "_annotation_tmp.mt", overwrite=True)
+        #######################################################
+        # Annotate variants with Gnomad population + mismatch #
+        #######################################################
+        mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
+        args.gnomad_idx = mt.gnomad_popmax_index_dict.take(1)[0][args.gnomad_population]
+        mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
 
-    h.remove_preemptibles(args.cluster_name)
+        mt = mt.checkpoint(temp_filename, overwrite=True)
+
+        h.remove_preemptibles(args.cluster_name)
 
     return mt
 
