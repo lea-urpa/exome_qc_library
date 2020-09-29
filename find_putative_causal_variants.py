@@ -150,7 +150,7 @@ def annotate_variants(mt, args):
     :param args: arguments for cadd, mpc, and gnomad hail table locations
     :return: returns annotated matrix table
     """
-    temp_filename = args.output_stem + "_annotation_tmp.mt"  #TODO rename this later to something more semantic
+    temp_filename = args.output_stem + "_cadd_mpc_gnomad_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
     if exists == 0 and (args.force == False):
