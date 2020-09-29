@@ -10,6 +10,20 @@ import subprocess
 import hail as hl
 
 
+def check_if_object_exists(filename):
+    """
+    Check if named file exists, adding needed slash if .ht or .mt object
+    :param filename:
+    :return:
+    """
+    if filename.endswith(".mt") or filename.endswith(".ht"):
+        filename = filename + "/"
+    qstat_cmd = ['gsutil', '-q', 'stat', filename]
+    exists = subprocess.call(qstat_cmd)
+
+    return exists
+
+
 def remove_monomorphic(mt, args):
     """
     Takes matrix table and counts the number of non-reference genotypes per variant, removes variants with non-ref GT
@@ -19,8 +33,7 @@ def remove_monomorphic(mt, args):
     :return: returns filtered matrix table
     """
     filename = args.output_stem + "_non_monomorphic_tmp.mt"
-    qstat_cmd = ['gsutil', '-q', 'stat', filename]
-    exists = subprocess.call(qstat_cmd)
+    exists = check_if_object_exists(filename)
 
     if exists == 0:
         logging.info(f"Detected file with monomorphic variants filtered out: {filename}. Loading this file.")
@@ -51,8 +64,7 @@ def count_case_control_carriers(mt, args):
     :return: returns annotated matrix table
     """
     temp_filename = args.output_stem + "_carriers_annotated_tmp.mt"
-    qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
-    exists = subprocess.call(qstat_cmd)
+    exists = check_if_object_exists(temp_filename)
 
     if exists == 0:
         logging.info(f"Detected file with carriers annotated exists: {temp_filename}. Loading this file.")
@@ -136,8 +148,7 @@ def annotate_variants(mt, args):
     :return: returns annotated matrix table
     """
     temp_filename = args.output_stem + "_annotation_tmp.mt"  #TODO rename this later to something more semantic
-    qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
-    exists = subprocess.call(qstat_cmd)
+    exists = check_if_object_exists(temp_filename)
 
     if exists == 0:
         logging.info(f"Detected that matrix table annotated with CADD, MPC and Gnomad exist: {temp_filename}. "
@@ -177,9 +188,8 @@ def annotate_population_thresholds(mt, args):
     :param args: arguments giving max allowed carrier counts, max allele frequencies, and gnomad population index
     :return: returns annotated matrix table
     """
-    temp_filename = args.output_stem + "_annotation_tmp2.mt"
-    qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
-    exists = subprocess.call(qstat_cmd)
+    temp_filename = args.output_stem + "_annotation_tmp2.mt"  #TODO make better name for this
+    exists = check_if_object_exists(temp_filename)
 
     if exists == 0:
         logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {temp_filename}. "
@@ -301,8 +311,7 @@ def annotate_genes(mt, args):
     and column of allelic requirement strings.
     """
     temp_filename = args.output_stem + "_genes_annotated.mt"
-    qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
-    exists = subprocess.call(qstat_cmd)
+    exists = check_if_object_exists(temp_filename)
 
     if exists == 0:
         logging.info(f"Detected matrix table with gene information annotated exists: {temp_filename}. Loading this.")
