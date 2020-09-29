@@ -300,7 +300,7 @@ def annotate_genes(mt, args):
     :return: Returns matrix table with rows annotated with T/F column of whether variant in gene set of interest,
     and column of allelic requirement strings.
     """
-    temp_filename = args.output_stem + "_annotation_tmp3.mt"
+    temp_filename = args.output_stem + "_genes_annotated.mt"
     qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
     exists = subprocess.call(qstat_cmd)
 
