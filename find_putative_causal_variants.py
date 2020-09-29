@@ -40,6 +40,7 @@ def remove_monomorphic(mt, args):
         mt = hl.read_matrix_table(filename)
         args.start_count = mt.count_rows()
         logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count}")
+        args.force = True
     else:
         start0_count = mt.count_rows()
         logging.info(f"Starting number of variants: {start0_count}")
@@ -51,6 +52,7 @@ def remove_monomorphic(mt, args):
         args.start_count = mt.count_rows()
         logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count} "
                      f"({round(args.start_count / start0_count * 100, 2)}% of all variants)")
+        args.force = False
 
     return mt
 
@@ -66,7 +68,7 @@ def count_case_control_carriers(mt, args):
     temp_filename = args.output_stem + "_carriers_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
-    if exists == 0:
+    if exists == 0 and (args.force is False):
         logging.info(f"Detected file with carriers annotated exists: {temp_filename}. Loading this file.")
         mt = hl.read_matrix_table(temp_filename)
 
@@ -79,6 +81,8 @@ def count_case_control_carriers(mt, args):
         logging.info(f"Samples missing case/control information: {missing}")
         if missing > 0:
             logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
+
+        args.force = True
     else:
         h.add_preemptibles(args.cluster_name, args.num_preemptibles)
         ############################################################
@@ -150,10 +154,11 @@ def annotate_variants(mt, args):
     temp_filename = args.output_stem + "_annotation_tmp.mt"  #TODO rename this later to something more semantic
     exists = check_if_object_exists(temp_filename)
 
-    if exists == 0:
+    if exists == 0 and (args.force == False):
         logging.info(f"Detected that matrix table annotated with CADD, MPC and Gnomad exist: {temp_filename}. "
                      f"Loading this.")
         mt = hl.read_matrix_table(temp_filename)
+        args.force = True
     else:
         logging.info("Annotating matrix table with CADD, MPC and Gnomad.")
 
@@ -188,12 +193,13 @@ def annotate_population_thresholds(mt, args):
     :param args: arguments giving max allowed carrier counts, max allele frequencies, and gnomad population index
     :return: returns annotated matrix table
     """
-    temp_filename = args.output_stem + "_annotation_tmp2.mt"  #TODO make better name for this
+    temp_filename = args.output_stem + "_gnomad_control_thresholds_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
-    if exists == 0:
+    if exists == 0 and (args.force == False):
         logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {temp_filename}. "
                      f"Loading this file.")
+        args.force = True
     else:
         logging.info("Annotating with boolean columns for whether variant fulfills population threshold criteria.")
 
@@ -313,9 +319,10 @@ def annotate_genes(mt, args):
     temp_filename = args.output_stem + "_genes_annotated.mt"
     exists = check_if_object_exists(temp_filename)
 
-    if exists == 0:
+    if exists == 0 and (args.force == False):
         logging.info(f"Detected matrix table with gene information annotated exists: {temp_filename}. Loading this.")
         mt = hl.read_matrix_table(temp_filename)
+        args.force = True
 
     else:
         ###########################################################################
