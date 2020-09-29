@@ -40,7 +40,7 @@ def remove_monomorphic(mt, args):
         mt = hl.read_matrix_table(filename)
         args.start_count = mt.count_rows()
         logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count}")
-        args.force = True
+        args.force = False
     else:
         start0_count = mt.count_rows()
         logging.info(f"Starting number of variants: {start0_count}")
@@ -52,7 +52,7 @@ def remove_monomorphic(mt, args):
         args.start_count = mt.count_rows()
         logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count} "
                      f"({round(args.start_count / start0_count * 100, 2)}% of all variants)")
-        args.force = False
+        args.force = True
 
     return mt
 
@@ -81,9 +81,8 @@ def count_case_control_carriers(mt, args):
         logging.info(f"Samples missing case/control information: {missing}")
         if missing > 0:
             logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
-
-        args.force = True
     else:
+        args.force = True
         h.add_preemptibles(args.cluster_name, args.num_preemptibles)
         ############################################################
         # Get count of samples that are cases and controls, report #
@@ -158,8 +157,8 @@ def annotate_variants(mt, args):
         logging.info(f"Detected that matrix table annotated with CADD, MPC and Gnomad exist: {temp_filename}. "
                      f"Loading this.")
         mt = hl.read_matrix_table(temp_filename)
-        args.force = True
     else:
+        args.force = True
         logging.info("Annotating matrix table with CADD, MPC and Gnomad.")
 
         h.add_preemptibles(args.cluster_name, args.num_preemptibles)
@@ -199,8 +198,8 @@ def annotate_population_thresholds(mt, args):
     if exists == 0 and (args.force == False):
         logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {temp_filename}. "
                      f"Loading this file.")
-        args.force = True
     else:
+        args.force = True
         logging.info("Annotating with boolean columns for whether variant fulfills population threshold criteria.")
 
         ############################
@@ -322,9 +321,9 @@ def annotate_genes(mt, args):
     if exists == 0 and (args.force == False):
         logging.info(f"Detected matrix table with gene information annotated exists: {temp_filename}. Loading this.")
         mt = hl.read_matrix_table(temp_filename)
-        args.force = True
 
     else:
+        args.force = True
         ###########################################################################
         # Pull MT rows, select only locus, alleles, and gene, checkpoint, explode #
         ###########################################################################
