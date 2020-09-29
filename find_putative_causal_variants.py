@@ -28,8 +28,6 @@ def remove_monomorphic(mt, args):
         args.start_count = mt.count_rows()
         logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count}")
     else:
-        h.add_preemptibles(args.cluster_name, args.num_preemptibles)
-
         start0_count = mt.count_rows()
         logging.info(f"Starting number of variants: {start0_count}")
         mt = mt.annotate_rows(non_ref_gt_count=hl.agg.count_where(mt.GT.is_non_ref()))
@@ -40,9 +38,6 @@ def remove_monomorphic(mt, args):
         args.start_count = mt.count_rows()
         logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count} "
                      f"({round(args.start_count / start0_count * 100, 2)}% of all variants)")
-
-        h.remove_preemptibles(args.cluster_name)
-
 
     return mt
 
@@ -73,7 +68,7 @@ def count_case_control_carriers(mt, args):
         if missing > 0:
             logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
     else:
-
+        h.add_preemptibles(args.cluster_name, args.num_preemptibles)
         ############################################################
         # Get count of samples that are cases and controls, report #
         ############################################################
@@ -182,93 +177,101 @@ def annotate_population_thresholds(mt, args):
     :param args: arguments giving max allowed carrier counts, max allele frequencies, and gnomad population index
     :return: returns annotated matrix table
     """
-    logging.info("Annotating with boolean columns for whether variant fulfills population threshold criteria.")
+    temp_filename = args.output_stem + "_annotation_tmp2.mt"
+    qstat_cmd = ['gsutil', '-q', 'stat', temp_filename]
+    exists = subprocess.call(qstat_cmd)
 
-    ############################
-    # Pull rows and checkpoint #
-    ############################
-    rows = mt.rows()
-    rows = rows.checkpoint(args.output_stem + "_rows_tmp.ht", overwrite=True)
+    if exists == 0:
+        logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {temp_filename}. "
+                     f"Loading this file.")
+    else:
+        logging.info("Annotating with boolean columns for whether variant fulfills population threshold criteria.")
 
-    ####################################################
-    # Annotate whether variant dominant rare in gnomad #
-    ####################################################
-    rows = rows.annotate(dominant_rare_gnomad=hl.cond(
-        # If gnomad data is good,
-        (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
-        (rows.gnomad_mismatch == False),
-        # Ask whether the gnomad AC is small and there are no homozygotes
-        hl.cond(
-            (rows.gnomad_popmax[args.gnomad_idx].AC <= args.max_allowed_carrier_dominant) &
-            (rows.gnomad_popmax[args.gnomad_idx].homozygote_count == 0),
-            True, False),
-        # else return None
-        hl.null(hl.tbool)))
+        ############################
+        # Pull rows and checkpoint #
+        ############################
+        rows = mt.rows()
+        rows = rows.checkpoint(args.output_stem + "_rows_tmp.ht", overwrite=True)
 
-    #####################################################
-    # Annotate whether variant recessive rare in gnomad #
-    #####################################################
-    rows = rows.annotate(recessive_rare_gnomad=hl.cond(
-        (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
-        (rows.gnomad_mismatch == False),
-        hl.cond(
-            (rows.gnomad_popmax[args.gnomad_idx].homozygote_count <= args.max_allowed_homozygotes_recessive)
-            & (rows.gnomad_popmax[args.gnomad_idx].AF <= args.gnomad_AF_cutoff_recessive),
-            True, False),
-        hl.null(hl.tbool)))
+        ####################################################
+        # Annotate whether variant dominant rare in gnomad #
+        ####################################################
+        rows = rows.annotate(dominant_rare_gnomad=hl.cond(
+            # If gnomad data is good,
+            (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
+            (rows.gnomad_mismatch == False),
+            # Ask whether the gnomad AC is small and there are no homozygotes
+            hl.cond(
+                (rows.gnomad_popmax[args.gnomad_idx].AC <= args.max_allowed_carrier_dominant) &
+                (rows.gnomad_popmax[args.gnomad_idx].homozygote_count == 0),
+                True, False),
+            # else return None
+            hl.null(hl.tbool)))
 
-    ###################################################################################################################
-    # Find which population is the max for each variant, find index of males and females for that population in freqs #
-    ###################################################################################################################
-    rows = rows.annotate(popmax_population=rows.gnomad_popmax[args.gnomad_idx].pop)
-    rows = rows.annotate(popmax_female_index=
-                          rows.gnomad_freq_index_dict[args.gnomad_population + "_" + rows.popmax_population + "_female"])
-    rows = rows.annotate(popmax_male_index=
-                          rows.gnomad_freq_index_dict[args.gnomad_population + "_" + rows.popmax_population + "_male"])
+        #####################################################
+        # Annotate whether variant recessive rare in gnomad #
+        #####################################################
+        rows = rows.annotate(recessive_rare_gnomad=hl.cond(
+            (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
+            (rows.gnomad_mismatch == False),
+            hl.cond(
+                (rows.gnomad_popmax[args.gnomad_idx].homozygote_count <= args.max_allowed_homozygotes_recessive)
+                & (rows.gnomad_popmax[args.gnomad_idx].AF <= args.gnomad_AF_cutoff_recessive),
+                True, False),
+            hl.null(hl.tbool)))
 
-    ######################################################
-    # Annotate whether variant hemizygous rare in gnomad #
-    ######################################################
-    rows = rows.annotate(hemizygous_rare_gnomad=hl.cond(
-        (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
-        (rows.gnomad_mismatch == False) & (rows.locus.contig == 'chrX'),
-        hl.cond(
-            (rows.gnomad_freq[rows.popmax_male_index].AC <= args.max_allowed_carrier_dominant) &
-            (rows.gnomad_freq[rows.popmax_female_index].homozygote_count <= args.max_allowed_homozygotes_recessive) &
-            (rows.gnomad_popmax[args.gnomad_idx].AF <= args.gnomad_AF_cutoff_recessive),
-            True, False),
-        hl.null(hl.tbool)
-    ))
+        ###################################################################################################################
+        # Find which population is the max for each variant, find index of males and females for that population in freqs #
+        ###################################################################################################################
+        rows = rows.annotate(popmax_population=rows.gnomad_popmax[args.gnomad_idx].pop)
+        rows = rows.annotate(popmax_female_index=
+                              rows.gnomad_freq_index_dict[args.gnomad_population + "_" + rows.popmax_population + "_female"])
+        rows = rows.annotate(popmax_male_index=
+                              rows.gnomad_freq_index_dict[args.gnomad_population + "_" + rows.popmax_population + "_male"])
 
-    ######################################################################################
-    # Annotate whether variant dominant/recessive/hemizygous rare in controls in dataset #
-    ######################################################################################
-    rows = rows.annotate(dominant_rare_controls=hl.cond(
-        (rows.control_het_count <= args.max_allowed_carrier_dominant) &
-        (rows.control_homvar_count == 0),
-        True, False))
+        ######################################################
+        # Annotate whether variant hemizygous rare in gnomad #
+        ######################################################
+        rows = rows.annotate(hemizygous_rare_gnomad=hl.cond(
+            (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
+            (rows.gnomad_mismatch == False) & (rows.locus.contig == 'chrX'),
+            hl.cond(
+                (rows.gnomad_freq[rows.popmax_male_index].AC <= args.max_allowed_carrier_dominant) &
+                (rows.gnomad_freq[rows.popmax_female_index].homozygote_count <= args.max_allowed_homozygotes_recessive) &
+                (rows.gnomad_popmax[args.gnomad_idx].AF <= args.gnomad_AF_cutoff_recessive),
+                True, False),
+            hl.null(hl.tbool)
+        ))
 
-    rows = rows.annotate(recessive_rare_controls=hl.cond(
-        (rows.control_homvar_count <= args.max_allowed_homozygotes_recessive),
-        True, False))
+        ######################################################################################
+        # Annotate whether variant dominant/recessive/hemizygous rare in controls in dataset #
+        ######################################################################################
+        rows = rows.annotate(dominant_rare_controls=hl.cond(
+            (rows.control_het_count <= args.max_allowed_carrier_dominant) &
+            (rows.control_homvar_count == 0),
+            True, False))
 
-    rows = rows.annotate(hemizygous_rare_controls=hl.cond(
-        (rows.locus.contig == 'chrX') &
-        (rows.control_homvar_count_female <= args.max_allowed_homozygotes_recessive) &
-        (rows.control_het_count_male <= args.max_allowed_carrier_dominant),
-        True, False))
+        rows = rows.annotate(recessive_rare_controls=hl.cond(
+            (rows.control_homvar_count <= args.max_allowed_homozygotes_recessive),
+            True, False))
 
-    #####################################################
-    # Annotate matrix table rows from 'rows' hail table #
-    #####################################################
-    mt = mt.annotate_rows(dominant_rare_gnomad=rows[mt.locus, mt.alleles].dominant_rare_gnomad,
-                          recessive_rare_gnomad=rows[mt.locus, mt.alleles].recessive_rare_gnomad,
-                          hemizygous_rare_gnomad=rows[mt.locus, mt.alleles].hemizygous_rare_gnomad,
-                          dominant_rare_controls=rows[mt.locus, mt.alleles].dominant_rare_controls,
-                          recessive_rare_controls=rows[mt.locus, mt.alleles].recessive_rare_controls,
-                          hemizygous_rare_controls=rows[mt.locus, mt.alleles].hemizygous_rare_controls)
+        rows = rows.annotate(hemizygous_rare_controls=hl.cond(
+            (rows.locus.contig == 'chrX') &
+            (rows.control_homvar_count_female <= args.max_allowed_homozygotes_recessive) &
+            (rows.control_het_count_male <= args.max_allowed_carrier_dominant),
+            True, False))
 
-    mt = mt.checkpoint(args.output_stem + "_annotation_tmp2.mt", overwrite=True)
+        #####################################################
+        # Annotate matrix table rows from 'rows' hail table #
+        #####################################################
+        mt = mt.annotate_rows(dominant_rare_gnomad=rows[mt.locus, mt.alleles].dominant_rare_gnomad,
+                              recessive_rare_gnomad=rows[mt.locus, mt.alleles].recessive_rare_gnomad,
+                              hemizygous_rare_gnomad=rows[mt.locus, mt.alleles].hemizygous_rare_gnomad,
+                              dominant_rare_controls=rows[mt.locus, mt.alleles].dominant_rare_controls,
+                              recessive_rare_controls=rows[mt.locus, mt.alleles].recessive_rare_controls,
+                              hemizygous_rare_controls=rows[mt.locus, mt.alleles].hemizygous_rare_controls)
+
+        mt = mt.checkpoint(temp_filename, overwrite=True)
 
     dominant_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.dominant_rare_gnomad))
     recessive_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.recessive_rare_gnomad))
@@ -754,6 +757,7 @@ if __name__ == "__main__":
     ########################################################
     # Read in matrix table and remove monomorphic variants #
     ########################################################
+    h.add_preemptibles(args.cluster_name, args.num_preemptibles)
     full_mt = hl.read_matrix_table(args.mt)
     var_mt = remove_monomorphic(full_mt, args)
 
@@ -763,13 +767,16 @@ if __name__ == "__main__":
     var_mt = count_case_control_carriers(var_mt, args)
     var_mt = annotate_variants(var_mt, args)
     var_mt = annotate_population_thresholds(var_mt, args)
-    var_mt = annotate_genes(var_mt, args)
+    h.remove_preemptibles(args.cluster_name)
+    var_mt = annotate_genes(var_mt, args)  # Triggers shuffles
 
     ##########################################
     # Run analysis to find putative variants #
     ##########################################
+    h.add_preemptibles(args.cluster_name, args.num_preemptibles)
     variants = find_putative_causal_variants(var_mt, args)
-    annotate_denovos(variants, args)
+    h.remove_preemptibles(args.cluster_name)
+    annotate_denovos(variants, args)   # Triggers shuffles
 
     ###########################
     # Copy logs and shut down #
