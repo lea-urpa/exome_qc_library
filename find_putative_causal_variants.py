@@ -198,6 +198,7 @@ def annotate_population_thresholds(mt, args):
     if (exists == 0) and (args.force == False):
         logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {temp_filename}. "
                      f"Loading this file.")
+        mt = hl.read_matrix_table(temp_filename)
     else:
         args.force = True
         logging.info("Annotating with boolean columns for whether variant fulfills population threshold criteria.")
