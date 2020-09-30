@@ -577,9 +577,6 @@ def find_putative_causal_variants(mt, args):
                               hl.agg.collect(mt.s)))
 
     mt = mt.annotate_rows(hemizygous_carriers=hl.flatten([mt.het_male_carriers, mt.homvar_female_carriers]))
-    #mt = mt.annotate_rows(genotype_filters=hl.agg.collect_as_set(hl.struct(
-    #    id=mt.s, final_failing_depth_quality=mt.final_failing_depth_quality, final_failing_ab=mt.final_failing_ab)))
-
     mt.write(args.output_stem + "_putative_causal_final.mt", overwrite=True)
 
     rows = mt.rows()
@@ -587,10 +584,10 @@ def find_putative_causal_variants(mt, args):
     counter = rows.aggregate(hl.agg.counter(hl.len(rows.putative_causal)))
     logging.info(f"Counter of number of putative causal annotations per variant: {counter}")
 
-    return rows
+    return rows, mt
 
 
-def annotate_denovos(rows, args):
+def annotate_denovos_genotypes(rows, mt, args):
 
     #############################################################################################
     # Pull dominant, recessive and hemizgous to separate tables, explode by appropriate carrier #
@@ -636,6 +633,22 @@ def annotate_denovos(rows, args):
 
     if args.de_novo_ht is None:
         causal_vars = causal_vars.annotate(p_de_novo=hl.null(hl.tfloat64), denovo_confidence=hl.null(hl.tstr))
+
+    #####################################################
+    # Annotate with entry information from matrix table #
+    #####################################################
+    entries = mt.entries()
+    causal_vars = causal_vars.key_by()
+    causal_vars = causal_vars.transmute(s=causal_vars.id)
+    causal_vars = causal_vars.key_by('locus', 'alleles', 's')
+
+    causal_vars = causal_vars.annotate(
+    GT=entries[causal_vars.locus, causal_vars.alleles, causal_vars.s].GT,
+    final_failing_depth_quality=entries[causal_vars.locus, causal_vars.alleles, causal_vars.s].final_failing_depth_quality,
+    final_failing_ab=entries[causal_vars.locus, causal_vars.alleles, causal_vars.s].final_failing_ab,
+    AD=entries[causal_vars.locus, causal_vars.alleles, causal_vars.s].AD,
+    DP=entries[causal_vars.locus, causal_vars.alleles, causal_vars.s].DP,
+    GQ=entries[causal_vars.locus, causal_vars.alleles, causal_vars.s].GQ)
 
     ##############################
     # Annotate evidence category #
@@ -794,9 +807,9 @@ if __name__ == "__main__":
     # Run analysis to find putative variants #
     ##########################################
     h.add_preemptibles(args.cluster_name, args.num_preemptibles)
-    variants = find_putative_causal_variants(var_mt, args)
+    variants, filt_mt = find_putative_causal_variants(var_mt, args)
     h.remove_preemptibles(args.cluster_name)
-    annotate_denovos(variants, args)   # Triggers shuffles
+    annotate_denovos_genotypes(variants, filt_mt, args)   # Triggers shuffles
 
     ###########################
     # Copy logs and shut down #
