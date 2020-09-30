@@ -351,8 +351,8 @@ def annotate_genes(mt, args):
             ######################################################
             # Annotate inheritance based on allelic requirements #
             ######################################################
-            dominant_terms = ['biallelic', 'uncertain', 'digenic']
-            recessive_terms = ['monoallelic', 'imprinted', 'x-linked dominant', 'x-linked over-dominance', 'uncertain',
+            recessive_terms = ['biallelic', 'uncertain', 'digenic']
+            dominant_terms = ['monoallelic', 'imprinted', 'x-linked dominant', 'x-linked over-dominance', 'uncertain',
                                'digenic', 'mosaic']
             allelic_req = allelic_req.annotate(inheritance=hl.case()
                                    .when(hl.array(dominant_terms).contains(allelic_req.allelic_requirement), 'dominant')
