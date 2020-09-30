@@ -576,8 +576,8 @@ def find_putative_causal_variants(mt, args):
                               hl.agg.collect(mt.s)))
 
     mt = mt.annotate_rows(hemizygous_carriers=hl.flatten([mt.het_male_carriers, mt.homvar_female_carriers]))
-    mt = mt.annotate_rows(genotype_filters=hl.agg.collect_as_set(hl.struct(
-        id=mt.s, final_failing_depth_quality=mt.final_failing_depth_quality, final_failing_ab=mt.final_failing_ab)))
+    #mt = mt.annotate_rows(genotype_filters=hl.agg.collect_as_set(hl.struct(
+    #    id=mt.s, final_failing_depth_quality=mt.final_failing_depth_quality, final_failing_ab=mt.final_failing_ab)))
 
     mt.write(args.output_stem + "_putative_causal_final.mt", overwrite=True)
 
