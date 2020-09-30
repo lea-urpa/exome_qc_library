@@ -346,7 +346,7 @@ def annotate_genes(mt, args):
             ##################################################################################
             genes = genes.annotate(**gene_table[genes.gene])
 
-            genes = genes.annotate(allelic_requirement=genes[args.allelic_requirement_col].split(","))
+            genes = genes.annotate(allelic_requirement=genes[args.allelic_requirement_col].strip().split(","))
             allelic_req = genes.explode(genes.allelic_requirement)
 
             ######################################################
