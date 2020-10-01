@@ -690,7 +690,7 @@ def annotate_denovos_genotypes(rows, mt, args):
     ###########################
     # Export table + tsv file #
     ###########################
-    causal_vars.write(args.output_dir + "_causal_vars_table_final.ht", overwrite=True)
+    causal_vars.write(args.output_stem + "_causal_vars_table_final.ht", overwrite=True)
 
     # Pull out relevant gnomad population information, drop large structs, and flatten
     causal_vars = causal_vars.annotate(
