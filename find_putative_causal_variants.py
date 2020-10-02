@@ -32,6 +32,7 @@ def remove_monomorphic(mt, args):
     :param args: arguments for checkpoint output location and name
     :return: returns filtered matrix table
     """
+    # TODO change output to depend on initial input name, but in output directory
     filename = args.output_stem + "_non_monomorphic_tmp.mt"
     exists = check_if_object_exists(filename)
 
@@ -54,6 +55,9 @@ def remove_monomorphic(mt, args):
                      f"({round(args.start_count / start0_count * 100, 2)}% of all variants)")
         args.force = True
 
+
+    # TODO add export of column info, if it doesn't already exists
+
     return mt
 
 
@@ -65,6 +69,7 @@ def count_case_control_carriers(mt, args):
     :param args: arguments for pheno column, etc
     :return: returns annotated matrix table
     """
+    # TODO change output to depend on initial input name, but in output directory
     temp_filename = args.output_stem + "_carriers_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
@@ -150,6 +155,7 @@ def annotate_variants(mt, args):
     :param args: arguments for cadd, mpc, and gnomad hail table locations
     :return: returns annotated matrix table
     """
+    # TODO change output to depend on initial input name, but in output directory
     temp_filename = args.output_stem + "_cadd_mpc_gnomad_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
@@ -192,6 +198,7 @@ def annotate_population_thresholds(mt, args):
     :param args: arguments giving max allowed carrier counts, max allele frequencies, and gnomad population index
     :return: returns annotated matrix table
     """
+    # TODO change output to depend on initial input name, but in output directory
     temp_filename = args.output_stem + "_gnomad_control_thresholds_annotated_tmp.mt"
     exists = check_if_object_exists(temp_filename)
 
@@ -316,6 +323,7 @@ def annotate_genes(mt, args):
     :return: Returns matrix table with rows annotated with T/F column of whether variant in gene set of interest,
     and column of allelic requirement strings.
     """
+    # TODO change it to run high pLI genes only if a gene list is NOT given, not in addition
     temp_filename = args.output_stem + "_genes_annotated.mt"
     exists = check_if_object_exists(temp_filename)
 
