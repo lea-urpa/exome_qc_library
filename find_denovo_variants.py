@@ -7,7 +7,6 @@ import time
 import logging
 import sys
 from collections import OrderedDict
-import utils
 
 
 def validate_pedigree(fam, kin, args):
@@ -206,12 +205,13 @@ if __name__ == "__main__":
     parser.add_argument("--num_2nd_workers", type=int, default=20, help="Number of secondary workers to add")
     args = parser.parse_args()
 
-    scripts = ["variant_annotation.py", "helper_scripts.py"]
+    scripts = ["variant_annotation.py", "helper_scripts.py", "utils.py"]
     for script in scripts:
         hl.spark_context().addPyFile(os.path.join(args.scripts_dir, script))
 
     import variant_annotation as va
     import helper_scripts as h
+    import utils
 
     args.output_stem = os.path.join(args.output_dir, args.output_name)
     args.force = False
