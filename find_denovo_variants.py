@@ -136,9 +136,10 @@ def get_denovos(fam, mt, args):
     # First of all, use prior AF if it exists in Gnomad
     logging.info(f"Population for population allele frequency prior, from Gnomad: {args.gnomad_population}")
     mt = mt.annotate_rows(denovo_prior=hl.cond(
-        (hl.len(mt.gnomad_filters) == 0) &
-        hl.is_defined(mt.gnomad_freq[mt.gnomad_freq_index_dict[args.gnomad_population]]),
+        (hl.len(mt.gnomad_filters) == 0) & hl.is_defined(mt.gnomad_freq),
         mt.gnomad_freq[mt.gnomad_freq_index_dict[args.gnomad_population]].AF, 0))
+
+    mt = mt.annotate_rows(denovo_prior=hl.or_else(mt.denovo_prior, 0)) # why is this necessary? cond above should work
 
     check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
     logging.info(f"Missing AFs after adding gnomad AFs: {check}")
