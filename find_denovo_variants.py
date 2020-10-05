@@ -74,8 +74,7 @@ def validate_pedigree(fam, kin, args):
         exists = utils.check_if_gcloud_object_exists(new_fam)
 
         if exists == 0:
-            logging.info(f"Detected validated fam file exists, loading that: {new_fam}")
-            new_fam = hl.import_table(new_fam)
+            logging.info(f"Detected validated fam file exists, skipping writing new fam file.")
         else:
             # Create key of family ID, MID, PID
             fam_ht = fam_ht.annotate(fid_iid_mid_pid=fam_ht.f0 + ":" + fam_ht.f1 + ":" + fam_ht.f2 + ":" + fam_ht.f3)
