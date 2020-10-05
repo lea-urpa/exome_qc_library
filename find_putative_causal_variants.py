@@ -457,7 +457,7 @@ def find_putative_causal_variants(mt, args):
     rows = rows.annotate(putative_causal=hl.empty_array(hl.tdict(hl.tstr, hl.tstr)))
 
     inheritances = ['dominant', 'recessive', 'hemizygous']
-    gene_sets = [args.gene_set_name, 'high_pLI']
+    gene_sets = [args.gene_set_name]
     consequences = ['LOF', 'missense', 'noncoding']
 
     for consequence in consequences:
@@ -492,14 +492,12 @@ def find_putative_causal_variants(mt, args):
                 ################################
                 # Create boolean for gene sets #
                 ################################
-                if gene_set is args.gene_set_name:
+                if gene_set is 'high_pLI':  # If no gene set given, look for variants in high pLI genes
+                    gene_set_bool = rows.high_pLI == True # variant is high pLI
+                    annotation['gene_set'] = 'high_pLI'
+                else:
                     gene_set_bool = rows[args.gene_set_name] == True  # variant is in gene set
                     annotation['gene_set'] = args.gene_set_name
-                elif gene_set is 'high_pLI':
-                    gene_set_bool = (
-                            (rows.high_pLI == True) &  # variant is high pLI
-                            (rows[args.gene_set_name] == False))  # variant is not in gene set
-                    annotation['gene_set'] = 'high_pLI'
 
                 ###################################
                 # Create boolean for inheritances #
@@ -763,8 +761,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     args.output_stem = os.path.join(args.output_dir, args.output_name)
-    if args.gene_set_name is None:
-        args.gene_set_name = 'no_geneset'
+    if args.disease_genes is None:
+        args.gene_set_name = 'high_pLI'
+
+    if (args.disease_genes is None) and (args.gnomad_gene_metrics is None):
+        logging.error("Error! If not giving disease gene list, gnomad gene metrics to get pLI values must be given.")
+        exit()
+
+    if (args.disease_genes is not None) and (args.gene_set_name is None):
+        logging.error("Error! If giving disease gene list, --gene_set_name must also be given.")
+        exit()
 
     scripts = ["variant_annotation.py", "helper_scripts.py"]
     for script in scripts:
