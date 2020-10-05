@@ -290,6 +290,7 @@ def count_families_kin0(kin0_file, cohorts):
         ###############################################################
         count_families(new_edgelist_name)
 
+
 def count_trios(kin_file, fam_file, cohorts):
 
     if "all" not in cohorts:
@@ -372,3 +373,54 @@ def count_trios(kin_file, fam_file, cohorts):
 
 
 # Arguments and file main goes here
+if __name__ == "__main__":
+    ######################################
+    # Initialize Hail and import scripts #
+    ######################################
+    import os
+    import argparse
+    import hail as hl
+    hl.init()
+
+    parser = argparse.ArgumentParser(description="Parse kinship output from King and write report of errors.")
+    parser.add_argument("--kin_file", type=str, help="King output, .kin file")
+    parser.add_argument("--kin0_file", type=str, help="King output, .kin0 file")
+    parser.add_argument("--fam_file", type=str, help="fam file that went into King relatedness calculation.")
+    parser.add_argument("--cohort_subset_string", type=str,
+                        help="string (or strings, comma separated) to subset kin output")
+    parser.add_argument("--output_dir", type=str, help="Directory to write output.")
+    parser.add_argument("--output_name", type=str, help="Output name, default the kin or kin0 file base name.")
+
+    args = parser.parse_args()
+
+    #####################
+    # Check file inputs #
+    #####################
+    if args.cohort_subset_string is not None:
+        cohorts = args.cohort_subset_string.strip().split(",")
+    else:
+        cohorts = []
+
+    if (args.kin_file is None) and (args.kin0_file is None):
+        print("Error! either kin_file or kin0_file (or both) must be given!")
+        exit()
+
+    if (args.kin_file is not None) and ~(args.kin_file.endswith(".kin")):
+        print("Error! kin_file input does not end with .kin. Are you sure it's king output?")
+
+    if (args.kin0_file is not None) and ~(args.kin_file.endswith(".kin0")):
+        print("Error! kin_file input does not end with .kin. Are you sure it's king output?")
+
+    if args.output_name is None:
+        if args.kin_file is not None:
+            args.output_name = os.path.splitext(os.path.basename(args.kin_file)[0])
+        else:
+            args.output_name = os.path.splitext(os.path.basename(args.kin0_file)[0])
+
+
+    # Parse kin and kin0 errors
+    parse_kin_errors(args.kin_file, cohorts, args)
+    parse_kin0_errors(args.kin0_file, cohorts, args)
+
+    # Count families from kin file
+    count_families_kin(args.kin_file, cohorts)
