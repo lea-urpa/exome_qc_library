@@ -147,17 +147,17 @@ def get_denovos(fam, mt, args):
     zero_count = mt.aggregate_rows(hl.agg.count_where(mt.denovo_prior == 0))
     logging.info(f"de novo prior AFs are equal to 0 (true) or not (false): {zero_count}")
 
-    mt = mt.checkpoint(args.output_stem + "_gnomad_annotated_tmp.mt")
+    mt = mt.checkpoint(args.output_stem + "_gnomad_annotated_tmp.mt", overwrite=True)
 
     #####################################################
     # Get de novo mutations, annotate with variant info #
     #####################################################
     denovos = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior)
-    denovos = denovos.checkpoint(args.output_stem + "_denovos_unannotated_tmp.ht")
+    denovos = denovos.checkpoint(args.output_stem + "_denovos_unannotated_tmp.ht", overwrite=True)
 
     h.remove_preemptibles(args.cluster_name)
     denovos = denovos.key_by(denovos.locus, denovos.alleles)
-    denovos = denovos.checkpoint(args.output_stem + "_rekeyed_tmp.ht")
+    denovos = denovos.checkpoint(args.output_stem + "_rekeyed_tmp.ht", overwrite=True)
     h.add_preemptibles(args.cluster_name, args.num_2nd_workers)
 
     mtrows = mt.rows()
