@@ -7,6 +7,7 @@ import time
 import logging
 import sys
 from collections import OrderedDict
+import utils
 
 
 def validate_pedigree(fam, kin, args):
@@ -20,31 +21,39 @@ def validate_pedigree(fam, kin, args):
     :param args: arguments for output directory
     :return: fam file, same as input if no errors, otherwise the new fam file with offending lines removed.
     """
-    # Import pedigree file from fam as Hail table
-    fam_ht = hl.import_table(fam, no_header=True)
+    kinship_annotated_fam = args.output_stem + "_kinship_annotated_fam.txt"
+    exists = utils.check_if_gcloud_object_exists(kinship_annotated_fam)
 
-    # Collect MID and PID as array, explode so one line with ID1 and FID or MID
-    fam_ht = fam_ht.annotate(parent=[fam_ht.f2, fam_ht.f3])
-    fam_ht = fam_ht.explode('parent')
+    if (exists == 0) and (args.force == False):
+        logging.info(f"Detected kinship annotated fam exists, loading file: {kinship_annotated_fam}")
+        fam_ht = hl.import_table(kinship_annotated_fam, impute=True)
+    else:
+        args.force = True
+        # Import pedigree file from fam as Hail table
+        fam_ht = hl.import_table(fam, no_header=True)
 
-    # Create key to merge with kinship data, explode (IDs may be switched in kinship data)
-    fam_ht = fam_ht.annotate(kinship_key=[fam_ht.f0 + ":" + fam_ht.f1 + ":" + fam_ht.parent,
-                                          fam_ht.f0 + ":" + fam_ht.parent + ":" + fam_ht.f1])
-    fam_ht = fam_ht.explode('kinship_key')
-    fam_ht = fam_ht.key_by('kinship_key')
+        # Collect MID and PID as array, explode so one line with ID1 and FID or MID
+        fam_ht = fam_ht.annotate(parent=[fam_ht.f2, fam_ht.f3])
+        fam_ht = fam_ht.explode('parent')
 
-    # Import King output files
-    kinship = hl.import_table(kin, types={'Kinship': hl.tfloat64, 'IBS0': hl.tfloat64})
-    kinship = kinship.annotate(kinship_key=kinship.FID + ":" + kinship.ID1 + ":" + kinship.ID2)
-    kinship = kinship.key_by('kinship_key')
+        # Create key to merge with kinship data, explode (IDs may be switched in kinship data)
+        fam_ht = fam_ht.annotate(kinship_key=[fam_ht.f0 + ":" + fam_ht.f1 + ":" + fam_ht.parent,
+                                              fam_ht.f0 + ":" + fam_ht.parent + ":" + fam_ht.f1])
+        fam_ht = fam_ht.explode('kinship_key')
+        fam_ht = fam_ht.key_by('kinship_key')
 
-    # Add kinship information to fam ht
-    fam_ht = fam_ht.annotate(Kinship=kinship.index(fam_ht.key).Kinship,
-                             IBS0=kinship.index(fam_ht.key).IBS0)
+        # Import King output files
+        kinship = hl.import_table(kin, types={'Kinship': hl.tfloat64, 'IBS0': hl.tfloat64})
+        kinship = kinship.annotate(kinship_key=kinship.FID + ":" + kinship.ID1 + ":" + kinship.ID2)
+        kinship = kinship.key_by('kinship_key')
 
-    # Export to tsv a file with the relationships and the kinship values side by side
-    logging.info("Exporting kinship-annotated fam file")
-    fam_ht.export(args.output_stem + "_kinship_annotated_fam.txt")
+        # Add kinship information to fam ht
+        fam_ht = fam_ht.annotate(Kinship=kinship.index(fam_ht.key).Kinship,
+                                 IBS0=kinship.index(fam_ht.key).IBS0)
+
+        # Export to tsv a file with the relationships and the kinship values side by side
+        logging.info("Exporting kinship-annotated fam file")
+        fam_ht.export(kinship_annotated_fam)
 
     # Remove rows in fam ht that do not have kinship data
     fam_ht = fam_ht.filter(hl.is_defined(fam_ht.Kinship))
@@ -62,27 +71,35 @@ def validate_pedigree(fam, kin, args):
         # Print offending lines
         logging.info(fam_ht.filter(fam_ht.incorrect_po == True).show(failing_count))
 
-        # Create key of family ID, MID, PID
-        fam_ht = fam_ht.annotate(fid_iid_mid_pid=fam_ht.f0 + ":" + fam_ht.f1 + ":" + fam_ht.f2 + ":" + fam_ht.f3)
-
-        # Collect set of lines in fam ht that are failing kinship checks in either parent
-        failing_fam_lines = fam_ht.aggregate(hl.agg.filter(fam_ht.incorrect_po == True,
-            hl.agg.collect_as_set(fam_ht.fid_iid_mid_pid)))
-
-        # Filter out lines with incorrect PO from fam
-        fam_ht = fam_ht.filter(hl.array(failing_fam_lines).contains(fam_ht.fid_iid_mid_pid), keep=False)
-
-        # Drop extra columns and get unique lines
-        fam_ht = fam_ht.key_by('f0', 'f1')
-        fam_ht = fam_ht.drop('parent', 'kinship_key', 'Kinship', 'IBS0', 'incorrect_po', 'fid_iid_mid_pid')
-        fam_ht = fam_ht.distinct()
-
-        # Write to new fam file
-        count = fam_ht.count()
-        logging.info(f"Number of lines in new fam file, without lines containing PO relationships unsupported by kinship: "
-              f"{count}")
         new_fam = fam.replace(".fam", "") + "_without_failing_PO_trios.fam"
-        fam_ht.export(new_fam)
+        exists = utils.check_if_gcloud_object_exists(new_fam)
+
+        if exists == 0:
+            logging.info(f"Detected validated fam file exists, loading that: {new_fam}")
+            new_fam = hl.import_table(new_fam)
+        else:
+            # Create key of family ID, MID, PID
+            fam_ht = fam_ht.annotate(fid_iid_mid_pid=fam_ht.f0 + ":" + fam_ht.f1 + ":" + fam_ht.f2 + ":" + fam_ht.f3)
+
+            # Collect set of lines in fam ht that are failing kinship checks in either parent
+            failing_fam_lines = fam_ht.aggregate(hl.agg.filter(fam_ht.incorrect_po == True,
+                hl.agg.collect_as_set(fam_ht.fid_iid_mid_pid)))
+
+            # Filter out lines with incorrect PO from fam
+            fam_ht = fam_ht.filter(hl.array(failing_fam_lines).contains(fam_ht.fid_iid_mid_pid), keep=False)
+
+            # Drop extra columns and get unique lines
+            fam_ht = fam_ht.key_by('f0', 'f1')
+            fam_ht = fam_ht.drop('parent', 'kinship_key', 'Kinship', 'IBS0', 'incorrect_po', 'fid_iid_mid_pid')
+            fam_ht = fam_ht.distinct()
+
+            # Write to new fam file
+            count = fam_ht.count()
+            logging.info(f"Number of lines in new fam file, without lines containing PO relationships unsupported by kinship: "
+                  f"{count}")
+
+            fam_ht.export(new_fam)
+
         fam = new_fam
 
     return fam
@@ -218,6 +235,7 @@ if __name__ == "__main__":
     import helper_scripts as h
 
     args.output_stem = os.path.join(args.output_dir, args.output_name)
+    args.force = False
 
     ####################
     # Configure logger #
