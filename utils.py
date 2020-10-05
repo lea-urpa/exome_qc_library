@@ -5,6 +5,22 @@ import os
 from functools import partial
 import gzip
 import csv
+import subprocess
+
+
+def check_if_gcloud_object_exists(filename):
+    """
+    Check if named file exists, adding needed slash if .ht or .mt object
+    :param filename:
+    :return:
+    """
+    if filename.endswith(".mt") or filename.endswith(".ht"):
+        filename = filename + "/"
+    qstat_cmd = ['gsutil', '-q', 'stat', filename]
+    exists = subprocess.call(qstat_cmd)
+
+    return exists
+
 
 def get_path_info(path):  # shamelessly stolen from Pietro
     file_path = os.path.dirname(path)
