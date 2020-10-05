@@ -134,44 +134,32 @@ def get_denovos(fam, mt, args):
     # Annotate dataset with gnomad frequencies #
     ############################################
     mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
-    pop_index = mt.gnomad_freq_index_dict.take(1)[0][args.gnomad_population]
 
     # First of all, use prior AF if it exists in Gnomad
+    logging.info(f"Population for population allele frequency prior, from Gnomad: {args.gnomad_population}")
     mt = mt.annotate_rows(denovo_prior=hl.cond(
-        (hl.len(mt.gnomad_filters) == 0) & hl.is_defined(mt.gnomad_freq[pop_index]),
-        mt.gnomad_freq[pop_index].AF, hl.null(hl.tfloat64)))
-    mt = mt.annotate_rows(denovo_prior_source=hl.cond(hl.is_defined(mt.denovo_prior), "gnomad", hl.null(hl.tstr)))
+        (hl.len(mt.gnomad_filters) == 0) &
+        hl.is_defined(mt.gnomad_freq[mt.gnomad_freq_index_dict[args.gnomad_population]]),
+        mt.gnomad_freq[mt.gnomad_freq_index_dict[args.gnomad_population]].AF, 0))
 
     check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
     logging.info(f"Missing AFs after adding gnomad AFs: {check}")
 
-    # If it's missing in gnomad, then use variant QC AF
-    mt = mt.annotate_rows(denovo_prior=hl.or_else(mt.denovo_prior, mt.final_no_failing_samples_varqc.AF[1]))
-    mt = mt.annotate_rows(denovo_prior_source=hl.cond(
-        (hl.is_defined(mt.denovo_prior)) & (mt.denovo_prior_source != "gnomad"),
-        "varqc_AF", hl.null(hl.tstr)))
-
-    check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
-    logging.info(f"Missing AFs after adding variant QC AFs: {check}")
-
-    # If still missing, set to 0
-    mt = mt.annotate_rows(denovo_prior=hl.or_else(mt.denovo_prior, 0))
-    mt = mt.annotate_rows(denovo_prior_source=hl.or_else(mt.denovo_prior_source, "set_to_zero"))
-
     prior_stats = mt.aggregate_rows(hl.agg.stats(mt.denovo_prior))
-
-    check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
-    check2 = mt.aggregate_rows(hl.agg.counter(mt.denovo_prior_source))
-    logging.info(f"Count of defined values for denovo prior AF (false should be 0): {check}")
-    logging.info(f"Source of de novo prior AFs: {check2}")
     logging.info(f"De novo prior AF stats: {prior_stats}")
+
+    mt = mt.checkpoint(args.output_stem + "_gnomad_annotated_tmp.mt")
 
     #####################################################
     # Get de novo mutations, annotate with variant info #
     #####################################################
     denovos = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior)
+    denovos = denovos.checkpoint(args.output_stem + "_denovos_unannotated_tmp.ht")
+
     h.remove_preemptibles(args.cluster_name)
     denovos = denovos.key_by(denovos.locus, denovos.alleles)
+    denovos = denovos.checkpoint(args.output_stem + "_rekeyed_tmp.ht")
+    h.add_preemptibles(args.cluster_name, args.num_2nd_workers)
 
     mtrows = mt.rows()
 
@@ -183,25 +171,16 @@ def get_denovos(fam, mt, args):
         missense=mtrows[denovos.locus, denovos.alleles].missense
     )
 
-
     ###################################
     # Summarize # of de novo variants #
     ###################################
     denovo_count = denovos.count()
     high_confidence = denovos.filter((denovos.confidence == "HIGH") & (denovos.prior < 0.01))
-    denovo_per_person = high_confidence.group_by('id').aggregate(
-        de_novo_mutations=hl.agg.collect(hl.struct(locus=high_confidence.locus, alleles=high_confidence.alleles))
-    )
-
-    denovo_per_count = denovo_per_person.aggregate(hl.agg.counter(hl.len(denovo_per_person.de_novo_mutations)))
-    denovo_per_count = OrderedDict(sorted(denovo_per_count.items()))
 
     logging.info(f"Number of de novo mutations, total: {denovo_count}")
-    logging.info("Count of de high-confidence novo mutations (with AF < 1%) per person:")
-    for key, value in denovo_per_count.items():
-        logging.info(f"{key} de novo mutations: {value} individuals")
+    logging.info(f"Count of de high-confidence novo mutations (with AF < 1%): {high_confidence}")
 
-    return denovos, denovo_per_person
+    return denovos
 
 
 if __name__ == "__main__":
@@ -276,13 +255,11 @@ if __name__ == "__main__":
     ########################
     # Find denovo variants #
     ########################
-    denovo_table, denovo_aggregated = get_denovos(validated_fam, qcd_mt, args)
+    denovo_table = get_denovos(validated_fam, qcd_mt, args)
 
     denovo_table.write(args.output_stem + "_denovo_variants.ht", overwrite=True)
     denovo_table = denovo_table.flatten()
     denovo_table.export(args.output_stem + "_denovo_variants.txt")
-
-    denovo_aggregated.export(args.output_stem + "_denovo_variants_aggregated_by_individual.txt")
 
     ########################
     # Copy logs and finish #
