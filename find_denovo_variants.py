@@ -144,8 +144,8 @@ def get_denovos(fam, mt, args):
     check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
     logging.info(f"Missing AFs after adding gnomad AFs: {check}")
 
-    prior_stats = mt.aggregate_rows(hl.agg.stats(mt.denovo_prior))
-    logging.info(f"De novo prior AF stats: {prior_stats}")
+    zero_count = mt.aggregate_rows(hl.agg.count_where(mt.denovo_prior == 0))
+    logging.info(f"de novo prior AFs are equal to 0 (true) or not (false): {zero_count}")
 
     mt = mt.checkpoint(args.output_stem + "_gnomad_annotated_tmp.mt")
 
