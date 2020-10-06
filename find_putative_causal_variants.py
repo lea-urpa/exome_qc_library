@@ -6,7 +6,6 @@ import os
 import logging
 import argparse
 import sys
-import utils
 import subprocess
 import hail as hl
 
@@ -760,12 +759,13 @@ if __name__ == "__main__":
         logging.error("Error! If giving disease gene list, --gene_set_name must also be given.")
         exit()
 
-    scripts = ["variant_annotation.py", "helper_scripts.py"]
+    scripts = ["variant_annotation.py", "helper_scripts.py", "utils.py"]
     for script in scripts:
         hl.spark_context().addPyFile(os.path.join(args.scripts_dir, script))
 
     import variant_annotation as va
     import helper_scripts as h
+    import utils
 
     ####################
     # Configure logger #
