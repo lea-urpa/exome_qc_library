@@ -622,7 +622,7 @@ def annotate_denovos_genotypes(rows, mt, args):
             denovo_confidence=de_novos[hemizygous.locus, hemizygous.alleles, hemizygous.id].confidence)
 
     causal_vars = dominant.union(recessive, hemizygous, unify=True)
-    causal_vars = causal_vars.checkpoint(args.output_stem + "_causalvars_tmp1.ht")
+    causal_vars = causal_vars.checkpoint(args.output_stem + "_causalvars_tmp1.ht", overwrite=True)
     h.add_preemptibles(args.cluster_name, args.num_preemptibles)
 
     if args.de_novo_ht is None:
@@ -635,7 +635,7 @@ def annotate_denovos_genotypes(rows, mt, args):
     causal_vars = causal_vars.key_by()
     causal_vars = causal_vars.transmute(s=causal_vars.id)
     causal_vars = causal_vars.key_by('locus', 'alleles', 's')
-    causal_vars = causal_vars.checkpoint(args.output_stem + "_causalvars_tmp2.ht")
+    causal_vars = causal_vars.checkpoint(args.output_stem + "_causalvars_tmp2.ht", overwrite=True)
 
     causal_vars = causal_vars.annotate(
     GT=entries[causal_vars.locus, causal_vars.alleles, causal_vars.s].GT,
@@ -675,7 +675,7 @@ def annotate_denovos_genotypes(rows, mt, args):
                      causal_vars.putative_causal), 'strongly_suggestive')
         .or_missing()))
 
-    causal_vars = causal_vars.checkpoint(args.output_stem + "_causalvars_tmp3.ht")
+    causal_vars = causal_vars.checkpoint(args.output_stem + "_causalvars_tmp3.ht", overwrite=True)
 
     counter = causal_vars.aggregate(hl.agg.counter(causal_vars.putative_category))
     logging.info(f"Number of causal variants per individual in each putative category: {counter}")
