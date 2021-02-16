@@ -138,7 +138,7 @@ def get_denovos(fam, mt, args):
     ############################################
     # Annotate dataset with gnomad frequencies #
     ############################################
-    if not check_exists(os.path.join(folder, f"{basename}_gnomad_annotated.mt")):
+    if not utils.check_exists(os.path.join(folder, f"{basename}_gnomad_annotated.mt")):
         mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
         mt = mt.checkpoint(os.path.join(folder, f"{basename}_gnomad_annotated.mt"))
     else:
@@ -227,6 +227,9 @@ def get_denovos(fam, mt, args):
     else:
         denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_unannotated_tmp.ht"))
 
+    #######################
+    ## Annotate de novos ##
+    #######################
     # Annotate de novos with variant information
     if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_tmp.ht")):
         denovos = denovos.key_by(denovos.locus, denovos.alleles)
@@ -241,22 +244,53 @@ def get_denovos(fam, mt, args):
     else:
         denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_tmp.ht"))
 
+    # Annotate with CADD and MPC, if given
+    if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_tmp2.ht")):
+        # Annotate CADD + MPC values
+        if args.cadd_ht is not None:
+            CADD = hl.read_table(args.cadd_ht)
+            denovos = denovos.annotate(CADD_phred=CADD[denovos.locus, denovos.alleles].PHRED)
 
+        if args.mpc_ht is not None:
+            MPC = hl.read_table(args.mpc_ht)
+            denovos = denovos.annotate(MPC=MPC[denovos.locus, denovos.alleles].MPC)
+            denovos = denovos.checkpoint(os.path.join(folder, f"{basename}_denovos_annotated_tmp2.ht"))
+    else:
+        denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_tmp2.ht"))
 
+    # Annotate genes with gene list and constraint values
 
-    h.remove_preemptibles(args.cluster_name)
-    denovos = denovos.key_by(denovos.locus, denovos.alleles)
-    denovos = denovos.checkpoint(args.output_stem + "_rekeyed_tmp.ht", overwrite=True)
-    h.add_preemptibles(args.cluster_name, args.num_2nd_workers)
+    if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_final.ht")):
+        # Pull de novo genes and explode by gene
+        denovo_genes = denovos.select(denovos.id, denovos.gene)
+        denovo_genes = denovo_genes.explode(denovo_genes.gene)
 
-    ###################################
-    # Summarize # of de novo variants #
-    ###################################
-    denovo_count = denovos.count()
-    high_confidence = denovos.filter((denovos.confidence == "HIGH") & (denovos.prior < 0.01))
+        # Annotate pLI metrics for genes
+        gene_metrics = hl.import_table(args.gnomad_gene_metrics, types={'pLI': hl.tfloat64}, key='gene')
+        denovo_genes = denovo_genes.annotate(pLI=gene_metrics[denovo_genes.gene].pLI)
 
-    logging.info(f"Number of de novo mutations, total: {denovo_count}")
-    logging.info(f"Count of de high-confidence novo mutations (with AF < 1%): {high_confidence}")
+        vars_missing_pLI = denovo_genes.aggregate(hl.agg.counter(hl.is_defined(denovo_genes.pLI)))
+        print(f"Count of variants where pLI values are missing (False) or not (True): {vars_missing_pLI}")
+
+        gene_count = denovo_genes.group_by("gene").aggregate(pLI=hl.agg.mean(denovo_genes.pLI))
+        missing_pLI = gene_count.aggregate(hl.agg.counter(hl.is_defined(gene_count.pLI)))
+        print(f"Count of genes where pLI values are missing (False) or not (True): {missing_pLI}")
+
+        # Group genes, pLI metrics and annotate to main de novos table
+        denovo_vars = denovo_genes.group_by('locus', 'alleles', 'id').aggregate(
+            pLI=hl.array(hl.agg.collect_as_set(denovo_genes.pLI)))
+        denovo_vars = denovo_vars.key_by('locus', 'alleles', 'id')
+
+        denovos = denovos.key_by('locus', 'alleles', 'id')
+        denovos = denovos.annotate(pLI=denovo_vars[denovos.locus, denovos.alleles, denovos.id].pLI)
+
+        denovos = denovos.checkpoint(os.path.join(folder, f"{basename}_denovos_annotated_final.ht"))
+    else:
+        denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_final.ht"))
+
+    # maybe rekeying fails above? use this in that case
+    #h.remove_preemptibles(args.cluster_name)
+    #h.add_preemptibles(args.cluster_name, args.num_2nd_workers)
 
     return denovos
 
@@ -276,6 +310,9 @@ if __name__ == "__main__":
     parser.add_argument("--gnomad_ht", required=True, type=str, help="File name of gnomad hail table.")
     parser.add_argument("--gnomad_population", type=str, default="gnomad_fin",
                         choices=[])
+    parser.add_argument("--cadd_ht", type=str, help="Location of CADD hail table")
+    parser.add_argument("--mpc_ht", type=str, help="Location of MPC hail table")
+    parser.add_argument("--gnomad_gene_metrics", type=str, help="Location of gnomad gene constraint metrics, .bgz file")
     parser.add_argument("--output_name", required=True, type=str, help="Output name for files.")
     parser.add_argument("--scripts_dir", required=True, type=str, help="Directory containing scripts for this library.")
     parser.add_argument("--output_dir", required=True, type=str, help="Output directory for output files.")
