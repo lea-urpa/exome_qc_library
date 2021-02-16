@@ -17,7 +17,7 @@ def check_exists(filename):
     if filename.startswith("gs://"):
         if filename.endswith(".mt") or filename.endswith(".ht"):
             filename = filename + "/"
-        if filename.endswiht(".mt/") or filename.endswith(".ht/"):
+        if filename.endswith(".mt/") or filename.endswith(".ht/"):
             filename = filename + "metadata.json.gz" # needs file, not mt/ht dir
         qstat_cmd = ['gsutil', '-q', 'stat', filename]
         exists = subprocess.call(qstat_cmd)
