@@ -126,47 +126,128 @@ def get_denovos(fam, mt, args):
     logging.info(f"Number of trios: {trios}")
     logging.info(f"Number of complete trios: {complete_trios}")
 
+    #############################
+    # Pull base name and folder #
+    #############################
+    if mt.endswith("/"):
+        mt = mt.rstrip("/")
+
+    folder, basename = os.path.split(mt)
+    basename = basename.rstrip(".mt")
+
     ############################################
     # Annotate dataset with gnomad frequencies #
     ############################################
-    mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
+    if not check_exists(os.path.join(folder, f"{basename}_gnomad_annotated.mt")):
+        mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
+        mt = mt.checkpoint(os.path.join(folder, f"{basename}_gnomad_annotated.mt"))
+    else:
+        mt = hl.read_matrix_table(os.path.join(folder, f"{basename}_gnomad_annotated.mt"))
 
-    # First of all, use prior AF if it exists in Gnomad
-    logging.info(f"Population for population allele frequency prior, from Gnomad: {args.gnomad_population}")
-    mt = mt.annotate_rows(denovo_prior=hl.cond(
-        (hl.len(mt.gnomad_filters) == 0) & hl.is_defined(mt.gnomad_freq),
-        mt.gnomad_freq[mt.gnomad_freq_index_dict[args.gnomad_population]].AF, 0))
+    # A little exposition
+    #
+    # Given a list of population priors, Hail uses the max of
+    #  - n alt alleles - 1 / total alleles
+    #  - given pop frequency
+    #  - min pop prior (100/30000000)
+    #
+    # unless you give ignore_in_sample_allele_frequency, in which case it skips the first measure
+    # For our data, which includes failing genotypes, the in-sample AF might be off
+    # We will then filter failing genotypes, calculate n alt alleles -1 / total alleles
+    # then annotate unfiltered dataset with those values
+    # Then take the max of gnomad AFs and genotype-filtered sample AFs and set that as the gnomad prior
+    # Then run de novo calling with the ignore_in_sample_allele_frequency flag.
 
-    mt = mt.annotate_rows(denovo_prior=hl.or_else(mt.denovo_prior, 0)) # why is this necessary? cond above should work
+    # Filter genotypes
+    if not utils.check_exists(os.path.join(folder, f"{basename}_genotypes_filtered_tmp.mt")):
+        mt_genofilt = mt.filter_entries((hl.len(mt.final_failing_depth_quality) == 0) &
+                                        (hl.len(mt.final_failing_ab) == 0))
+        mt_genofilt = mt_genofilt.checkpoint(os.path.join(folder, f"{basename}_genotypes_filtered_tmp.mt"))
+    else:
+        mt_genofilt = hl.read_matrix_table(os.path.join(folder, f"{basename}_genotypes_filtered_tmp.mt"))
 
-    check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.denovo_prior)))
-    logging.info(f"Missing AFs after adding gnomad AFs: {check}")
+    # Calculate in-sample allele frequency, and AF if gnomad N is included
+    if not utils.check_exists(os.path.join(folder, f"{basename}_genotypes_filtered_rows.ht/")):
+        # https://gnomad.broadinstitute.org/faq 56885 is gnomad v2 sample size
+        gnomad_fin_AN = 2 * 56885
+        mt_genofilt = mt_genofilt.annotate_rows(n_alt_alleles=hl.agg.sum(mt_genofilt.GT.n_alt_alleles()),
+                                                total_alleles=2 * hl.agg.sum(hl.is_defined(mt_genofilt.GT)))
 
-    zero_count = mt.aggregate_rows(hl.agg.count_where(mt.denovo_prior == 0))
-    logging.info(f"de novo prior AFs are equal to 0 (true) or not (false): {zero_count}")
+        mt_genofilt = mt_genofilt.annotate_rows(
+            site_freq_filtered=(mt_genofilt.n_alt_alleles - 1) / mt_genofilt.total_alleles,
+            site_freq_gnomad_n=(mt_genofilt.n_alt_alleles - 1) / (mt_genofilt.total_alleles + gnomad_fin_AN))
 
-    mt = mt.checkpoint(args.output_stem + "_gnomad_annotated_tmp.mt", overwrite=True)
+        genofilt_rows = mt_genofilt.rows()
+        genofilt_rows = genofilt_rows.checkpoint(os.path.join(folder, f"{basename}_genotypes_filtered_rows.ht/"))
+    else:
+        genofilt_rows = hl.read_table(os.path.join(folder, f"{basename}_genotypes_filtered_rows.ht/"))
+
+    # Annotate original dataset with allele frequencies from genotype filtered dataset
+    if not utils.check_exists(os.path.join(folder, f"{basename}_denovo_prior_annotated.mt/")):
+        # Annotate alt alleles, allele frequencies from genotype filtered dataset to unfiltered datset
+        mt = mt.annotate_rows(n_alt_alleles=genofilt_rows[mt.locus, mt.alleles].n_alt_alleles,
+                              total_alleles=genofilt_rows[mt.locus, mt.alleles].total_alleles,
+                              site_freq_filtered=genofilt_rows[mt.locus, mt.alleles].site_freq_filtered,
+                              site_freq_gnomad_n=genofilt_rows[mt.locus, mt.alleles].site_freq_gnomad_n)
+
+        # Pull out gnomad fin allele frequencies
+        gnomad_population = "gnomad_fin"
+        mt = mt.annotate_rows(gnomad_af=hl.if_else((hl.len(mt.gnomad_filters) == 0) & hl.is_defined(mt.gnomad_freq),
+                                                   mt.gnomad_freq[mt.gnomad_freq_index_dict[gnomad_population]].AF,
+                                                   0))
+        mt = mt.annotate_rows(gnomad_af=hl.or_else(mt.gnomad_af, 0))
+
+        check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.gnomad_af)))
+        print(f"Sanity check: gnomad_af is_defined count: {check}")
+
+        # Annotate de novo prior as max of gnomad AF and site freq, with gnomad AN in denominator
+        mt = mt.annotate_rows(denovo_prior=hl.max(mt.gnomad_af, mt.site_freq_gnomad_n))
+
+        mt = mt.checkpoint(os.path.join(folder, f"{basename}_denovo_prior_annotated.mt/"))
+    else:
+        print('Detected denovo prior annotated file exists')
+        mt = hl.read_matrix_table(os.path.join(folder, f"{basename}_denovo_prior_annotated.mt/"))
 
     #####################################################
     # Get de novo mutations, annotate with variant info #
     #####################################################
-    denovos = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior)
-    denovos = denovos.checkpoint(args.output_stem + "_denovos_unannotated_tmp.ht", overwrite=True)
+    # Pull rows to annotate de novos table
+    if not utils.check_exists(os.path.join(folder, f"{basename}_rows.ht")):
+        rows = mt.rows()
+        rows = rows.checkpoint(os.path.join(folder, f"{basename}_rows.ht"), overwrite=True)
+    else:
+        rows = hl.read_table(os.path.join(folder, f"{basename}_rows.ht"))
+
+    # Call de novos
+    if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_unannotated_tmp.ht")):
+        denovos = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior,
+                             ignore_in_sample_allele_frequency=True)
+        denovos = denovos.checkpoint(os.path.join(folder, f"{basename}_denovos_unannotated_tmp.ht"),
+                                     overwrite=True)
+    else:
+        denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_unannotated_tmp.ht"))
+
+    # Annotate de novos with variant information
+    if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_tmp.ht")):
+        denovos = denovos.key_by(denovos.locus, denovos.alleles)
+
+        denovos = denovos.annotate(
+            final_failing_variant_qc=rows[denovos.locus, denovos.alleles].final_failing_variant_qc,
+            final_no_failing_samples_varqc=rows[denovos.locus, denovos.alleles].final_no_failing_samples_varqc,
+            gene=rows[denovos.locus, denovos.alleles].gene,
+            LOF=rows[denovos.locus, denovos.alleles].LOF,
+            missense=rows[denovos.locus, denovos.alleles].missense,
+            synonymous=rows[denovos.locus, denovos.alleles].synonymous)
+    else:
+        denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_tmp.ht"))
+
+
+
 
     h.remove_preemptibles(args.cluster_name)
     denovos = denovos.key_by(denovos.locus, denovos.alleles)
     denovos = denovos.checkpoint(args.output_stem + "_rekeyed_tmp.ht", overwrite=True)
     h.add_preemptibles(args.cluster_name, args.num_2nd_workers)
-
-    mtrows = mt.rows()
-
-    denovos = denovos.annotate(
-        final_failing_variant_qc=mtrows[denovos.locus, denovos.alleles].final_failing_variant_qc,
-        final_no_failing_samples_varqc=mtrows[denovos.locus, denovos.alleles].final_no_failing_samples_varqc,
-        gene=mtrows[denovos.locus, denovos.alleles].gene,
-        LOF=mtrows[denovos.locus, denovos.alleles].LOF,
-        missense=mtrows[denovos.locus, denovos.alleles].missense
-    )
 
     ###################################
     # Summarize # of de novo variants #
