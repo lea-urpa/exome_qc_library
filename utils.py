@@ -16,6 +16,8 @@ def check_if_gcloud_object_exists(filename):
     """
     if filename.endswith(".mt") or filename.endswith(".ht"):
         filename = filename + "/"
+    if filename.endswiht(".mt/") or filename.endswith(".ht/"):
+        filename = filename + "metadata.json.gz" # needs file, not mt/ht dir
     qstat_cmd = ['gsutil', '-q', 'stat', filename]
     exists = subprocess.call(qstat_cmd)
 
