@@ -21,9 +21,8 @@ def validate_pedigree(fam, kin, args):
     :return: fam file, same as input if no errors, otherwise the new fam file with offending lines removed.
     """
     kinship_annotated_fam = args.output_stem + "_kinship_annotated_fam.txt"
-    exists = utils.check_if_gcloud_object_exists(kinship_annotated_fam)
 
-    if (exists == 0) and (args.force == False):
+    if utils.check_exists(kinship_annotated_fam) and (args.force == False):
         logging.info(f"Detected kinship annotated fam exists, loading file: {kinship_annotated_fam}")
         fam_ht = hl.import_table(kinship_annotated_fam, impute=True)
     else:
@@ -71,9 +70,8 @@ def validate_pedigree(fam, kin, args):
         logging.info(fam_ht.filter(fam_ht.incorrect_po == True).show(failing_count))
 
         new_fam = fam.replace(".fam", "") + "_without_failing_PO_trios.fam"
-        exists = utils.check_if_gcloud_object_exists(new_fam)
 
-        if exists == 0:
+        if utils.check_exists(new_fam):
             logging.info(f"Detected validated fam file exists, skipping writing new fam file.")
         else:
             # Create key of family ID, MID, PID

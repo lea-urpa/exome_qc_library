@@ -20,9 +20,8 @@ def remove_monomorphic(mt, args):
     """
     # TODO change output to depend on initial input name, but in output directory
     filename = args.output_stem + "_non_monomorphic_tmp.mt"
-    exists = utils.check_if_gcloud_object_exists(filename)
 
-    if exists == 0:
+    if utils.check_exists(filename):
         logging.info(f"Detected file with monomorphic variants filtered out: {filename}. Loading this file.")
         mt = hl.read_matrix_table(filename)
         args.start_count = mt.count_rows()
@@ -57,9 +56,8 @@ def count_case_control_carriers(mt, args):
     """
     # TODO change output to depend on initial input name, but in output directory
     temp_filename = args.output_stem + "_carriers_annotated_tmp.mt"
-    exists = utils.check_if_gcloud_object_exists(temp_filename)
 
-    if (exists == 0) and (args.force is False):
+    if utils.check_exists(temp_filename) and (args.force is False):
         logging.info(f"Detected file with carriers annotated exists: {temp_filename}. Loading this file.")
         mt = hl.read_matrix_table(temp_filename)
 
@@ -143,9 +141,8 @@ def annotate_variants(mt, args):
     """
     # TODO change output to depend on initial input name, but in output directory
     temp_filename = args.output_stem + "_cadd_mpc_gnomad_annotated_tmp.mt"
-    exists = utils.check_if_gcloud_object_exists(temp_filename)
 
-    if (exists == 0) and (args.force == False):
+    if utils.check_exists(temp_filename) and (args.force == False):
         logging.info(f"Detected that matrix table annotated with CADD, MPC and Gnomad exist: {temp_filename}. "
                      f"Loading this.")
         mt = hl.read_matrix_table(temp_filename)
@@ -186,9 +183,8 @@ def annotate_population_thresholds(mt, args):
     """
     # TODO change output to depend on initial input name, but in output directory
     temp_filename = args.output_stem + "_gnomad_control_thresholds_annotated_tmp.mt"
-    exists = utils.check_if_gcloud_object_exists(temp_filename)
 
-    if (exists == 0) and (args.force == False):
+    if utils.check_exists(temp_filename) and (args.force == False):
         logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {temp_filename}. "
                      f"Loading this file.")
         mt = hl.read_matrix_table(temp_filename)
@@ -311,9 +307,8 @@ def annotate_genes(mt, args):
     """
     # TODO change it to run high pLI genes only if a gene list is NOT given, not in addition
     temp_filename = args.output_stem + "_genes_annotated.mt"
-    exists = utils.check_if_gcloud_object_exists(temp_filename)
 
-    if (exists == 0) and (args.force == False):
+    if utils.check_exists(temp_filename) and (args.force == False):
         logging.info(f"Detected matrix table with gene information annotated exists: {temp_filename}. Loading this.")
         mt = hl.read_matrix_table(temp_filename)
 

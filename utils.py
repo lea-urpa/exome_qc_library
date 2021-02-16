@@ -8,21 +8,27 @@ import csv
 import subprocess
 
 
-def check_if_gcloud_object_exists(filename):
+def check_exists(filename):
     """
     Check if named file exists, adding needed slash if .ht or .mt object
     :param filename:
     :return:
     """
-    if filename.endswith(".mt") or filename.endswith(".ht"):
-        filename = filename + "/"
-    if filename.endswiht(".mt/") or filename.endswith(".ht/"):
-        filename = filename + "metadata.json.gz" # needs file, not mt/ht dir
-    qstat_cmd = ['gsutil', '-q', 'stat', filename]
-    exists = subprocess.call(qstat_cmd)
+    if filename.startswith("gs://"):
+        if filename.endswith(".mt") or filename.endswith(".ht"):
+            filename = filename + "/"
+        if filename.endswiht(".mt/") or filename.endswith(".ht/"):
+            filename = filename + "metadata.json.gz" # needs file, not mt/ht dir
+        qstat_cmd = ['gsutil', '-q', 'stat', filename]
+        exists = subprocess.call(qstat_cmd)
 
-    return exists
+        if exists == 0:
+            return True
+        else:
+            return False
 
+    else:
+        return os.path.exists(filename)
 
 def get_path_info(path):  # shamelessly stolen from Pietro
     file_path = os.path.dirname(path)
