@@ -129,10 +129,11 @@ def get_denovos(fam, mt, args):
     #############################
     # Pull base name and folder #
     #############################
-    if mt.endswith("/"):
-        mt = mt.rstrip("/")
+    mt_name = args.mt
+    if mt_name.endswith("/"):
+        mt_name = mt_name.rstrip("/")
 
-    folder, basename = os.path.split(mt)
+    folder, basename = os.path.split(mt_name)
     basename = basename.rstrip(".mt")
 
     ############################################
