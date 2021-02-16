@@ -274,7 +274,6 @@ def annotate_variants_gnomad(mt, gnomad_ht):
     :param gnomad_ht: string with file location + name of gnomad hail table to load
     :return: returns annotated matrix table
     """
-
     gnomad_sites = hl.read_table(gnomad_ht)
 
     mt = mt.annotate_rows(gnomad_freq=gnomad_sites.index(mt.row_key).freq,
