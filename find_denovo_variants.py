@@ -261,33 +261,34 @@ def get_denovos(fam, mt, args):
 
     # Annotate genes with gene list and constraint values
 
-    if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_final.ht")):
-        # Pull de novo genes and explode by gene
-        denovo_genes = denovos.select(denovos.id, denovos.gene)
-        denovo_genes = denovo_genes.explode(denovo_genes.gene)
+    if args.gnomad_gene_metrics is not None:
+        if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_final.ht")):
+            # Pull de novo genes and explode by gene
+            denovo_genes = denovos.select(denovos.id, denovos.gene)
+            denovo_genes = denovo_genes.explode(denovo_genes.gene)
 
-        # Annotate pLI metrics for genes
-        gene_metrics = hl.import_table(args.gnomad_gene_metrics, types={'pLI': hl.tfloat64}, key='gene')
-        denovo_genes = denovo_genes.annotate(pLI=gene_metrics[denovo_genes.gene].pLI)
+            # Annotate pLI metrics for genes
+            gene_metrics = hl.import_table(args.gnomad_gene_metrics, types={'pLI': hl.tfloat64}, key='gene')
+            denovo_genes = denovo_genes.annotate(pLI=gene_metrics[denovo_genes.gene].pLI)
 
-        vars_missing_pLI = denovo_genes.aggregate(hl.agg.counter(hl.is_defined(denovo_genes.pLI)))
-        print(f"Count of variants where pLI values are missing (False) or not (True): {vars_missing_pLI}")
+            vars_missing_pLI = denovo_genes.aggregate(hl.agg.counter(hl.is_defined(denovo_genes.pLI)))
+            print(f"Count of variants where pLI values are missing (False) or not (True): {vars_missing_pLI}")
 
-        gene_count = denovo_genes.group_by("gene").aggregate(pLI=hl.agg.mean(denovo_genes.pLI))
-        missing_pLI = gene_count.aggregate(hl.agg.counter(hl.is_defined(gene_count.pLI)))
-        print(f"Count of genes where pLI values are missing (False) or not (True): {missing_pLI}")
+            gene_count = denovo_genes.group_by("gene").aggregate(pLI=hl.agg.mean(denovo_genes.pLI))
+            missing_pLI = gene_count.aggregate(hl.agg.counter(hl.is_defined(gene_count.pLI)))
+            print(f"Count of genes where pLI values are missing (False) or not (True): {missing_pLI}")
 
-        # Group genes, pLI metrics and annotate to main de novos table
-        denovo_vars = denovo_genes.group_by('locus', 'alleles', 'id').aggregate(
-            pLI=hl.array(hl.agg.collect_as_set(denovo_genes.pLI)))
-        denovo_vars = denovo_vars.key_by('locus', 'alleles', 'id')
+            # Group genes, pLI metrics and annotate to main de novos table
+            denovo_vars = denovo_genes.group_by('locus', 'alleles', 'id').aggregate(
+                pLI=hl.array(hl.agg.collect_as_set(denovo_genes.pLI)))
+            denovo_vars = denovo_vars.key_by('locus', 'alleles', 'id')
 
-        denovos = denovos.key_by('locus', 'alleles', 'id')
-        denovos = denovos.annotate(pLI=denovo_vars[denovos.locus, denovos.alleles, denovos.id].pLI)
+            denovos = denovos.key_by('locus', 'alleles', 'id')
+            denovos = denovos.annotate(pLI=denovo_vars[denovos.locus, denovos.alleles, denovos.id].pLI)
 
-        denovos = denovos.checkpoint(os.path.join(folder, f"{basename}_denovos_annotated_final.ht"))
-    else:
-        denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_final.ht"))
+            denovos = denovos.checkpoint(os.path.join(folder, f"{basename}_denovos_annotated_final.ht"))
+        else:
+            denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_final.ht"))
 
     # maybe rekeying fails above? use this in that case
     #h.remove_preemptibles(args.cluster_name)
