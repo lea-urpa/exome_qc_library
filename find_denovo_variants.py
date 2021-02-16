@@ -53,50 +53,50 @@ def validate_pedigree(fam, kin, args):
         logging.info("Exporting kinship-annotated fam file")
         fam_ht.export(kinship_annotated_fam)
 
-    # Remove rows in fam ht that do not have kinship data
-    fam_ht = fam_ht.filter(hl.is_defined(fam_ht.Kinship))
+        # Remove rows in fam ht that do not have kinship data
+        fam_ht = fam_ht.filter(hl.is_defined(fam_ht.Kinship))
 
-    # Find PO relationships not supported by the data
-    fam_ht = fam_ht.annotate(incorrect_po=hl.cond(
-        (fam_ht.Kinship < 0.177) | (fam_ht.Kinship > 0.354) | (fam_ht.IBS0 > 0.1),
-        True, False))
+        # Find PO relationships not supported by the data
+        fam_ht = fam_ht.annotate(incorrect_po=hl.cond(
+            (fam_ht.Kinship < 0.177) | (fam_ht.Kinship > 0.354) | (fam_ht.IBS0 > 0.1),
+            True, False))
 
-    failing_count = fam_ht.aggregate(hl.agg.count_where(fam_ht.incorrect_po == True))
-    logging.info(f"Number of reported parent-offspring pairs unsupported by kinship or IBS0 values: {failing_count}")
+        failing_count = fam_ht.aggregate(hl.agg.count_where(fam_ht.incorrect_po == True))
+        logging.info(f"Number of reported parent-offspring pairs unsupported by kinship or IBS0 values: {failing_count}")
 
-    # If there are PO relationships not supported by the data, write new fam file excluding those individuals
-    if failing_count > 0:
-        # Print offending lines
-        logging.info(fam_ht.filter(fam_ht.incorrect_po == True).show(failing_count))
+        # If there are PO relationships not supported by the data, write new fam file excluding those individuals
+        if failing_count > 0:
+            # Print offending lines
+            logging.info(fam_ht.filter(fam_ht.incorrect_po == True).show(failing_count))
 
-        new_fam = fam.replace(".fam", "") + "_without_failing_PO_trios.fam"
+            new_fam = fam.replace(".fam", "") + "_without_failing_PO_trios.fam"
 
-        if utils.check_exists(new_fam):
-            logging.info(f"Detected validated fam file exists, skipping writing new fam file.")
-        else:
-            # Create key of family ID, MID, PID
-            fam_ht = fam_ht.annotate(fid_iid_mid_pid=fam_ht.f0 + ":" + fam_ht.f1 + ":" + fam_ht.f2 + ":" + fam_ht.f3)
+            if utils.check_exists(new_fam):
+                logging.info(f"Detected validated fam file exists, skipping writing new fam file.")
+            else:
+                # Create key of family ID, MID, PID
+                fam_ht = fam_ht.annotate(fid_iid_mid_pid=fam_ht.f0 + ":" + fam_ht.f1 + ":" + fam_ht.f2 + ":" + fam_ht.f3)
 
-            # Collect set of lines in fam ht that are failing kinship checks in either parent
-            failing_fam_lines = fam_ht.aggregate(hl.agg.filter(fam_ht.incorrect_po == True,
-                hl.agg.collect_as_set(fam_ht.fid_iid_mid_pid)))
+                # Collect set of lines in fam ht that are failing kinship checks in either parent
+                failing_fam_lines = fam_ht.aggregate(hl.agg.filter(fam_ht.incorrect_po == True,
+                    hl.agg.collect_as_set(fam_ht.fid_iid_mid_pid)))
 
-            # Filter out lines with incorrect PO from fam
-            fam_ht = fam_ht.filter(hl.array(failing_fam_lines).contains(fam_ht.fid_iid_mid_pid), keep=False)
+                # Filter out lines with incorrect PO from fam
+                fam_ht = fam_ht.filter(hl.array(failing_fam_lines).contains(fam_ht.fid_iid_mid_pid), keep=False)
 
-            # Drop extra columns and get unique lines
-            fam_ht = fam_ht.key_by('f0', 'f1')
-            fam_ht = fam_ht.drop('parent', 'kinship_key', 'Kinship', 'IBS0', 'incorrect_po', 'fid_iid_mid_pid')
-            fam_ht = fam_ht.distinct()
+                # Drop extra columns and get unique lines
+                fam_ht = fam_ht.key_by('f0', 'f1')
+                fam_ht = fam_ht.drop('parent', 'kinship_key', 'Kinship', 'IBS0', 'incorrect_po', 'fid_iid_mid_pid')
+                fam_ht = fam_ht.distinct()
 
-            # Write to new fam file
-            count = fam_ht.count()
-            logging.info(f"Number of lines in new fam file, without lines containing PO relationships unsupported by kinship: "
-                  f"{count}")
+                # Write to new fam file
+                count = fam_ht.count()
+                logging.info(f"Number of lines in new fam file, without lines containing PO relationships unsupported by kinship: "
+                      f"{count}")
 
-            fam_ht.export(new_fam)
+                fam_ht.export(new_fam)
 
-        fam = new_fam
+            fam = new_fam
 
     return fam
 
