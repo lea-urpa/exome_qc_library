@@ -140,6 +140,7 @@ def get_denovos(fam, mt, args):
     # Annotate dataset with gnomad frequencies #
     ############################################
     if not utils.check_exists(os.path.join(folder, f"{basename}_gnomad_annotated.mt")):
+        logging.info("Detected gnomad annotated matrix table exists. Loading that.")
         mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
         mt = mt.checkpoint(os.path.join(folder, f"{basename}_gnomad_annotated.mt"))
     else:
@@ -159,16 +160,17 @@ def get_denovos(fam, mt, args):
     # Then take the max of gnomad AFs and genotype-filtered sample AFs and set that as the gnomad prior
     # Then run de novo calling with the ignore_in_sample_allele_frequency flag.
 
+
     # Filter genotypes
-    if not utils.check_exists(os.path.join(folder, f"{basename}_genotypes_filtered_tmp.mt")):
+    if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_tmp.mt")):
         mt_genofilt = mt.filter_entries((hl.len(mt.final_failing_depth_quality) == 0) &
                                         (hl.len(mt.final_failing_ab) == 0))
-        mt_genofilt = mt_genofilt.checkpoint(os.path.join(folder, f"{basename}_genotypes_filtered_tmp.mt"))
+        mt_genofilt = mt_genofilt.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_tmp.mt"))
     else:
-        mt_genofilt = hl.read_matrix_table(os.path.join(folder, f"{basename}_genotypes_filtered_tmp.mt"))
+        mt_genofilt = hl.read_matrix_table(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_tmp.mt"))
 
     # Calculate in-sample allele frequency, and AF if gnomad N is included
-    if not utils.check_exists(os.path.join(folder, f"{basename}_genotypes_filtered_rows.ht/")):
+    if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_rows.ht/")):
         # https://gnomad.broadinstitute.org/faq 56885 is gnomad v2 sample size
         gnomad_fin_AN = 2 * 56885
         mt_genofilt = mt_genofilt.annotate_rows(n_alt_alleles=hl.agg.sum(mt_genofilt.GT.n_alt_alleles()),
@@ -179,12 +181,12 @@ def get_denovos(fam, mt, args):
             site_freq_gnomad_n=(mt_genofilt.n_alt_alleles - 1) / (mt_genofilt.total_alleles + gnomad_fin_AN))
 
         genofilt_rows = mt_genofilt.rows()
-        genofilt_rows = genofilt_rows.checkpoint(os.path.join(folder, f"{basename}_genotypes_filtered_rows.ht/"))
+        genofilt_rows = genofilt_rows.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_rows.ht/"))
     else:
-        genofilt_rows = hl.read_table(os.path.join(folder, f"{basename}_genotypes_filtered_rows.ht/"))
+        genofilt_rows = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_rows.ht/"))
 
     # Annotate original dataset with allele frequencies from genotype filtered dataset
-    if not utils.check_exists(os.path.join(folder, f"{basename}_denovo_prior_annotated.mt/")):
+    if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_denovo_prior_annotated.mt/")):
         # Annotate alt alleles, allele frequencies from genotype filtered dataset to unfiltered datset
         mt = mt.annotate_rows(n_alt_alleles=genofilt_rows[mt.locus, mt.alleles].n_alt_alleles,
                               total_alleles=genofilt_rows[mt.locus, mt.alleles].total_alleles,
@@ -199,40 +201,40 @@ def get_denovos(fam, mt, args):
         mt = mt.annotate_rows(gnomad_af=hl.or_else(mt.gnomad_af, 0))
 
         check = mt.aggregate_rows(hl.agg.counter(hl.is_defined(mt.gnomad_af)))
-        print(f"Sanity check: gnomad_af is_defined count: {check}")
+        logging.info(f"Sanity check: gnomad_af is_defined count: {check}")
 
         # Annotate de novo prior as max of gnomad AF and site freq, with gnomad AN in denominator
         mt = mt.annotate_rows(denovo_prior=hl.max(mt.gnomad_af, mt.site_freq_gnomad_n))
 
-        mt = mt.checkpoint(os.path.join(folder, f"{basename}_denovo_prior_annotated.mt/"))
+        mt = mt.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovo_prior_annotated.mt/"))
     else:
-        print('Detected denovo prior annotated file exists')
-        mt = hl.read_matrix_table(os.path.join(folder, f"{basename}_denovo_prior_annotated.mt/"))
+        logging.info('Detected denovo prior annotated file exists, loading that')
+        mt = hl.read_matrix_table(os.path.join(args.output_dir, f"{args.output_name}_denovo_prior_annotated.mt/"))
 
     #####################################################
     # Get de novo mutations, annotate with variant info #
     #####################################################
     # Pull rows to annotate de novos table
-    if not utils.check_exists(os.path.join(folder, f"{basename}_rows.ht")):
+    if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_rows.ht")):
         rows = mt.rows()
-        rows = rows.checkpoint(os.path.join(folder, f"{basename}_rows.ht"), overwrite=True)
+        rows = rows.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_rows.ht"), overwrite=True)
     else:
-        rows = hl.read_table(os.path.join(folder, f"{basename}_rows.ht"))
+        rows = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_rows.ht"))
 
     # Call de novos
-    if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_unannotated_tmp.ht")):
+    if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_denovos_unannotated_tmp.ht")):
         denovos = hl.de_novo(mt, pedigree, pop_frequency_prior=mt.denovo_prior,
                              ignore_in_sample_allele_frequency=True)
-        denovos = denovos.checkpoint(os.path.join(folder, f"{basename}_denovos_unannotated_tmp.ht"),
+        denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_unannotated_tmp.ht"),
                                      overwrite=True)
     else:
-        denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_unannotated_tmp.ht"))
+        denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_unannotated_tmp.ht"))
 
     #######################
     ## Annotate de novos ##
     #######################
     # Annotate de novos with variant information
-    if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_tmp.ht")):
+    if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp.ht")):
         denovos = denovos.key_by(denovos.locus, denovos.alleles)
 
         denovos = denovos.annotate(
@@ -243,10 +245,10 @@ def get_denovos(fam, mt, args):
             missense=rows[denovos.locus, denovos.alleles].missense,
             synonymous=rows[denovos.locus, denovos.alleles].synonymous)
     else:
-        denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_tmp.ht"))
+        denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp.ht"))
 
     # Annotate with CADD and MPC, if given
-    if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_tmp2.ht")):
+    if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp2.ht")):
         # Annotate CADD + MPC values
         if args.cadd_ht is not None:
             CADD = hl.read_table(args.cadd_ht)
@@ -255,14 +257,14 @@ def get_denovos(fam, mt, args):
         if args.mpc_ht is not None:
             MPC = hl.read_table(args.mpc_ht)
             denovos = denovos.annotate(MPC=MPC[denovos.locus, denovos.alleles].MPC)
-            denovos = denovos.checkpoint(os.path.join(folder, f"{basename}_denovos_annotated_tmp2.ht"))
+            denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp2.ht"))
     else:
-        denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_tmp2.ht"))
+        denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp2.ht"))
 
     # Annotate genes with gene list and constraint values
 
     if args.gnomad_gene_metrics is not None:
-        if not utils.check_exists(os.path.join(folder, f"{basename}_denovos_annotated_final.ht")):
+        if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_final.ht")):
             # Pull de novo genes and explode by gene
             denovo_genes = denovos.select(denovos.id, denovos.gene)
             denovo_genes = denovo_genes.explode(denovo_genes.gene)
@@ -286,9 +288,9 @@ def get_denovos(fam, mt, args):
             denovos = denovos.key_by('locus', 'alleles', 'id')
             denovos = denovos.annotate(pLI=denovo_vars[denovos.locus, denovos.alleles, denovos.id].pLI)
 
-            denovos = denovos.checkpoint(os.path.join(folder, f"{basename}_denovos_annotated_final.ht"))
+            denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_final.ht"))
         else:
-            denovos = hl.read_table(os.path.join(folder, f"{basename}_denovos_annotated_final.ht"))
+            denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_final.ht"))
 
     # maybe rekeying fails above? use this in that case
     #h.remove_preemptibles(args.cluster_name)
