@@ -252,7 +252,9 @@ def get_denovos(fam, mt, args):
             gene=rows[denovos.locus, denovos.alleles].gene,
             LOF=rows[denovos.locus, denovos.alleles].LOF,
             missense=rows[denovos.locus, denovos.alleles].missense,
-            synonymous=rows[denovos.locus, denovos.alleles].synonymous)
+            synonymous=rows[denovos.locus, denovos.alleles].synonymous,
+            vep=rows[denovos.locus, denovos.alleles].vep)
+        force = True
     else:
         denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp.ht"))
 
