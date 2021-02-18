@@ -271,6 +271,12 @@ def get_denovos(fam, mt, args):
             denovos = denovos.annotate(MPC=MPC[denovos.locus, denovos.alleles].MPC)
             denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp2.ht"))
 
+        if args.segdup_intervals_file is not None:
+            segdup_intervals = hl.import_locus_intervals(args.segdup_intervals, reference_genome=args.reference_genome,
+                                                         skip_invalid_intervals=True)
+            denovos = denovos.annotate(in_segdup_region=hl.if_else(hl.is_defined(segdup_intervals[denovos.locus]),
+                                                                   True, False))
+
         force = True
     else:
         denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp2.ht"))
@@ -329,8 +335,10 @@ if __name__ == "__main__":
     parser.add_argument("--gnomad_ht", required=True, type=str, help="File name of gnomad hail table.")
     parser.add_argument("--gnomad_population", type=str, default="gnomad_fin",
                         choices=[])
+    parser.add_argument("--reference_genome", default="GRCh38")
     parser.add_argument("--cadd_ht", type=str, help="Location of CADD hail table")
     parser.add_argument("--mpc_ht", type=str, help="Location of MPC hail table")
+    parser.add_argument("--segdup_intervals_file", type="str", help="Location of segmental duplication intervals file.")
     parser.add_argument("--gnomad_gene_metrics", type=str, help="Location of gnomad gene constraint metrics, .bgz file")
     parser.add_argument("--output_name", required=True, type=str, help="Output name for files.")
     parser.add_argument("--scripts_dir", required=True, type=str, help="Directory containing scripts for this library.")
