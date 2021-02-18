@@ -183,7 +183,8 @@ def get_denovos(fam, mt, args):
             site_freq_gnomad_n=(mt_genofilt.n_alt_alleles - 1) / (mt_genofilt.total_alleles + gnomad_fin_AN))
 
         genofilt_rows = mt_genofilt.rows()
-        genofilt_rows = genofilt_rows.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_rows.ht/"))
+        genofilt_rows = genofilt_rows.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_rows.ht/"),
+                                                 overwrite=True)
         force = True
     else:
         genofilt_rows = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_rows.ht/"))
@@ -210,7 +211,8 @@ def get_denovos(fam, mt, args):
         # Annotate de novo prior as max of gnomad AF and site freq, with gnomad AN in denominator
         mt = mt.annotate_rows(denovo_prior=hl.max(mt.gnomad_af, mt.site_freq_gnomad_n))
 
-        mt = mt.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovo_prior_annotated.mt/"))
+        mt = mt.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovo_prior_annotated.mt/"),
+                           overwrite=True)
         force = True
     else:
         logging.info('Detected denovo prior annotated file exists, loading that')
@@ -269,7 +271,8 @@ def get_denovos(fam, mt, args):
         if args.mpc_ht is not None:
             MPC = hl.read_table(args.mpc_ht)
             denovos = denovos.annotate(MPC=MPC[denovos.locus, denovos.alleles].MPC)
-            denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp2.ht"))
+            denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp2.ht"),
+                                         overwrite=True)
 
         if args.segdup_intervals_file is not None:
             segdup_intervals = hl.import_locus_intervals(args.segdup_intervals, reference_genome=args.reference_genome,
@@ -309,7 +312,8 @@ def get_denovos(fam, mt, args):
             denovos = denovos.key_by('locus', 'alleles', 'id')
             denovos = denovos.annotate(pLI=denovo_vars[denovos.locus, denovos.alleles, denovos.id].pLI)
 
-            denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp3.ht"))
+            denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp3.ht"),
+                                         overwrite=True)
         else:
             denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp3.ht"))
 
