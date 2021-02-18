@@ -36,6 +36,21 @@ def annotate_variants(mt):
                                        canon_pc.map(lambda x: x.gene_symbol),
                                        most_severe.map(lambda x: x.gene_symbol)))
 
+    # The above returns gene symbols for all canonical and protein coding transcripts, not just the one related to the
+    # most severe consequence. So we will keep the above, but annotate also the gene corresponding to the most severe
+    # consequence as well (useful for synonymous, missense, and LOF annotations)
+
+    canon_pc = mt.row.vep.transcript_consequences.filter(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding')
+                                                         & x.consequence_terms.contains(mt.vep.most_severe_consequence))
+    most_severe = mt.vep.transcript_consequences.filter(lambda x:
+                                                        x.consequence_terms.contains(mt.row.vep.most_severe_consequence))
+
+    mt = mt.annotate_rows(gene_most_severe_conseq=
+                          hl.cond(hl.any(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding'),
+                                         mt.vep.transcript_consequences),
+                                  canon_pc.map(lambda x: x.gene_symbol),
+                                  most_severe.map(lambda x: x.gene_symbol)))
+
     # either if there is a canonical and protein coding transcript consequence for that variant,
     # and the lof annotation is not missing and equal to HC, and the lof flag is missing or is blank,
     # or if there isn't a canonical and protein coding transcript consequence for that variant and the
