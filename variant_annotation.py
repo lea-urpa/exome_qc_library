@@ -31,7 +31,7 @@ def annotate_variants(mt):
                                                             x.consequence_terms.contains(
                                                                 mt.row.vep.most_severe_consequence))
 
-    mt = mt.annotate_rows(gene=hl.cond(hl.any(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding'),
+    mt = mt.annotate_rows(gene=hl.if_else(hl.any(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding'),
                                        mt.row.vep.transcript_consequences),
                                        canon_pc.map(lambda x: x.gene_symbol),
                                        most_severe.map(lambda x: x.gene_symbol)))
@@ -46,7 +46,7 @@ def annotate_variants(mt):
                                                         x.consequence_terms.contains(mt.row.vep.most_severe_consequence))
 
     mt = mt.annotate_rows(gene_most_severe_conseq=
-                          hl.cond(hl.any(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding'),
+                          hl.if_else(hl.any(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding'),
                                          mt.vep.transcript_consequences),
                                   canon_pc.map(lambda x: x.gene_symbol),
                                   most_severe.map(lambda x: x.gene_symbol)))
@@ -76,7 +76,7 @@ def annotate_variants(mt):
                       (most_severe.map(lambda x: x.lof) == ["HC"]) &
                       (hl.all(lambda x: hl.is_missing(x.lof_flags) | (x.lof_flags == ""), most_severe)))
 
-    mt = mt.annotate_rows(LOF=hl.cond(canon_bool | non_canon_bool, True, False))
+    mt = mt.annotate_rows(LOF=hl.if_else(canon_bool | non_canon_bool, True, False))
 
     # Either if there is a canonical and protein coding transcript consequence for that variant
     # whose consequence terms contain "missense variant"
@@ -101,11 +101,11 @@ def annotate_variants(mt):
                                mt.row.vep.transcript_consequences)) &
                              (mt.row.vep.most_severe_consequence == "inframe_deletion"))
 
-    mt = mt.annotate_rows(missense=hl.cond((canon_missense_bool | noncanon_missense_bool |
+    mt = mt.annotate_rows(missense=hl.if_else((canon_missense_bool | noncanon_missense_bool |
                                             canon_inframe_bool | noncanon_inframe_bool), True, False))
 
     # If the most severe consequence is "synonymous_variant", true else false
-    mt = mt.annotate_rows(synonymous=hl.cond(mt.row.vep.most_severe_consequence == "synonymous_variant", True, False))
+    mt = mt.annotate_rows(synonymous=hl.if_else(mt.row.vep.most_severe_consequence == "synonymous_variant", True, False))
 
     # When there is a transcript consequence for that variant that is canonical,
     # protein coding, and lof = "HC", its lof flags
