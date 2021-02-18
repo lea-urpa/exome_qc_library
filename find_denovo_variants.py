@@ -284,7 +284,7 @@ def get_denovos(fam, mt, args):
     # Annotate genes with gene list and constraint values
 
     if args.gnomad_gene_metrics is not None:
-        if (not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_final.ht"))) or \
+        if (not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp3.ht"))) or \
                 (force is True):
             # Pull de novo genes and explode by gene
             denovo_genes = denovos.select(denovos.id, denovos.gene)
@@ -309,9 +309,9 @@ def get_denovos(fam, mt, args):
             denovos = denovos.key_by('locus', 'alleles', 'id')
             denovos = denovos.annotate(pLI=denovo_vars[denovos.locus, denovos.alleles, denovos.id].pLI)
 
-            denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_final.ht"))
+            denovos = denovos.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp3.ht"))
         else:
-            denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_final.ht"))
+            denovos = hl.read_table(os.path.join(args.output_dir, f"{args.output_name}_denovos_annotated_tmp3.ht"))
 
     # maybe rekeying fails above? use this in that case
     #h.remove_preemptibles(args.cluster_name)
@@ -338,7 +338,7 @@ if __name__ == "__main__":
     parser.add_argument("--reference_genome", default="GRCh38")
     parser.add_argument("--cadd_ht", type=str, help="Location of CADD hail table")
     parser.add_argument("--mpc_ht", type=str, help="Location of MPC hail table")
-    parser.add_argument("--segdup_intervals_file", type="str", help="Location of segmental duplication intervals file.")
+    parser.add_argument("--segdup_intervals_file", type=str, help="Location of segmental duplication intervals file.")
     parser.add_argument("--gnomad_gene_metrics", type=str, help="Location of gnomad gene constraint metrics, .bgz file")
     parser.add_argument("--output_name", required=True, type=str, help="Output name for files.")
     parser.add_argument("--scripts_dir", required=True, type=str, help="Directory containing scripts for this library.")
