@@ -406,6 +406,7 @@ if __name__ == "__main__":
 
     denovo_table.write(args.output_stem + "_denovo_variants.ht", overwrite=True)
     denovo_table = denovo_table.flatten()
+    denovo_table = denovo_table.drop("vep.input")
     denovo_table.export(args.output_stem + "_denovo_variants.txt")
 
     ########################
