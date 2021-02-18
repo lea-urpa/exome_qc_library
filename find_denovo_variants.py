@@ -275,7 +275,7 @@ def get_denovos(fam, mt, args):
                                          overwrite=True)
 
         if args.segdup_intervals_file is not None:
-            segdup_intervals = hl.import_locus_intervals(args.segdup_intervals, reference_genome=args.reference_genome,
+            segdup_intervals = hl.import_locus_intervals(args.segdup_intervals_file, reference_genome=args.reference_genome,
                                                          skip_invalid_intervals=True)
             denovos = denovos.annotate(in_segdup_region=hl.if_else(hl.is_defined(segdup_intervals[denovos.locus]),
                                                                    True, False))
