@@ -101,8 +101,15 @@ def annotate_variants(mt):
                                mt.row.vep.transcript_consequences)) &
                              (mt.row.vep.most_severe_consequence == "inframe_deletion"))
 
-    mt = mt.annotate_rows(missense=hl.if_else((canon_missense_bool | noncanon_missense_bool |
-                                            canon_inframe_bool | noncanon_inframe_bool), True, False))
+    canon_inframe_ins_bool = canon_pc.map(lambda x: x.consequence_terms).contains(["inframe_insertion"])
+    noncanon_inframe_ins_bool = (~(hl.any(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding'),
+                               mt.row.vep.transcript_consequences)) &
+                             (mt.row.vep.most_severe_consequence == "inframe_insertion"))
+
+    mt = mt.annotate_rows(missense=hl.if_else((canon_missense_bool | noncanon_missense_bool | canon_inframe_bool |
+                                               noncanon_inframe_bool | canon_inframe_ins_bool |
+                                               noncanon_inframe_ins_bool),
+                                              True, False))
 
     # If the most severe consequence is "synonymous_variant", true else false
     mt = mt.annotate_rows(synonymous=hl.if_else(mt.row.vep.most_severe_consequence == "synonymous_variant", True, False))
