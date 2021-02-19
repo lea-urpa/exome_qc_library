@@ -252,6 +252,7 @@ def get_denovos(fam, mt, args):
             final_failing_variant_qc=rows[denovos.locus, denovos.alleles].final_failing_variant_qc,
             final_no_failing_samples_varqc=rows[denovos.locus, denovos.alleles].final_no_failing_samples_varqc,
             gene=rows[denovos.locus, denovos.alleles].gene,
+            gene_most_severe_conseq=rows[denovos.locus, denovos.alleles].gene_most_severe_conseq,
             LOF=rows[denovos.locus, denovos.alleles].LOF,
             missense=rows[denovos.locus, denovos.alleles].missense,
             synonymous=rows[denovos.locus, denovos.alleles].synonymous,
