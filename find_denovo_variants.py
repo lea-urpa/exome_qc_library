@@ -165,7 +165,8 @@ def get_denovos(fam, mt, args):
     if not utils.check_exists(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_tmp.mt")):
         mt_genofilt = mt.filter_entries((hl.len(mt.final_failing_depth_quality) == 0) &
                                         (hl.len(mt.final_failing_ab) == 0))
-        mt_genofilt = mt_genofilt.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_tmp.mt"))
+        mt_genofilt = mt_genofilt.checkpoint(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_tmp.mt"),
+                                             overwrite=True)
         force = True
     else:
         mt_genofilt = hl.read_matrix_table(os.path.join(args.output_dir, f"{args.output_name}_genotypes_filtered_tmp.mt"))
