@@ -140,10 +140,10 @@ def get_denovos(fam, mt, args):
     # Annotate dataset with gnomad frequencies #
     ############################################
     if not utils.check_exists(os.path.join(folder, f"{basename}_gnomad_annotated.mt")):
-        logging.info("Detected gnomad annotated matrix table exists. Loading that.")
         mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
-        mt = mt.checkpoint(os.path.join(folder, f"{basename}_gnomad_annotated.mt"))
+        mt = mt.checkpoint(os.path.join(folder, f"{basename}_gnomad_annotated.mt", overwrite=True))
     else:
+        logging.info("Detected gnomad annotated matrix table exists. Loading that.")
         mt = hl.read_matrix_table(os.path.join(folder, f"{basename}_gnomad_annotated.mt"))
 
     # A little exposition
