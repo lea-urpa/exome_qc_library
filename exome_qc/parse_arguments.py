@@ -165,6 +165,9 @@ def parse_arguments(arguments):
 
     parsed_args.sample_cols_check = columns
 
+    # Define output stem
+    parsed_args.output_stem = parsed_args.out_dir + parsed_args.out_name
+
     # Format input mt
     if not parsed_args.mt.endswith("/"):
         parsed_args.mt = parsed_args.mt + "/"
