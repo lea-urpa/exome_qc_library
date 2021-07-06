@@ -86,32 +86,32 @@ def copy_logs_output(log_dir, log_file, plot_dir):
     subprocess.call(cmd)
 
 
-def add_secondary(cluster_name, num_preemptibles, region='europe-west1'):
+def add_secondary(cluster_name, num_secondary, region='europe-west1'):
     """
     Add preemptible nodes on the cluster for applicable (non-shuffle) steps.
     :param cluster_name: Name of the cluster
-    :param num_preemptibles: Number of preemptibles
+    :param num_secondary: Number of preemptibles
     :param region: region (default europe-west1)
     :return:
     """
     if cluster_name is not None:
-        logging.info(f"Adding {str(num_preemptibles)} preemptiple nodes to cluster {cluster_name}")
+        logging.info(f"Adding {str(num_secondary)} secondary workers to cluster {cluster_name}")
 
         cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
-                          f"--num-secondary-workers {str(num_preemptibles)}")
+                          f"--num-secondary-workers {str(num_secondary)}")
 
         subprocess.call(cmd)
 
 
 def remove_secondary(cluster_name, region='europe-west1'):
     """
-    Removes all preemptible nodes from a cluster.
+    Removes all secondary workers from a cluster.
     :param cluster_name: cluster name
     :param region: region, default 'europe-west1'
     :return:
     """
     if cluster_name is not None:
-        logging.info('Removing preemptible nodes.')
+        logging.info('Removing secondary workers.')
 
         cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
                           f"--num-secondary-workers 0")
