@@ -179,7 +179,7 @@ def check_inputs(parsed_args):
                       "be given!")
         exit(1)
 
-    if (parsed_args.num_preemptible_workers is not None) and (parsed_args.cluster_name is None):
+    if (parsed_args.num_secondary_workers is not None) and (parsed_args.cluster_name is None):
         logging.info("Warning! If you want to add preemptible workers during the pipeline, give --cluster_name as well."
                      "No preemptible workers added.")
 

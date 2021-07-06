@@ -62,7 +62,7 @@ General options for the pipeline:
 --test                      Restricts to chromosome 22 + chromosome X for testing the pipeline
 --overwrite_checkpoints     Overwrites previous checkpoints, default true
 --run_king                  Stops the pipeline after checkpoint 4, to run King outside of Hail
---num_preemptible_workers   Number of preemptible workers for scaling the cluster in steps which it is allowed
+--num_secondary_workers   Number of preemptible workers for scaling the cluster in steps which it is allowed
 --cluster_name              Name of the Google cloud dataproc cluster the script is submitted to, for scaling
 --region                    Region name for scaling in the pipeline
 ```
