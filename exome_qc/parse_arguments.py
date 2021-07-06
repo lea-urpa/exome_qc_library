@@ -7,7 +7,8 @@ import argparse
 import subprocess
 import shlex
 import logging
-
+import utils
+import os
 
 def parse_arguments(arguments):
     # TODO think about how we could make this less... extra
@@ -24,7 +25,6 @@ def parse_arguments(arguments):
     params.add_argument("--reference_genome", type=str, help="Reference_genome", choices=["GRCh37", "GRCh38"],
                         default="GRCh38")
     params.add_argument("--test", action='store_true', help="run test with just chrom 22?")
-    params.add_argument('--run_king', action='store_true', help='Pause pipeline to run King relatedness calculations?')
     params.add_argument('--pc_num', default=10, type=int, help="Number of PCs to calculate.")
     params.add_argument('--verbosity', type=int, default=1,
                         help='Verbosity? Does counts, takes extra time for processing. 0 is least verbose.')
@@ -171,14 +171,9 @@ def parse_arguments(arguments):
 
 
 def check_inputs(parsed_args):
-    ################################################################
-    # Check that relatives removal file given if run_king is false #
-    ################################################################
-    if (parsed_args.run_king is False) and (parsed_args.relatives_removal_file is None):
-        logging.error("Error! If --run_king is false, then give the file with list of relatives to remove with "
-                      "--relatives_removal_file")
-        exit(1)
-
+    ############################################################
+    # Check some mutually exclusive/dependent input parameters #
+    ############################################################
     if (parsed_args.samples_annotation_files is not None) and (parsed_args.samples_col is None):
         logging.error("Error! If --samples_annotation_files given, --samples_col pointing to sample column must also"
                       "be given!")
@@ -197,8 +192,6 @@ def check_inputs(parsed_args):
     for f in files:
         f1 = getattr(parsed_args, f)
 
-        # TODO implement utils check_if_exists function
-
         if f == 'samples_annotation_files':
             files = getattr(parsed_args, f)
             if files is not None:
@@ -209,20 +202,10 @@ def check_inputs(parsed_args):
         if files is not None:
             for file in files:
                 if file is not None:
-                    if file.endswith("/"):
-                        file = file.rstrip("/")
-
-                    if f == "mt":
-                        file = file + "/metadata.json.gz"
-                    if f == "scripts_dir":
-                        file = file + "/exome_qc.py"
-
-                    stat_cmd = ['gsutil', '-q', 'stat', file]
-                    status = subprocess.call(stat_cmd)
-
-                    if status != 0:
+                    if not utils.check_exists(file):
                         logging.error(f"Error! Input file {file} does not exist!")
                         exit(1)
+
 
     ##################################################
     # Check that bucket for output directories exist #
@@ -252,19 +235,12 @@ def check_inputs(parsed_args):
     # Check that cluster name for adding preemptibles is correct #
     ##############################################################
     if parsed_args.cluster_name is not None:
-        cmd = shlex.split(f"gcloud dataproc clusters update {parsed_args.cluster_name} --region {parsed_args.region} "
-                          f"--num-secondary-workers 1")
 
+        cmd = shlex.split(f"gcloud dataproc clusters list")
+
+        print(cmd)
         success = subprocess.call(cmd)
 
         if success != 0:
             logging.error("Error! Cluster name or region given does not exist!")
             exit(1)
-        else:
-            cmd = shlex.split(f"gcloud dataproc clusters update {parsed_args.cluster_name} --region {parsed_args.region} "
-                              f"--num-secondary-workers 0")
-
-            subprocess.call(cmd)
-
-    if args.stop_checkpoint is None:
-        args.stop_checkpoint = 99
