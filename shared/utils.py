@@ -3,6 +3,7 @@ utility functions
 """
 import os
 from functools import partial
+from tempfile import NamedTemporaryFile
 import gzip
 import csv
 import subprocess
@@ -33,6 +34,7 @@ def check_exists(filename):
 
     else:
         return os.path.exists(filename)
+
 
 def get_path_info(path):  # shamelessly stolen from Pietro
     file_path = os.path.dirname(path)
@@ -66,6 +68,7 @@ def check_delimiter(f):  # shamelessly stolen from Pietro
         return dialect.delimiter
     else:
         return None
+
 
 def copy_logs_output(log_dir, log_file, plot_dir):
     if not log_dir.endswith("/"):
@@ -132,3 +135,23 @@ def check_counts(mt, args):
         print("defined counts OK ")
 
 
+def tmp_bash(cmd, check=False):
+    """
+    Creates a temporary bash file to run subprocess command files, useful when you want to have the output piped to
+    another file
+    :param cmd: command to run
+    :param check:
+    :return:
+    """
+    script_file = NamedTemporaryFile(delete=True)
+
+    with open(script_file.name, 'w') as f:
+        f.write("#!/bin/bash\n")
+        f.write(cmd + "\n")
+    os.chmod(script_file.name, 0o777)
+    script_file.file.close()
+
+    if check:
+        subprocess.check_call(script_file.name)
+    else:
+        subprocess.call(script_file.name, stderr=subprocess.DEVNULL)

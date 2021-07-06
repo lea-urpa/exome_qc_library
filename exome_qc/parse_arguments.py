@@ -8,7 +8,6 @@ import subprocess
 import shlex
 import logging
 import utils
-import os
 
 def parse_arguments(arguments):
     # TODO think about how we could make this less... extra
@@ -212,35 +211,34 @@ def check_inputs(parsed_args):
     ##################################################
     outputs = ['out_dir', 'log_dir']
 
-    # TODO write utility function for this
-    test_f = open('test.txt', 'w')
-    test_f.write("testing bucket exists")
-    test_f.close()
+    utils.tmp_bash("gsutil ls > bucket_list.txt")
+    buckets = []
+    with open("bucket_list.txt") as in_f:
+        for line in in_f:
+            buckets.append(line.strip())
+    in_f.close()
 
     for output in outputs:
         out_dir = getattr(parsed_args, output)
-        bucket = "/".join(out_dir.split("/")[0:3])
-
-        test_cmd = ['gsutil', 'cp', 'test.txt', bucket]
-        success = subprocess.call(test_cmd)
-
-        if success != 0:
-            logging.error(f"Error! Bucket {bucket} for output {out_dir} does not exist!")
+        bucket = "/".join(out_dir.split("/")[0:3]) + "/"
+        if not bucket in buckets:
+            logging.error(f"Error! Bucket does not exist: {bucket}")
             exit(1)
-        else:
-            rm_cmd = ['gsutil', 'rm', os.path.join(bucket, 'test.txt')]
-            subprocess.call(rm_cmd)
 
     ##############################################################
     # Check that cluster name for adding preemptibles is correct #
     ##############################################################
     if parsed_args.cluster_name is not None:
 
-        cmd = shlex.split(f"gcloud dataproc clusters list")
+        utils.tmp_bash(f"gcloud dataproc clusters list --region {parsed_args.region} > clusters_list.txt")
 
-        print(cmd)
-        success = subprocess.call(cmd)
+        clusters = []
+        with open("clusters_list.txt") as in_f:
+            for line in in_f:
+                if not line.startswith("NAME"):
+                    clusters.append(line.strip().split()[0])
+        in_f.close()
 
-        if success != 0:
+        if not parsed_args.cluster_name in clusters:
             logging.error("Error! Cluster name or region given does not exist!")
             exit(1)
