@@ -47,7 +47,6 @@ if __name__ == "__main__":
     root.addHandler(ch)
 
     ## Configure inputs ##
-    args.output_stem = os.path.join(args.out_dir, args.out_name)
     args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
     args.plot_folder = os.path.join(args.out_dir, "plots")
     stepcount = 1
@@ -56,8 +55,6 @@ if __name__ == "__main__":
     else:
         args.test_str = ""
 
-    logging.info("Got as far as logs enabled! Exiting now.")
-    exit(0)
     ##################################
     # Load data and annotate samples #
     ##################################
@@ -80,7 +77,7 @@ if __name__ == "__main__":
         if args.test:
             utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
-            logging.info('Test flag given, filtering to on chrom 22 and chrom X.')
+            logging.info('Test flag given, filtering to chrom 22 and chrom X.')
             if args.reference_genome == "GRCh38":
                 chrom_codes = hl.array(["chr22", "chrX"])
             else:
@@ -88,7 +85,10 @@ if __name__ == "__main__":
 
             mt = mt.filter_rows(chrom_codes.contains(mt.locus.contig))
 
-            test_mt = args.mt.replace(".mt", "") + "_test.mt"
+            if args.mt.endswith(".mt/"):
+                test_mt = (args.mt.replace(".mt/", "") + "_test.mt").split("/")[-1]
+            else:
+                test_mt = (args.mt[:-1] + "_test.mt").split("/")[-1]
             mt = mt.checkpoint(os.path.join(args.out_dir, test_mt), overwrite=True)
 
             utils.remove_secondary(args.cluster_name, args.region)
@@ -124,6 +124,9 @@ if __name__ == "__main__":
 
     samples_removed = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_samples_removed{args.test_str}.mt/")
 
+
+    logging.info("Got as far as samples annotation. Exiting now.")
+    exit(0)
     ##################
     # Remove samples #
     ##################
@@ -391,11 +394,11 @@ if __name__ == "__main__":
         # Export rows and columns
         mtcols = mt.cols()
         mtcols = mtcols.flatten()
-        mtcols.export(args.output_stem + '_final_dataset_cols.tsv')
+        mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv'))
 
         mtrows = mt.rows()
         mtrows = mtrows.flatten()
-        mtrows.export(args.output_stem + '_final_dataset_rows.tsv')
+        mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv'))
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
