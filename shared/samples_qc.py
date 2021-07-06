@@ -7,7 +7,6 @@ import logging
 import time
 import hail as hl
 from bokeh.io import output_file, save
-from pprint import pprint
 
 
 def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, unfilter_entries=False, pheno_qc=False,

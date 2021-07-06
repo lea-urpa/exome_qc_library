@@ -9,9 +9,6 @@ import logging
 import time
 import hail as hl
 from bokeh.io import output_file, save
-
-# Add python files as zip file with pyspark submission to Dataproc
-sys.path.insert(0, exome_qc.zip)
 from parse_arguments import parse_arguments, check_inputs
 import utils
 import samples_annotation as sa
@@ -19,15 +16,12 @@ import variant_qc as vq
 import samples_qc as sq
 import variant_annotation as va
 
-
-# Now it needs to be run as spark-submit --py-files pyfile.py,exome_qc.zip exome_qc.py --args ...
-# Check how the Hail wrapper for spark-submit works
-
 if __name__ == "__main__":
     ###################################################################
     # Initialize Hail and import scripts, configure logger and inputs #
     ###################################################################
     hl.init()
+
     args = parse_arguments(sys.argv[1:])
     check_inputs(args)
 
@@ -62,6 +56,8 @@ if __name__ == "__main__":
     else:
         args.test_str = ""
 
+    logging.info("Got as far as logs enabled! Exiting now.")
+    exit(0)
     ##################################
     # Load data and annotate samples #
     ##################################
@@ -191,6 +187,8 @@ if __name__ == "__main__":
     # Calculate relatedness #
     #########################
     ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
+    logging.info("This part of the pipeline not implemented yet, exiting now!")
+    exit(0)
 
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
