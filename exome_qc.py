@@ -122,11 +122,11 @@ if __name__ == "__main__":
         mt = mt.checkpoint(samples_annotated, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
+    else:
+        logging.info("Detected sample-annotated mt exists, skipping samples annotation.")
+
     samples_removed = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_samples_removed{args.test_str}.mt/")
 
-
-    logging.info("Got as far as samples annotation. Exiting now.")
-    exit(0)
     ##################
     # Remove samples #
     ##################
@@ -181,11 +181,15 @@ if __name__ == "__main__":
         logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")
         mt = mt.checkpoint(low_pass_qcd, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+    else:
+        logging.info("Detected low-pass variant QC mt exists, skipping low-pass variant QC.")
 
     stepcount += 1
     relatedness_calculated = os.path.join(
         args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
 
+    logging.info("Tested up to low-pass variant QC, exiting now.")
+    exit(0)
     #########################
     # Calculate relatedness #
     #########################
