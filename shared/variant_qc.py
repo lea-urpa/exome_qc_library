@@ -82,15 +82,16 @@ def ld_prune(mt, args):
     return mt_ldpruned
 
 
-def filter_failing_GTs_depth_quality(mt, prefix, checkpoint_name, min_dp=10, min_gq=20, count_failing=True,
+def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, min_gq=20, count_failing=True,
                                      filter_missing_measures=False):
     """
     Filter out genotypes with low depth and GQ values.
     :param mt: GT-filtered matrix table
     :return: returns filtered matrix table
     """
-    # Log thresholds + report
     logging.info(f"Finding genotypes with min_dp < {min_dp}, or min GQ < {min_gq}.")
+    if not prefix.endswith("_"):
+        prefix = prefix + "_"
 
     # Get starting genotypes count, instantiate genotype annotation
     gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
@@ -147,7 +148,7 @@ def filter_failing_GTs_depth_quality(mt, prefix, checkpoint_name, min_dp=10, min
             logging.info(f"Number of GTs that are defined but missing depth measure: {missing_depth} ({missing_depth_perc}%)")
             logging.info("(these genotypes missing depth measure are counted as failing)")
 
-        globals_fail_annot = prefix + "_genotype_qc_failing_quality_depth"
+        globals_fail_annot = prefix + "genotype_qc_failing_quality_depth"
         mt = mt.annotate_globals(
             **{globals_fail_annot: {'depth_excluded': failing_depth, 'quality_excluded': failing_gq}})
 
@@ -172,10 +173,11 @@ def filter_failing_GTs_depth_quality(mt, prefix, checkpoint_name, min_dp=10, min
     return mt
 
 
-def count_variant_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2, max_het_ref_reads=0.8,
+def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2, max_het_ref_reads=0.8,
                      min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
     """
     :param mt: matrix table to annotate
+    :param checkpoint_name: Name of checkpoint to write to, including bucket name or file dir to write to
     :param prefix: prefix to add to variant annotations
     :param samples_qc: has samples QC been run, failing samples and population outliers found?
     :param pheno_col: is there a column annotation giving True/False for case status?
@@ -185,6 +187,9 @@ def count_variant_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_het_re
     :param max_hom_alt_ref_reads: maximum percent reference reads for hom alt genotype
     :return:
     """
+    if not prefix.endswith("_"):
+        prefix = prefix + "_"
+
     het_gt_cnt = prefix + 'n_het'
     het_ab = prefix + 'frac_het_gts_in_ab'
     case_het_gt_count = prefix + '_case_n_het'
@@ -288,17 +293,20 @@ def count_variant_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_het_re
         if undefined_cont_het_ab > 0:
             logging.info(f"Warning- {undefined_cont_het_ab} variants have undefined cont het GT allelic balance.")
 
+    mt = mt.checkpoint(checkpoint_name + "_variant_het_ab_annotated.mt/", overwrite=True)
+
     return mt
 
 
-def annotate_variant_het_ab(mt, prefix, samples_qc=False, pheno_col=None, min_het_ref_reads=0.2, max_het_ref_reads=0.8,
-                            min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
+def annotate_variant_het_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2,
+                            max_het_ref_reads=0.8, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
     """
     Annotate percentage of het genotypes per variant that are in  allelic balance. That means that the genotype has ref
     reads within the 20-80% range of all reads.
 
     :param mt: matrix table to annotate
     :param prefix: prefix to add to variant annotations
+    :param checkpoint_name: Name of checkpoint to write to, including bucket name or file dir to write to
     :param samples_qc: has samples QC been run, failing samples and population outliers found?
     :param pheno_col: is there a column annotation giving True/False for case status?
     :param min_het_ref_reads: minimum percent reference reads for het genotype
@@ -313,7 +321,7 @@ def annotate_variant_het_ab(mt, prefix, samples_qc=False, pheno_col=None, min_he
                  "population outliers and samples failing samples QC (if run already) and genotypes failing on "
                  "depth and quality by depth measures.")
 
-    mt = count_variant_ab(mt, prefix=prefix, samples_qc=samples_qc, pheno_col=None,
+    mt = count_variant_ab(mt, checkpoint_name, prefix=prefix, samples_qc=samples_qc, pheno_col=None,
                           min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
                           min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
 
@@ -321,15 +329,15 @@ def annotate_variant_het_ab(mt, prefix, samples_qc=False, pheno_col=None, min_he
     # Annotate het GT and het GT allelic balance for cases and controls separately #
     ################################################################################
     if pheno_col is not None:
-        mt = count_variant_ab(mt, prefix=prefix, samples_qc=samples_qc, pheno_col=pheno_col,
+        mt = count_variant_ab(mt, checkpoint_name, prefix=prefix, samples_qc=samples_qc, pheno_col=pheno_col,
                               min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
                               min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
 
     return mt
 
 
-def find_failing_genotypes_ab(mt, prefix, max_het_ref_reads=0.2, min_het_ref_reads=0.8, min_hom_ref_ref_reads=0.9,
-                              max_hom_alt_ref_reads=0.1, count_failing=True):
+def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=0.2, min_het_ref_reads=0.8,
+                              min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1, count_failing=True):
     """
     Finds genotypes failing allelic balance, defined as the percentage of ref reads that should correspond to that
     called genotype. For hets, percent of ref reads should be between 20-80%, for hom ref they should be at least 90%,
@@ -420,6 +428,7 @@ def find_failing_genotypes_ab(mt, prefix, max_het_ref_reads=0.2, min_het_ref_rea
     # Filter failing genotypes #
     ############################
     mt = mt.filter_entries(het_ab_cond | hom_ab_cond | homalt_ab_cond)
+    mt = mt.checkpoint(checkpoint_name + "_GT_ab_filtered.mt/", overwrite=True)
 
     passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
     passing_gts_perc = round(passing_gts / gt_total * 100, 2)
@@ -427,7 +436,6 @@ def find_failing_genotypes_ab(mt, prefix, max_het_ref_reads=0.2, min_het_ref_rea
     logging.info(f"Number of passing genotypes: {passing_gts} ({passing_gts_perc}%)")
 
     return mt
-
 
 
 def find_failing_variants(
@@ -488,33 +496,30 @@ def find_failing_variants(
     # Find failing genotypes and do allelic balance annotation #
     ############################################################
     # Filter genotypes failing on depth + quality
-    mt = filter_failing_GTs_depth_quality(mt, annotation_prefix, checkpoint_name, min_dp=min_dp, min_gq=min_gq,
-                                          filter_missing_measures=filter_missing_measures,
-                                          count_failing=count_failing)
+    mt_filt1 = filter_failing_GTs_depth_quality(
+        mt, checkpoint_name, prefix=annotation_prefix, min_dp=min_dp, min_gq=min_gq,
+        filter_missing_measures=filter_missing_measures, count_failing=count_failing)
 
     # Annotate variants failing het AB measure (percentage of het GT calls for that variant *in balance*)
-    mt = annotate_variant_het_ab(
-        mt, annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col, max_het_ref_reads=max_het_ref_reads,
-        min_het_ref_reads=min_het_ref_reads, min_hom_ref_ref_reads=min_hom_ref_ref_reads,
-        max_hom_alt_ref_reads=max_hom_alt_ref_reads
+    mt_filt1 = annotate_variant_het_ab(
+        mt_filt1, checkpoint_name, annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
+        max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
+        min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads
     )
-
     # Filter genotypes failing on allelic balance
-    mt = find_failing_genotypes_ab(
-        mt, annotation_prefix, max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
-        min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads,
-        count_failing=count_failing
+    mt_filt2 = find_failing_genotypes_ab(
+        mt_filt1, checkpoint_name, prefix=annotation_prefix, max_het_ref_reads=max_het_ref_reads,
+        min_het_ref_reads=min_het_ref_reads, min_hom_ref_ref_reads=min_hom_ref_ref_reads,
+        max_hom_alt_ref_reads=max_hom_alt_ref_reads, count_failing=count_failing
     )
 
+    ###############################################
+    # Filter matrix table to only passing samples #
+    ###############################################
+    if samples_qc:
+        logging.info("Filtering out samples failing QC.")
+        mt_filt2 = sq.filter_failing(mt)
 
-    ###########################################################
-    # Filter matrix table to only passing genotypes + samples #
-    ###########################################################
-    # We have to actually filter out failing genotypes and samples because hl.variant_qc has no filter option
-    # Filter out failing genotypes for calculating variant QC statistics
-    logging.info("Filtering out genotypes failing on depth, quality, and allelic balance metrics for QC "
-                 "metric calculation. Variant-level % het GTs in allelic balance has already been annotated,"
-                 "after removing genotypes failing on depth and quality, so those variant annotations remain.")
     gtcount = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
     mt_filt = sq.filter_failing(mt, args, mode, variants=False)
 
