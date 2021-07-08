@@ -67,12 +67,8 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(args.mt)
         mt.annotate_globals(original_mt_input={'file': args.mt, 'date': datestr})
 
-        try:
-            test = hl.is_defined(mt.vep)
-        except Exception as e:
-            logging.error("Error! Input matrix table has not been VEP annotated!")
-            logging.error(e)
-            exit()
+        utils.check_vep(mt)
+
 
         if args.test:
             utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)

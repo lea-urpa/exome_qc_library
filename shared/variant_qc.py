@@ -6,6 +6,7 @@ Author: Lea Urpa, August 2020
 import logging
 import hail as hl
 import samples_qc as sq
+import utils
 
 
 def downsample_variants(mt, target_count):
@@ -455,24 +456,10 @@ def find_failing_variants(mt, args, mode):
     :param args: arguments object with thresholds
     :return: returns matrix table with entries and variants annotated with info on whether they fail QC metrics.
     """
-    ###########################################################
-    # Define specific things for low pass vs final variant QC #
-    ###########################################################
-    if mode == 'low_pass':
-        # Check that multiallelic variants have been split
-        try:
-            test = hl.is_defined(mt.row.was_split)
-        except Exception as e:
-            logging.info("Split multi-allelics before running!")
-            logging.info(e)
-            return
-
-        # Define variables
-        p_hwe = args.low_pass_p_hwe
-        call_rate = args.low_pass_min_call_rate
-        annotation_name = "variant_qc_thresholds_lowpass"
-        sex_aware_call_rate = "False"
-        varqc_name = 'prefilter_variant_qc'
+    ############################################################################
+    # Check that multiallelic variants have been split, define annotation name #
+    ############################################################################
+    utils.test_multi_split(mt)
 
     elif mode == "final":
         # Check that samples QC has been run

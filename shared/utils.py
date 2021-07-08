@@ -155,3 +155,21 @@ def tmp_bash(cmd, check=False):
         subprocess.check_call(script_file.name)
     else:
         subprocess.call(script_file.name, stderr=subprocess.DEVNULL)
+
+
+def check_vep(mt):
+    try:
+        test = hl.is_defined(mt.vep)
+    except Exception as e:
+        logging.error("Error! Input matrix table has not been VEP annotated!")
+        logging.error(e)
+        exit()
+
+
+def check_multi_split(mt):
+    try:
+        test = hl.is_defined(mt.was_split)
+    except Exception as e:
+        logging.error("Error! Multi-allelic variants must be split before running.")
+        logging.error(e)
+        exit()
