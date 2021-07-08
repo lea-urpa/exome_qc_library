@@ -186,6 +186,9 @@ if __name__ == "__main__":
         # min_het_ref_reads = args.min_het_ref_reads
         # count_failing = add arg
         # filter_missing_measures = add arg
+        # checkpoint name- give low_pass_qcd
+        # samples_qc - true if samples qc run yet
+
 
 
         logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")

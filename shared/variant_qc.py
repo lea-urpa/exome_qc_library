@@ -76,13 +76,14 @@ def ld_prune(mt, args):
 
     logging.info(f"Variant and sample count after LD pruning: {mt_ldpruned.count()}")
 
-    mt_ldpruned = mt_ldpruned.annotate_globals(ld_pruning_parameters={'r2': args.r2,
-                                                                      'bp_window_size': args.bp_window_size})
+    mt_ldpruned = mt_ldpruned.annotate_globals(
+        ld_pruning_parameters={'r2': args.r2, 'bp_window_size': args.bp_window_size})
+
     return mt_ldpruned
 
 
-def find_failing_genotypes_depth_quality(mt, prefix, min_dp=10, min_gq=20, count_failing=True,
-                                         filter_missing_measures=False):
+def filter_failing_GTs_depth_quality(mt, prefix, checkpoint_name, min_dp=10, min_gq=20, count_failing=True,
+                                     filter_missing_measures=False):
     """
     Filter out genotypes with low depth and GQ values.
     :param mt: GT-filtered matrix table
@@ -90,8 +91,6 @@ def find_failing_genotypes_depth_quality(mt, prefix, min_dp=10, min_gq=20, count
     """
     # Log thresholds + report
     logging.info(f"Finding genotypes with min_dp < {min_dp}, or min GQ < {min_gq}.")
-    globals_annot_name = prefix + "genotype_qc_thresh_dp_gq"
-    mt = mt.annotate_globals(**{globals_annot_name: {'min_dp': min_dp, 'min_gq': min_gq}})
 
     # Get starting genotypes count, instantiate genotype annotation
     gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
@@ -163,10 +162,168 @@ def find_failing_genotypes_depth_quality(mt, prefix, min_dp=10, min_gq=20, count
         filter_condition = failing_dp_cond | pl_cond | gq_cond
 
     mt = mt.filter_entries(filter_condition)
+    mt = mt.checkpoint(checkpoint_name + "_DP_GQ_filtered.mt/", overwrite=True)
+
     passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
     passing_gts_perc = round(passing_gts / gt_total * 100, 2)
 
     logging.info(f"Number of passing genotypes: {passing_gts} ({passing_gts_perc}%)")
+
+    return mt
+
+
+def count_variant_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2, max_het_ref_reads=0.8,
+                     min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
+    """
+    :param mt: matrix table to annotate
+    :param prefix: prefix to add to variant annotations
+    :param samples_qc: has samples QC been run, failing samples and population outliers found?
+    :param pheno_col: is there a column annotation giving True/False for case status?
+    :param min_het_ref_reads: minimum percent reference reads for het genotype
+    :param max_het_ref_reads: maximum percent reference reads for het genotype
+    :param min_hom_ref_ref_reads: minimum percent reference reads for hom ref genotype
+    :param max_hom_alt_ref_reads: maximum percent reference reads for hom alt genotype
+    :return:
+    """
+    het_gt_cnt = prefix + 'n_het'
+    het_ab = prefix + 'frac_het_gts_in_ab'
+    case_het_gt_count = prefix + '_case_n_het'
+    case_het_gt_ab = prefix + '_case_frac_het_gts_in_ab'
+    cont_het_gt_count = prefix + '_control_n_het'
+    cont_het_gt_ab = prefix + '_control_frac_het_gts_in_ab'
+
+    ##########################################################################
+    # Get total # of het GTs per variant in passing samples (or all samples) #
+    ##########################################################################
+    het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT)
+
+    if samples_qc:
+        sample_filter = (
+                (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) &
+                hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
+        )
+        if pheno_col is not None:
+            case_filter = sample_filter & (mt[pheno_col] == True) & (hl.is_defined(mt[pheno_col]))
+            cont_filter = sample_filter + (mt[pheno_col] == False) & (hl.is_defined(mt[pheno_col]))
+
+            mt = mt.annotate_rows(**{case_het_gt_count: hl.agg.filter(case_filter, hl.agg.count_where(het_gt_filters))})
+            mt = mt.annotate_rows(**{cont_het_gt_count: hl.agg.filter(cont_filter, hl.agg.count_where(het_gt_filters))})
+
+        else:
+            mt = mt.annotate_rows(**{het_gt_cnt: hl.agg.filter(sample_filter, hl.agg.count_where(het_gt_filters))})
+    else:
+        mt = mt.annotate_rows(**{het_gt_cnt: hl.agg.count_where(het_gt_filters)})
+
+    ###########################################
+    # Define filter conditions for variant ab #
+    ###########################################
+    het_ab_cond = (
+            (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
+            & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
+    )
+    hom_ab_cond = (
+            ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
+            mt.GT.is_hom_ref() & hl.is_defined(mt.GT)
+    )
+    homalt_ab_cond = (
+            ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
+            mt.GT.is_hom_var() & hl.is_defined(mt.GT)
+    )
+
+    #####################################################
+    # Get percent of het gts in AB if het gt count != 0 #
+    #####################################################
+    passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (het_ab_cond | hom_ab_cond | homalt_ab_cond)
+
+    if samples_qc:
+        sample_filter = ((mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) &
+                         hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc))
+
+        if pheno_col is not None:
+            case_filter = sample_filter + (mt[pheno_col] == True) & (hl.is_defined(mt[pheno_col]))
+            cont_filter = sample_filter + (mt[pheno_col] == False) & (hl.is_defined(mt[pheno_col]))
+
+            mt = mt.annotate_rows(**{
+                case_het_gt_ab: hl.agg.filter(case_filter,
+                                              hl.cond(
+                                                  (mt[case_het_gt_count] > 0) & hl.is_defined(mt[case_het_gt_count]),
+                                                  hl.agg.count_where(passing_het_gts) / mt[case_het_gt_count],
+                                                  hl.null(hl.tfloat)))})
+
+            mt = mt.annotate_rows(**{
+                cont_het_gt_ab: hl.agg.filter(cont_filter,
+                                              hl.cond(
+                                                  (mt[cont_het_gt_count] > 0) & hl.is_defined(mt[cont_het_gt_count]),
+                                                  hl.agg.count_where(passing_het_gts) / mt[cont_het_gt_count],
+                                                  hl.null(hl.tfloat)))})
+
+        else:
+            mt = mt.annotate_rows(
+                **{het_ab: hl.agg.filter(sample_filter,
+                                         hl.cond((mt[het_gt_cnt] > 0) & hl.is_defined(mt[het_gt_cnt]),
+                                                 hl.agg.count_where(passing_het_gts) / mt[het_gt_cnt],
+                                                 hl.null(hl.tfloat)))})
+    else:
+        mt = mt.annotate_rows(**{het_ab: hl.cond((mt[het_gt_cnt] > 0) & hl.is_defined(mt[het_gt_cnt]),
+                                                 hl.agg.count_where(passing_het_gts) / mt[het_gt_cnt],
+                                                 hl.null(hl.tfloat))})
+
+    if pheno_col is not None:
+        # Check annotations defined for all variants
+        undefined_case_het_ct = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[case_het_gt_count]))))
+        undefined_case_het_ab = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[case_het_gt_ab]))))
+
+        if undefined_case_het_ct > 0:
+            logging.info(f"Warning- {undefined_case_het_ct} variants have undefined case het GT count.")
+
+        if undefined_case_het_ab > 0:
+            logging.info(f"Warning- {undefined_case_het_ab} variants have undefined case het GT allelic balance.")
+
+        undefined_cont_het_ct = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[cont_het_gt_count]))))
+        undefined_cont_het_ab = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[cont_het_gt_ab]))))
+
+        if undefined_cont_het_ct > 0:
+            logging.info(f"Warning- {undefined_cont_het_ct} variants have undefined cont het GT count.")
+
+        if undefined_cont_het_ab > 0:
+            logging.info(f"Warning- {undefined_cont_het_ab} variants have undefined cont het GT allelic balance.")
+
+    return mt
+
+
+def annotate_variant_het_ab(mt, prefix, samples_qc=False, pheno_col=None, min_het_ref_reads=0.2, max_het_ref_reads=0.8,
+                            min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
+    """
+    Annotate percentage of het genotypes per variant that are in  allelic balance. That means that the genotype has ref
+    reads within the 20-80% range of all reads.
+
+    :param mt: matrix table to annotate
+    :param prefix: prefix to add to variant annotations
+    :param samples_qc: has samples QC been run, failing samples and population outliers found?
+    :param pheno_col: is there a column annotation giving True/False for case status?
+    :param min_het_ref_reads: minimum percent reference reads for het genotype
+    :param max_het_ref_reads: maximum percent reference reads for het genotype
+    :param min_hom_ref_ref_reads: minimum percent reference reads for hom ref genotype
+    :param max_hom_alt_ref_reads: maximum percent reference reads for hom alt genotype
+    """
+    ################################################################
+    # Annotate rows with het GT count, then het GT allelic balance #
+    ################################################################
+    logging.info("Annotating variants with fraction of het genotypes in allelic balance, after filtering out "
+                 "population outliers and samples failing samples QC (if run already) and genotypes failing on "
+                 "depth and quality by depth measures.")
+
+    mt = count_variant_ab(mt, prefix=prefix, samples_qc=samples_qc, pheno_col=None,
+                          min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
+                          min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
+
+    ################################################################################
+    # Annotate het GT and het GT allelic balance for cases and controls separately #
+    ################################################################################
+    if pheno_col is not None:
+        mt = count_variant_ab(mt, prefix=prefix, samples_qc=samples_qc, pheno_col=pheno_col,
+                              min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
+                              min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
 
     return mt
 
@@ -190,12 +347,6 @@ def find_failing_genotypes_ab(mt, prefix, max_het_ref_reads=0.2, min_het_ref_rea
                  f"\nor het ref reads < {min_het_ref_reads}"
                  f"\nor failing hom ref genotypes with ref reads < {min_hom_ref_ref_reads}"
                  f"\nor failing hom alt genotypes with ref reads > {max_hom_alt_ref_reads}")
-
-    globals_annot_name = prefix + "genotype_qc_thresholds_ab"
-    mt = mt.annotate_globals(**{globals_annot_name: {'max_het_ref_reads': max_het_ref_reads,
-                                                     'min_het_ref_reads': min_het_ref_reads,
-                                                     'min_hom_ref_ref_reads': min_hom_ref_ref_reads,
-                                                     'max_hom_alt_ref_reads': max_hom_alt_ref_reads}})
 
     gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
 
@@ -278,159 +429,12 @@ def find_failing_genotypes_ab(mt, prefix, max_het_ref_reads=0.2, min_het_ref_rea
     return mt
 
 
-def annotate_variant_het_ab(mt, prefix):
-    """
-     Annotate percentage of het genotypes per variant that are in  allelic balance. That means that the genotype has ref
-    reads within the 20-80% range of all reads.
-
-    :param mt: matrix table to annotate
-    :param prefix: prefix to add to variant annotation
-    :return: returns annotated matrix table
-    """
-    ##########################################
-    # Check dataset for expected annotations #
-    ##########################################
-    logging.info("Annotating variants with fraction of het genotypes in allelic balance, after filtering out "
-                 "population outliers and samples failing samples QC (if run already) and genotypes failing on "
-                 "depth and quality by depth measures.")
-    het_gt_cnt = prefix + 'het_gt_count'
-    het_ab = prefix + 'frac_het_gts_in_ab'
-    failing_dp_name = prefix + "failing_depth_quality"
-    failing_ab_name = prefix + "failing_ab"
-
-    # Check if samples QC has been run yet, if not add empty annotations
-    try:
-        test = hl.is_defined(mt.pop_outlier_sample)
-    except Exception as e:
-        logging.info("Detected samples QC not run, adding False pop_outlier_sample annotation to columns.")
-        logging.info(e)
-        mt = mt.annotate_cols(pop_outlier_sample=False)
-
-    try:
-        test = hl.is_defined(mt.failing_samples_qc)
-    except Exception as e:
-        logging.info("Detected samples QC not run, adding empty array failing_samples_qc annotation to columns.")
-        logging.info(e)
-        mt = mt.annotate_cols(failing_samples_qc=hl.empty_array(hl.tstr))
-
-    ################################################################
-    # Annotate rows with het GT count, then het GT allelic balance #
-    ################################################################
-    # Get count of het genotypes per variant
-    case_filter = (
-          (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) &
-          hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
-    )
-    het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & \
-                     hl.is_defined(mt[failing_dp_name])
-
-    mt = mt.annotate_rows(**{het_gt_cnt: hl.agg.filter(case_filter, hl.agg.count_where(het_gt_filters))})
-
-    # Get percent of het gts in AB if het gt count != 0
-    case_filter = (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) & \
-                  hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
-    passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & \
-                      ~(mt[failing_ab_name].contains("failing_het_ab")) & hl.is_defined(mt[failing_dp_name])
-
-    # Counting het GTs skips variants where there are no het GTs (which leads to div by 0 error)
-    mt = mt.annotate_rows(**{het_ab:
-             hl.agg.filter(case_filter,
-                           hl.cond((mt[het_gt_cnt] > 0) & hl.is_defined(mt[het_gt_cnt]),
-                                   hl.agg.count_where(passing_het_gts) / mt[het_gt_cnt],
-                                   hl.null(hl.tfloat)))})
-
-    # Check annotations defined for all variants
-    undefined_het_ct = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_gt_cnt]))))
-    undefined_het_ab = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_ab]))))
-    undefined_het_ab_hets = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_ab])) & (mt[het_gt_cnt] > 0)))
-
-    if undefined_het_ct > 0:
-        logging.info(f"Warning- {undefined_het_ct} variants have undefined het GT count.")
-
-    if undefined_het_ab > 0:
-        logging.info(f"Warning- {undefined_het_ab} variants have undefined het GT allelic balance.")
-        logging.info(f"{undefined_het_ab_hets} variants have undefined het GT allelic balance, and het GT count > 0.")
-
-    ################################################################################
-    # Annotate het GT and het GT allelic balance for cases and controls separately #
-    ################################################################################
-    if args.pheno_col is not None:
-        case_het_gt_count = prefix + '_case_het_gt_count'
-        case_het_gt_ab = prefix + '_case_frac_het_gts_in_ab'
-        cont_het_gt_count = prefix + '_control_het_gt_count'
-        cont_het_gt_ab = prefix + '_control_frac_het_gts_in_ab'
-
-        # Count case het GTs
-        case_filter = (mt[args.pheno_col] == True) & (hl.is_defined(mt[args.pheno_col])) & \
-                      (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) & \
-                      hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
-        het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & \
-                         hl.is_defined(mt[failing_dp_name])
-
-        mt = mt.annotate_rows(**{case_het_gt_count: hl.agg.filter(case_filter, hl.agg.count_where(het_gt_filters))})
-
-        # Get case het GT fraction in allelic balance
-        case_filter = (mt[args.pheno_col] == True) & (hl.is_defined(mt[args.pheno_col])) & \
-                      (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) > 0) & \
-                      hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
-        passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & \
-                          ~(mt[failing_ab_name].contains("failing_het_ab")) & hl.is_defined(mt[failing_dp_name])
-
-        mt = mt.annotate_rows(**{
-            case_het_gt_ab: hl.agg.filter(case_filter,
-                                          hl.cond((mt[case_het_gt_count] > 0) & hl.is_defined(mt[case_het_gt_count]),
-                                                  hl.agg.count_where(passing_het_gts) / mt[case_het_gt_count],
-                                                  hl.null(hl.tfloat)))})
-
-        # Get control het GT count
-        cont_filter = (mt[args.pheno_col] == False) & (hl.is_defined(mt[args.pheno_col])) &\
-                      (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) & \
-                      hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
-        het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & \
-                         hl.is_defined(mt[failing_dp_name])
-
-        mt = mt.annotate_rows(**{cont_het_gt_count: hl.agg.filter(cont_filter, hl.agg.count_where(het_gt_filters))})
-
-        # Get control het GT fraction in allelic balance
-        cont_filter = (mt[args.pheno_col] == False) & (hl.is_defined(mt[args.pheno_col])) &\
-                      (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) & \
-                      hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
-        passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & \
-                          ~(mt[failing_ab_name].contains("failing_het_ab")) & hl.is_defined(mt[failing_dp_name])
-
-        mt = mt.annotate_rows(**{
-            cont_het_gt_ab: hl.agg.filter(cont_filter,
-                                          hl.cond((mt[cont_het_gt_count] > 0) & hl.is_defined(mt[cont_het_gt_count]),
-                                                  hl.agg.count_where(passing_het_gts) / mt[cont_het_gt_count],
-                                                  hl.null(hl.tfloat)))})
-
-        # Check annotations defined for all variants
-        undefined_case_het_ct = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[case_het_gt_count]))))
-        undefined_case_het_ab = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[case_het_gt_ab]))))
-
-        if undefined_case_het_ct > 0:
-            logging.info(f"Warning- {undefined_case_het_ct} variants have undefined case het GT count.")
-
-        if undefined_case_het_ab > 0:
-            logging.info(f"Warning- {undefined_case_het_ab} variants have undefined case het GT allelic balance.")
-
-        undefined_cont_het_ct = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[cont_het_gt_count]))))
-        undefined_cont_het_ab = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[cont_het_gt_ab]))))
-
-        if undefined_cont_het_ct > 0:
-            logging.info(f"Warning- {undefined_cont_het_ct} variants have undefined cont het GT count.")
-
-        if undefined_cont_het_ab > 0:
-            logging.info(f"Warning- {undefined_cont_het_ab} variants have undefined cont het GT allelic balance.")
-
-    return mt
-
 
 def find_failing_variants(
-        mt, checkpoint_name=None, annotation_prefix="", min_dp=10, min_gq=20,
+        mt, checkpoint_name, annotation_prefix="", min_dp=10, min_gq=20,
         max_het_ref_reads=0.8, min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1,
         call_rate=0.8, p_hwe=1e-6, snp_qd=2, indel_qd=3, filter_missing_measures=False, count_failing=True,
-        sex_aware_call_rate=False, pheno_col=False):
+        sex_aware_call_rate=False, pheno_col=None, samples_qc=False):
     """
     Function to find variants failing on QC measures, which can be run in 'low_pass' or 'final' mode, with varying
     filters given by args depending on the mode.
@@ -452,8 +456,10 @@ def find_failing_variants(
     if not annotation_prefix.endswith("_"):
         annotation_prefix = annotation_prefix + "_"
 
-    if checkpoint_name is None:
-        checkpoint_name = "variant_qc_tmp.mt/"
+    if checkpoint_name.endswith(".mt"):
+        checkpoint_name = checkpoint_name.replace(".mt", "")
+    elif checkpoint_name.endswith(".mt/"):
+        checkpoint_name = checkpoint_name.replace(".mt/", "")
 
     #####################################
     # Annotate QC thresholds to globals #
@@ -463,31 +469,43 @@ def find_failing_variants(
     else:
         hwe_tag = "all samples"
 
-    threshold_dict = {'pval_hwe': str(p_hwe), 'hwe_excluded_in': str(hwe_tag),
+    var_thresholds = {'pval_hwe': str(p_hwe), 'hwe_excluded_in': str(hwe_tag),
                       'call_rate': str(call_rate),
                       'sex_aware_call_rate': sex_aware_call_rate, 'snp_qd': str(snp_qd),
                       'indel_qd': str(indel_qd),
                       'het_max_ref_reads_thresh': str(max_het_ref_reads),
                       'het_min_ref_reads_thresh': str(min_het_ref_reads)}
 
-    mt = mt.annotate_globals(**{annotation_prefix + "variant_qc_thresholds": threshold_dict})
+    mt = mt.annotate_globals(**{annotation_prefix + "variant_qc_thresholds": var_thresholds})
+
+    gt_thresholds = {'min_DP': min_dp, 'min_GQ': min_gq, 'max_het_ref_reads': max_het_ref_reads,
+                     'min_het_ref_reads': min_het_ref_reads, 'min_hom_ref_ref_reads': min_hom_ref_ref_reads,
+                     'max_hom_alt_ref_reads': max_hom_alt_ref_reads }
+
+    mt = mt.annotate_globals(**{annotation_prefix + "genotype_qc_thresholds": gt_thresholds})
 
     ############################################################
     # Find failing genotypes and do allelic balance annotation #
     ############################################################
-    # Find genotypes failing on depth, quality, and allelic balance
-    mt = find_failing_genotypes_depth_quality(mt, annotation_prefix, min_dp=min_dp, min_gq=min_gq,
-                                              filter_missing_measures=filter_missing_measures,
-                                              count_failing=count_failing)
+    # Filter genotypes failing on depth + quality
+    mt = filter_failing_GTs_depth_quality(mt, annotation_prefix, checkpoint_name, min_dp=min_dp, min_gq=min_gq,
+                                          filter_missing_measures=filter_missing_measures,
+                                          count_failing=count_failing)
+
+    # Annotate variants failing het AB measure (percentage of het GT calls for that variant *in balance*)
+    mt = annotate_variant_het_ab(
+        mt, annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col, max_het_ref_reads=max_het_ref_reads,
+        min_het_ref_reads=min_het_ref_reads, min_hom_ref_ref_reads=min_hom_ref_ref_reads,
+        max_hom_alt_ref_reads=max_hom_alt_ref_reads
+    )
+
+    # Filter genotypes failing on allelic balance
     mt = find_failing_genotypes_ab(
         mt, annotation_prefix, max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
         min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads,
         count_failing=count_failing
     )
 
-    # Define het allelic balance value (percentage of GT calls for that variant *in balance*)
-    mt = annotate_variant_het_ab(mt, annotation_prefix)
-    mt = mt.checkpoint(args.output_stem + mode + '_filtervartemp1_deleteme.mt', overwrite=True)
 
     ###########################################################
     # Filter matrix table to only passing genotypes + samples #
