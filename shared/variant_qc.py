@@ -518,17 +518,14 @@ def find_failing_variants(
     ###############################################
     if samples_qc:
         logging.info("Filtering out samples failing QC.")
-        mt_filt2 = sq.filter_failing(mt)
-
-    gtcount = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
-    mt_filt = sq.filter_failing(mt, args, mode, variants=False)
-
-    filt_gt_count = mt_filt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt_filt.GT)))
-    logging.info(f"Number of genotypes on which variant QC measures calculated: {filt_gt_count}")
-    logging.info(f"({100 - round((gtcount - filt_gt_count) / gtcount, 2)}% of all genotypes)")
+        mt_filt2 = sq.filter_failing(
+            mt, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col, entries=False, variants=False,
+            samples=True, pheno_qc=False, min_dp=min_dp, max_het_ref_reads=max_het_ref_reads,
+            min_het_ref_reads=min_het_ref_reads, min_hom_ref_ref_reads=min_hom_ref_ref_reads,
+            max_hom_alt_ref_reads=max_hom_alt_ref_reads)
 
     # Run variant QC on filtered matrix table
-    mt_filt = hl.variant_qc(mt_filt, name=varqc_name)
+    mt_filt3 = hl.variant_qc(mt_filt2, name=annotation_prefix)
 
     ######################################################
     # Set HWE calculation in either all or only controls #

@@ -9,8 +9,9 @@ import hail as hl
 from bokeh.io import output_file, save
 
 
-def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, unfilter_entries=False, pheno_qc=False,
-                   checkpoint=True):
+def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True, variants=True, samples=True,
+                   unfilter_entries=False, pheno_qc=False, min_dp=10, min_gq=20, max_het_ref_reads=0.8,
+                   min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
     """
     Filters failing samples, variants, and entries from a given matrix table
     :param mt: matrix table to filter
@@ -22,44 +23,78 @@ def filter_failing(mt, args, mode, entries=True, variants=True, samples=True, un
     :param unfilter_entries: Unfilter entries (set to missing) after filtering entries?
     :return:
     """
+    if not prefix.endswith("_"):
+        prefix = prefix + "_"
+
+    if checkpoint_name.endswith(".mt"):
+        checkpoint_name = checkpoint_name.replace(".mt", "")
+    elif checkpoint_name.endswith(".mt/"):
+        checkpoint_name = checkpoint_name.replace(".mt/", "")
+
     start_count = mt.count()
     tag = []
+
+    ##################
+    # Filter entries #
+    ##################
     if entries:
-        mt = mt.filter_entries((hl.len(mt[mode + '_failing_depth_quality']) == 0) &
-                                hl.is_defined(mt[mode + '_failing_depth_quality']) &
-                               (hl.len(mt[mode + '_failing_ab']) == 0) & hl.is_defined(mt[mode + "_failing_ab"]),
-                               keep=True)
+        dp_cond = hl.is_defined(mt.DP) & (mt.DP > min_dp)
+        gq_cond = hl.is_defined(mt.GQ) & (mt.GQ > min_gq)
+
+        het_ab_cond = (
+                (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
+                & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
+        )
+        hom_ab_cond = (
+                ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
+                mt.GT.is_hom_ref() & hl.is_defined(mt.GT)
+        )
+        homalt_ab_cond = (
+                ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
+                mt.GT.is_hom_var() & hl.is_defined(mt.GT)
+        )
+
+        mt = mt.filter_entries(hl.is_defined(mt.GT) & dp_cond & gq_cond & (het_ab_cond | hom_ab_cond | homalt_ab_cond))
+        mt = mt.checkpoint(checkpoint_name + "_GT_filtered.mt/", overwrite=True)
         tag.append("entries")
+
+    ###################
+    # Filter variants #
+    ###################
     if variants:
-        mt = mt.filter_rows((hl.len(mt[mode + '_failing_variant_qc']) == 0) &
-                            hl.is_defined(mt[mode + "_failing_variant_qc"]), keep=True)
+        mt = mt.filter_rows((hl.len(mt[prefix + 'failing_variant_qc']) == 0) &
+                            hl.is_defined(mt[prefix + "failing_variant_qc"]), keep=True)
         tag.append("variants")
-        if (args.pheno_col is not None) and (pheno_qc is True):
+
+        if (pheno_col is not None) and (pheno_qc is True):
             mt = mt.filter_rows((hl.len(mt.failing_pheno_varqc) == 0) & hl.is_defined(mt.failing_pheno_varqc),
                                 keep=True)
             tag.append("variants by phenotype")
 
+        mt = mt.checkpoint(checkpoint_name + "_variants_filtered.mt/", overwrite=True)
+
+    ##################
+    # Filter samples #
+    ##################
     if samples:
         mt = mt.filter_cols((hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc) &
                             (mt.pop_outlier_sample == False) & hl.is_defined(mt.pop_outlier_sample), keep=True)
+
+        mt = mt.checkpoint(checkpoint_name + "_samples_filtered.mt/", overwrite=True)
         tag.append("samples")
 
     final_count = mt.count()
 
     logging.info(f"Removing failing {', '.join(tag)}.")
     if entries:
-        logging.info("(including entries failing allelic balance)")
+        logging.info("(including entries failing allelic balance). "
+                     "Not filtering genotypes missing DP, GQ, AD, or PL measures.")
 
     logging.info(f"Matrix table count before filtering: {start_count}. After filtering: {final_count}")
 
-    if unfilter_entries is True:  # Unfilter entries if needed for pc_relate
+    if (unfilter_entries is True) and (entries is True):  # Unfilter entries if needed for pc_relate
         logging.info('Unfiltering entries (setting them to missing)')
         mt = mt.unfilter_entries()
-
-    if checkpoint:
-        logging.info(f"Writing temporary checkpoint for filtered mt.")
-        mt = mt.checkpoint(f"{args.output_stem}_{mode}_removed_tmp_{args.tmp_counter}.mt", overwrite=True)
-        args.tmp_counter = args.tmp_counter + 1
 
     return mt
 
