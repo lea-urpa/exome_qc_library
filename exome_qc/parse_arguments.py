@@ -85,6 +85,8 @@ def parse_arguments(arguments):
                              help="min % reference reads for a ref GT call")
     geno_thresh.add_argument("--max_hom_alt_ref_reads", default=0.1, type=float,
                              help="max % reference reads for an alt GT call")
+    geno_thresh.add_argument("--count_failing", default=True, type=bool,
+                             help="Count number of genotypes failing each filter? Slow, but handy for troubleshooting.")
 
 
     # LD pruning thresholds #

@@ -81,99 +81,98 @@ def ld_prune(mt, args):
     return mt_ldpruned
 
 
-def find_failing_genotypes_depth_quality(mt, args, prefix):
+def find_failing_genotypes_depth_quality(mt, prefix, min_dp=10, min_gq=20, count_failing=True,
+                                         filter_missing_measures=False):
     """
-    Annotates genotypes for initial low-pass variant QC in pipeline. Finds genotypes with low depth and GQ values.
-    :param mt: matrix table to filter
+    Filter out genotypes with low depth and GQ values.
+    :param mt: GT-filtered matrix table
     :return: returns filtered matrix table
     """
     # Log thresholds + report
-    logging.info(f"Finding genotypes with min_dp < {args.min_dp}, or min GQ < {args.min_gq}")
-    globals_annot_name = prefix + "_genotype_qc_thresh_dp_gq"
-    failing_name = prefix + "_failing_depth_quality"
-    mt = mt.annotate_globals(**{globals_annot_name: {'min_dp': args.min_dp, 'min_gq': args.min_gq}})
+    logging.info(f"Finding genotypes with min_dp < {min_dp}, or min GQ < {min_gq}.")
+    globals_annot_name = prefix + "genotype_qc_thresh_dp_gq"
+    mt = mt.annotate_globals(**{globals_annot_name: {'min_dp': min_dp, 'min_gq': min_gq}})
 
     # Get starting genotypes count, instantiate genotype annotation
     gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
     gt_het_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) &
                                                             (mt.GT.is_hom_var() | mt.GT.is_het())))
     gt_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
-    mt = mt.annotate_entries(**{failing_name: hl.empty_array(hl.tstr)})
 
     ############################
-    # Filter entries for depth #
+    # Define filter conditions #
     ############################
-    depth_cond = hl.cond((mt.DP < args.min_dp) & hl.is_defined(mt.DP),
-                         mt[failing_name].append("failing_DP"), mt[failing_name])
-    mt = mt.annotate_entries(**{failing_name: depth_cond})
-    missing_dp = hl.cond(~(hl.is_defined(mt.DP)) & hl.is_defined(mt.GT),
-                         mt[failing_name].append("missing_DP"), mt[failing_name])
-    mt = mt.annotate_entries(**{failing_name: missing_dp})
+    failing_dp_cond = ((mt.DP < min_dp) & hl.is_defined(mt.DP))
+    pl_cond = ((mt.GT.is_het() | mt.GT.is_hom_var()) & (mt.PL[0] < min_gq) &
+                    hl.is_defined(mt.GT) & hl.is_defined(mt.PL))
+    gq_cond = (mt.GT.is_hom_ref() & (mt.GQ < min_gq) & hl.is_defined(mt.GQ) & hl.is_defined(mt.GT))
 
-    failing_depth = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_DP")))
-    failing_depth_perc = round(failing_depth / gt_total*100, 2)
-    missing_depth = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("missing_DP")))
-    missing_depth_perc = round(missing_depth / gt_total*100, 2)
+    missing_dp_cond = (~(hl.is_defined(mt.DP)) & hl.is_defined(mt.GT))
+    missing_gq_cond = (~(hl.is_defined(mt.GQ)) & hl.is_defined(mt.GT) & mt.GT.is_hom_ref())
+    missing_pl_cond = (~(hl.is_defined(mt.PL)) & (mt.GT.is_het() | mt.GT.is_hom_var()) & hl.is_defined(mt.GT))
 
-    ###########################################
-    # Filter GQ or PL for different genotypes #
-    ###########################################
-    gq_cond = hl.cond((mt.GT.is_het() | mt.GT.is_hom_var()) & (mt.PL[0] < args.min_gq) &
-                      hl.is_defined(mt.GT) & hl.is_defined(mt.PL),
-                      mt[failing_name].append("failing_PL"), mt[failing_name])
-    mt = mt.annotate_entries(**{failing_name: gq_cond})
+    ########################################
+    # Count failing genotypes if indicated #
+    ########################################
+    if count_failing:
+        # Count failing depth
+        failing_depth = mt.aggregate_entries(hl.agg.count_where(failing_dp_cond))
+        failing_depth_perc = round(failing_depth / gt_total*100, 2)
+        missing_depth = mt.aggregate_entries(hl.agg.count_where(missing_dp_cond))
+        missing_depth_perc = round(missing_depth / gt_total*100, 2)
 
-    pl_cond = hl.cond(mt.GT.is_hom_ref() & (mt.GQ < args.min_gq) & hl.is_defined(mt.GQ) & hl.is_defined(mt.GT),
-                      mt[failing_name].append("failing_GQ"), mt[failing_name])
-    mt = mt.annotate_entries(**{failing_name: pl_cond})
+        # Count failing GQ or PL measures
+        failing_gq = mt.aggregate_entries(hl.agg.count_where(gq_cond))
+        failing_pl = mt.aggregate_entries(hl.agg.count_where(pl_cond))
+        missing_gq = mt.aggregate_entries(hl.agg.count_where(missing_gq_cond))
+        missing_pl = mt.aggregate_entries(missing_pl_cond)
 
-    gq_miss = hl.cond(~(hl.is_defined(mt.GQ)) & hl.is_defined(mt.GT) & mt.GT.is_hom_ref(),
-                      mt[failing_name].append("missing_GQ_hom_ref"), mt[failing_name])
+        logging.info(f"Number of GTs with depth < {min_dp}: {failing_depth} ({failing_depth_perc}%)")
+        logging.info(f"Number of hom ref GTs with GQ < {min_gq}: {failing_gq} "
+                     f"({round(failing_gq/gt_total*100, 2)}% of all GTs, "
+                     f"{round(failing_gq/gt_homref*100, 2)}% of homref GTs)")
+        logging.info(f"Number of het or hom alt GTs with PL[0] < {min_gq}: {failing_pl} "
+                     f"({round(failing_pl/gt_total*100, 2)}% of all GTs, "
+                     f"{round(failing_pl/gt_het_homalt*100, 2)} % of homalt + het GTs)")
 
-    mt = mt.annotate_entries(**{failing_name: gq_miss})
+        if missing_gq > 0:
+            logging.info(f"Number of hom ref GTs that are defined but missing GQ : {missing_gq} "
+                         f"({round(missing_gq/gt_total*100, 2)}% of all GTs, "
+                         f"{round(missing_gq/gt_homref*100, 2)}% of homref GTs)")
+            logging.info("(these genotypes are counted as failing)")
+        if missing_pl > 0:
+            logging.info(f"Number of het or hom alt GTs that are defined but missing PL: {missing_pl} "
+                         f"({round(missing_pl/gt_total*100, 2)}% of all GTs, "
+                         f"{round(missing_pl/gt_het_homalt*100, 2)}% of het and hom alt GTs)")
+        if missing_depth > 0:
+            logging.info(f"Number of GTs that are defined but missing depth measure: {missing_depth} ({missing_depth_perc}%)")
+            logging.info("(these genotypes missing depth measure are counted as failing)")
 
-    pl_miss = hl.cond(~(hl.is_defined(mt.PL)) & (mt.GT.is_het() | mt.GT.is_hom_var()) & hl.is_defined(mt.GT),
-                      mt[failing_name].append("missing_PL_het_homvar"), mt[failing_name])
-    mt = mt.annotate_entries(**{failing_name: pl_miss})
+        globals_fail_annot = prefix + "_genotype_qc_failing_quality_depth"
+        mt = mt.annotate_globals(
+            **{globals_fail_annot: {'depth_excluded': failing_depth, 'quality_excluded': failing_gq}})
 
-    failing_gq = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_GQ")))
-    failing_pl = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_PL")))
-    missing_gq = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("missing_GQ_or_PL")))
-    missing_pl = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("missing_PL_het_homvar")))
+    ############################
+    # Filter failing genotypes #
+    ############################
+    if filter_missing_measures:
+        logging.info("Filtering genotypes missing DP, GQ, or PL measures.")
+        filter_condition = failing_dp_cond | pl_cond | gq_cond | missing_dp_cond |missing_gq_cond | missing_pl_cond
+    else:
+        logging.info("Filtering only genotypes failing QC measures, leaving genotypes missing those measures.")
+        filter_condition = failing_dp_cond | pl_cond | gq_cond
 
-    logging.info(f"Number of GTs with depth < {args.min_dp}: {failing_depth} ({failing_depth_perc}%)")
-    logging.info(f"Number of hom ref GTs with GQ < {args.min_gq}: {failing_gq} "
-                 f"({round(failing_gq/gt_total*100, 2)}% of all GTs, "
-                 f"{round(failing_gq/gt_homref*100, 2)}% of homref GTs)")
-    logging.info(f"Number of het or hom alt GTs with PL[0] < {args.min_gq}: {failing_pl} "
-                 f"({round(failing_pl/gt_total*100, 2)}% of all GTs, "
-                 f"{round(failing_pl/gt_het_homalt*100, 2)} % of homalt + het GTs)")
-
-    if missing_gq > 0:
-        logging.info(f"Number of hom ref GTs that are defined but missing GQ : {missing_gq} "
-                     f"({round(missing_gq/gt_total*100, 2)}% of all GTs, "
-                     f"{round(missing_gq/gt_homref*100, 2)}% of homref GTs)")
-        logging.info("(these genotypes are counted as failing)")
-    if missing_pl > 0:
-        logging.info(f"Number of het or hom alt GTs that are defined but missing PL: {missing_pl} "
-                     f"({round(missing_pl/gt_total*100, 2)}% of all GTs, "
-                     f"{round(missing_pl/gt_het_homalt*100, 2)}% of het and hom alt GTs)")
-    if missing_depth > 0:
-        logging.info(f"Number of GTs that are defined but missing depth measure: {missing_depth} ({missing_depth_perc}%)")
-        logging.info("(these genotypes missing depth measure are counted as failing)")
-
-    passing_gts = mt.aggregate_entries(hl.agg.count_where((hl.len(mt[failing_name]) == 0) & hl.is_defined(mt.GT)))
+    mt = mt.filter_entries(filter_condition)
+    passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
     passing_gts_perc = round(passing_gts / gt_total * 100, 2)
 
     logging.info(f"Number of passing genotypes: {passing_gts} ({passing_gts_perc}%)")
 
-    globals_fail_annot = prefix + "_genotype_qc_failing_quality_depth"
-    mt = mt.annotate_globals(**{globals_fail_annot: {'depth_excluded': failing_depth, 'quality_excluded': failing_gq}})
-
     return mt
 
 
-def find_failing_genotypes_ab(mt, args, prefix):
+def find_failing_genotypes_ab(mt, prefix, max_het_ref_reads=0.2, min_het_ref_reads=0.8, min_hom_ref_ref_reads=0.9,
+                              max_hom_alt_ref_reads=0.1, count_failing=True):
     """
     Finds genotypes failing allelic balance, defined as the percentage of ref reads that should correspond to that
     called genotype. For hets, percent of ref reads should be between 20-80%, for hom ref they should be at least 90%,
@@ -182,116 +181,104 @@ def find_failing_genotypes_ab(mt, args, prefix):
     :param args: args to get thresholds from
     :return: 
     """
+    if not prefix.endswith("_"):
+        prefix = prefix + "_"
     ###############################
     # Log and annotate thresholds #
     ###############################
-    logging.info(f"\nFinding failing het genotypes with ref reads > {args.max_het_ref_reads}"
-                 f"\nor het ref reads < {args.min_het_ref_reads}"
-                 f"\nor failing hom ref genotypes with ref reads < {args.min_hom_ref_ref_reads}"
-                 f"\nor failing hom alt genotypes with ref reads > {args.max_hom_alt_ref_reads}")
+    logging.info(f"\nFinding failing het genotypes with ref reads > {max_het_ref_reads}"
+                 f"\nor het ref reads < {min_het_ref_reads}"
+                 f"\nor failing hom ref genotypes with ref reads < {min_hom_ref_ref_reads}"
+                 f"\nor failing hom alt genotypes with ref reads > {max_hom_alt_ref_reads}")
 
-    globals_annot_name = prefix + "_genotype_qc_thresholds_ab"
-    mt = mt.annotate_globals(**{globals_annot_name: {'max_het_ref_reads': args.max_het_ref_reads,
-                                                     'min_het_ref_reads': args.min_het_ref_reads,
-                                                     'min_hom_ref_ref_reads': args.min_hom_ref_ref_reads,
-                                                     'max_hom_alt_ref_reads': args.max_hom_alt_ref_reads}})
+    globals_annot_name = prefix + "genotype_qc_thresholds_ab"
+    mt = mt.annotate_globals(**{globals_annot_name: {'max_het_ref_reads': max_het_ref_reads,
+                                                     'min_het_ref_reads': min_het_ref_reads,
+                                                     'min_hom_ref_ref_reads': min_hom_ref_ref_reads,
+                                                     'max_hom_alt_ref_reads': max_hom_alt_ref_reads}})
 
-    ##################################################################
-    # Check that depth and gq filters have been applied, then filter #
-    ##################################################################
-    failing_dp_name = prefix + "_failing_depth_quality"
-    try:
-        test = hl.is_defined(mt[failing_dp_name])
-    except Exception as e:
-        logging.error("Error! Run find_failing_genotypes_depth_quality() on this matrix table before running "
-                      "find_failing_genotypes_ab().")
-        logging.error(e)
-        exit()
+    gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
 
-    ################################
-    # Get starting genotypes count #
-    ################################
-    failing_name = prefix + "_failing_ab"
-    mt = mt.annotate_entries(**{failing_name: hl.empty_array(hl.tstr)})
-    gthet = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_het()))
-    gthomvar = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_var()))
-    gthomref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
+    ############################
+    # Define filter conditions #
+    ############################
+    het_ab_cond = (
+            (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
+            & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
+    )
+    hom_ab_cond = (
+            ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
+            mt.GT.is_hom_ref() & hl.is_defined(mt.GT)
+    )
+    homalt_ab_cond = (
+            ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
+            mt.GT.is_hom_var() & hl.is_defined(mt.GT)
+    )
 
-    ###########################################
-    # Filter het genotypes on allelic balance #
-    ###########################################
-    het_ab_cond = (((mt.AD[0] / hl.sum(mt.AD)) < args.min_het_ref_reads) |
-                  ((mt.AD[0] / hl.sum(mt.AD)) > args.max_het_ref_reads)) & hl.is_defined(mt.AD)
-    ab_cond_het = hl.cond(mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & het_ab_cond,
-                          mt[failing_name].append("failing_het_ab"), mt[failing_name])
+    ###########################
+    # Count failing genotypes #
+    ###########################
+    if count_failing:
+        # Get starting genotypes count
+        gthet = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_het()))
+        gthomvar = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_var()))
+        gthomref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
 
-    mt = mt.annotate_entries(**{failing_name: ab_cond_het})
+        # Filter het genotypes on allelic balance
+        hets_failing_ab = mt.aggregate_entries(hl.agg.count_where(het_ab_cond))
+        het_failing_ab_perc = round(hets_failing_ab / gthet * 100, 2)
 
-    hets_failing_ab = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_het_ab")))
-    het_failing_ab_perc = round(hets_failing_ab / gthet * 100, 2)
+        # Filter hom ref genotypes on allelic balance
+        homref_failing_ab = mt.aggregate_entries(hl.agg.count_where(hom_ab_cond))
+        homref_failing_ab_perc = round(homref_failing_ab / gthomref * 100, 4)
 
-    ###############################################
-    # Filter hom ref genotypes on allelic balance #
-    ###############################################
-    hom_ab_cond = ((mt.AD[0] / hl.sum(mt.AD)) < args.min_hom_ref_ref_reads) & hl.is_defined(mt.AD)
-    ab_cond_homref = hl.cond(mt.GT.is_hom_ref() & hom_ab_cond & hl.is_defined(mt.GT),
-                             mt[failing_name].append("failing_homref_ab"), mt[failing_name])
+        # Filter hom var genotypes on allelic balance
+        homalt_failing_ab = mt.aggregate_entries(hl.agg.count_where(homalt_ab_cond))
+        homalt_failing_ab_perc = round(homalt_failing_ab / gthomvar * 100, 2)
 
-    mt = mt.annotate_entries(**{failing_name: ab_cond_homref})
+        # Find genotypes defined but missing AD
+        missing_ad_het = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
+                                                                 mt.GT.is_het()))
+        missing_ad_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
+                                                                    mt.GT.is_hom_ref()))
+        missing_ad_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
+                                                                    mt.GT.is_hom_var()))
 
-    homref_failing_ab = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_homref_ab")))
-    homref_failing_ab_perc = round(homref_failing_ab / gthomref * 100, 4)
+        # Report number and percent of genotypes excluded
+        logging.info("\nGenotypes failing ab, after excluding low DP and low GQ genotypes:")
+        logging.info(f"Number of het GTs failing ab: {hets_failing_ab}({het_failing_ab_perc}%)")
+        logging.info(f"Number of hom ref GTs failing_ab: {homref_failing_ab} ({homref_failing_ab_perc}%)")
+        logging.info(f"Number of hom alt GTs failing_ab: {homalt_failing_ab} ({homalt_failing_ab_perc})%")
 
-    ###############################################
-    # Filter hom var genotypes on allelic balance #
-    ###############################################
-    homalt_ab_cond = ((mt.AD[0] / hl.sum(mt.AD)) > args.max_hom_alt_ref_reads) & hl.is_defined(mt.AD)
-    ab_cond_homalt = hl.cond(mt.GT.is_hom_var() & homalt_ab_cond & hl.is_defined(mt.GT),
-                             mt[failing_name].append("failing_homalt_ab"), mt[failing_name])
+        logging.info(f"Number of het GTs missing AD info: {missing_ad_het} "
+                     f"({round(missing_ad_het/gthet*100, 2)}% of het GTs)")
+        logging.info(f"Number of hom ref GTs missing AD info: {missing_ad_homref} "
+                     f"({round(missing_ad_homref/gthomref*100, 2)}% of hom ref GTs)")
+        logging.info(f"Number of hom alt GTs missing AD info: {missing_ad_homalt} "
+                     f"({round(missing_ad_homalt/gthomvar*100, 2)}% of hom alt GTs)")
 
-    mt = mt.annotate_entries(**{failing_name: ab_cond_homalt})
+        global_fail_annot = prefix + "genotype_qc_failing_ab"
+        mt = mt.annotate_globals(**{global_fail_annot:
+                                   {'het_excluded_ct_percent': [hets_failing_ab, het_failing_ab_perc],
+                                    'hom_ref_excluded_ct_percent': [homref_failing_ab, homref_failing_ab_perc],
+                                    'hom_var_excluded_ct_percent': [homalt_failing_ab, homalt_failing_ab_perc],
+                                    'het_missing_ad': [float(missing_ad_het)],
+                                    'hom_ref_missing_ad': [float(missing_ad_homref)],
+                                    'hom_alt_missing_ad': [float(missing_ad_homalt)]}})
+    ############################
+    # Filter failing genotypes #
+    ############################
+    mt = mt.filter_entries(het_ab_cond | hom_ab_cond | homalt_ab_cond)
 
-    homalt_failing_ab = mt.aggregate_entries(hl.agg.count_where(mt[failing_name].contains("failing_homalt_ab")))
-    homalt_failing_ab_perc = round(homalt_failing_ab / gthomvar * 100, 2)
+    passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
+    passing_gts_perc = round(passing_gts / gt_total * 100, 2)
 
-    #########################################
-    # Find genotypes defined but missing AD #
-    #########################################
-    missing_ad_het = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
-                                                             mt.GT.is_het()))
-    missing_ad_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
-                                                                mt.GT.is_hom_ref()))
-    missing_ad_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & ~(hl.is_defined(mt.AD)) &
-                                                                mt.GT.is_hom_var()))
-
-    ###################################################
-    # Report number and percent of genotypes excluded #
-    ###################################################
-    logging.info("\nGenotypes failing ab, after excluding low DP and low GQ genotypes:")
-    logging.info(f"Number of het GTs failing ab: {hets_failing_ab}({het_failing_ab_perc}%)")
-    logging.info(f"Number of hom ref GTs failing_ab: {homref_failing_ab} ({homref_failing_ab_perc}%)")
-    logging.info(f"Number of hom alt GTs failing_ab: {homalt_failing_ab} ({homalt_failing_ab_perc})%")
-
-    logging.info(f"Number of het GTs missing AD info: {missing_ad_het} "
-                 f"({round(missing_ad_het/gthet*100, 2)}% of het GTs)")
-    logging.info(f"Number of hom ref GTs missing AD info: {missing_ad_homref} "
-                 f"({round(missing_ad_homref/gthomref*100, 2)}% of hom ref GTs)")
-    logging.info(f"Number of hom alt GTs missing AD info: {missing_ad_homalt} "
-                 f"({round(missing_ad_homalt/gthomvar*100, 2)}% of hom alt GTs)")
-
-    global_fail_annot = prefix + "_genotype_qc_failing_ab"
-    mt = mt.annotate_globals(**{global_fail_annot:
-                               {'het_excluded_ct_percent': [hets_failing_ab, het_failing_ab_perc],
-                                'hom_ref_excluded_ct_percent': [homref_failing_ab, homref_failing_ab_perc],
-                                'hom_var_excluded_ct_percent': [homalt_failing_ab, homalt_failing_ab_perc],
-                                'het_missing_ad': [float(missing_ad_het)],
-                                'hom_ref_missing_ad': [float(missing_ad_homref)],
-                                'hom_alt_missing_ad': [float(missing_ad_homalt)]}})
+    logging.info(f"Number of passing genotypes: {passing_gts} ({passing_gts_perc}%)")
 
     return mt
 
 
-def annotate_variant_het_ab(mt, args, prefix):
+def annotate_variant_het_ab(mt, prefix):
     """
      Annotate percentage of het genotypes per variant that are in  allelic balance. That means that the genotype has ref
     reads within the 20-80% range of all reads.
@@ -306,20 +293,10 @@ def annotate_variant_het_ab(mt, args, prefix):
     logging.info("Annotating variants with fraction of het genotypes in allelic balance, after filtering out "
                  "population outliers and samples failing samples QC (if run already) and genotypes failing on "
                  "depth and quality by depth measures.")
-    het_gt_cnt = prefix + '_het_gt_count'
-    het_ab = prefix + '_frac_het_gts_in_ab'
-    failing_dp_name = prefix + "_failing_depth_quality"
-    failing_ab_name = prefix + "_failing_ab"
-
-    # Check that genotype filter annotations have been added
-    try:
-        test = hl.is_defined(mt[failing_ab_name])
-        test = hl.is_defined(mt[failing_dp_name])
-    except Exception as e:
-        logging.error("Error! find_failing_genotypes_ab() and find_failing_genotypes_depth_quality() should be run "
-                      "before annotating variant's % of hets in allelic balance, to filter out bad genotypes.")
-        logging.error(e)
-        exit()
+    het_gt_cnt = prefix + 'het_gt_count'
+    het_ab = prefix + 'frac_het_gts_in_ab'
+    failing_dp_name = prefix + "failing_depth_quality"
+    failing_ab_name = prefix + "failing_ab"
 
     # Check if samples QC has been run yet, if not add empty annotations
     try:
@@ -340,8 +317,10 @@ def annotate_variant_het_ab(mt, args, prefix):
     # Annotate rows with het GT count, then het GT allelic balance #
     ################################################################
     # Get count of het genotypes per variant
-    case_filter = (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) & \
-                  hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
+    case_filter = (
+          (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) &
+          hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc)
+    )
     het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT) & (hl.len(mt[failing_dp_name]) == 0) & \
                      hl.is_defined(mt[failing_dp_name])
 
@@ -447,7 +426,11 @@ def annotate_variant_het_ab(mt, args, prefix):
     return mt
 
 
-def find_failing_variants(mt, args, mode):
+def find_failing_variants(
+        mt, checkpoint_name=None, annotation_prefix="", min_dp=10, min_gq=20,
+        max_het_ref_reads=0.8, min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1,
+        call_rate=0.8, p_hwe=1e-6, snp_qd=2, indel_qd=3, filter_missing_measures=False, count_failing=True,
+        sex_aware_call_rate=False, pheno_col=False):
     """
     Function to find variants failing on QC measures, which can be run in 'low_pass' or 'final' mode, with varying
     filters given by args depending on the mode.
@@ -461,53 +444,49 @@ def find_failing_variants(mt, args, mode):
     ############################################################################
     utils.test_multi_split(mt)
 
-    elif mode == "final":
-        # Check that samples QC has been run
-        try:
-            test = hl.is_defined(mt.failing_samples_qc)
-            test = hl.is_defined(mt.pop_outlier_sample)
-        except Exception as e:
-            logging.info('failing_samples_qc and pop_outlier_sample not defined! Run samples QC before invoking this.')
-            logging.info(e)
-
-        # Define variables
-        p_hwe = args.final_p_hwe
-        call_rate = args.final_min_call_rate
-        annotation_name = "variant_qc_thresholds_final"
-        sex_aware_call_rate = "True"
-        varqc_name = 'final_no_failing_samples_varqc'
-
+    if annotation_prefix is not None:
+        failing_name = annotation_prefix + "_failing_variant_qc"
     else:
-        logging.error("Error! modes allowed are low_pass and final variant QC")
-        return
+        failing_name = "failing_variant_qc"
 
-    failing_name = mode + "_failing_variant_qc"
+    if not annotation_prefix.endswith("_"):
+        annotation_prefix = annotation_prefix + "_"
+
+    if checkpoint_name is None:
+        checkpoint_name = "variant_qc_tmp.mt/"
+
     #####################################
     # Annotate QC thresholds to globals #
     #####################################
-    if args.pheno_col is not None:
+    if pheno_col is not None:
         hwe_tag = "controls samples only"
     else:
         hwe_tag = "all samples"
 
     threshold_dict = {'pval_hwe': str(p_hwe), 'hwe_excluded_in': str(hwe_tag),
                       'call_rate': str(call_rate),
-                      'sex_aware_call_rate': sex_aware_call_rate, 'snp_qd': str(args.snp_qd),
-                      'indel_qd': str(args.indel_qd),
-                      'het_max_ref_reads_thresh': str(args.max_het_ref_reads),
-                      'het_min_ref_reads_thresh': str(args.min_het_ref_reads)}
+                      'sex_aware_call_rate': sex_aware_call_rate, 'snp_qd': str(snp_qd),
+                      'indel_qd': str(indel_qd),
+                      'het_max_ref_reads_thresh': str(max_het_ref_reads),
+                      'het_min_ref_reads_thresh': str(min_het_ref_reads)}
 
-    mt = mt.annotate_globals(**{annotation_name: threshold_dict})
+    mt = mt.annotate_globals(**{annotation_prefix + "variant_qc_thresholds": threshold_dict})
 
     ############################################################
     # Find failing genotypes and do allelic balance annotation #
     ############################################################
     # Find genotypes failing on depth, quality, and allelic balance
-    mt = find_failing_genotypes_depth_quality(mt, args, mode)
-    mt = find_failing_genotypes_ab(mt, args, mode)
+    mt = find_failing_genotypes_depth_quality(mt, annotation_prefix, min_dp=min_dp, min_gq=min_gq,
+                                              filter_missing_measures=filter_missing_measures,
+                                              count_failing=count_failing)
+    mt = find_failing_genotypes_ab(
+        mt, annotation_prefix, max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
+        min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads,
+        count_failing=count_failing
+    )
 
     # Define het allelic balance value (percentage of GT calls for that variant *in balance*)
-    mt = annotate_variant_het_ab(mt, args, mode)
+    mt = annotate_variant_het_ab(mt, annotation_prefix)
     mt = mt.checkpoint(args.output_stem + mode + '_filtervartemp1_deleteme.mt', overwrite=True)
 
     ###########################################################

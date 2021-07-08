@@ -172,7 +172,21 @@ if __name__ == "__main__":
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
         mt = hl.read_matrix_table(samples_cleaned)
 
-        mt = vq.find_failing_variants(mt, args, mode='low_pass')
+        mt = vq.find_failing_variants(mt, mode='low_pass')
+        #TODO Give the following parameters to the new function
+        # p_hwe = args.low_pass_p_hwe
+        # call_rate = args.low_pass_min_call_rate
+        # annotation_name = "variant_qc_thresholds_lowpass"
+        # sex_aware_call_rate = "False"
+        # varqc_name = 'prefilter_variant_qc'
+
+        # pheno_col = args.pheno_col
+        # indel_qd = args.indel_qd
+        # max_het_ref_reads = args.max_het_ref_reads
+        # min_het_ref_reads = args.min_het_ref_reads
+        # count_failing = add arg
+        # filter_missing_measures = add arg
+
 
         logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")
         mt = mt.checkpoint(low_pass_qcd, overwrite=True)
@@ -318,7 +332,13 @@ if __name__ == "__main__":
 
         # Run variant QC
         mt = vq.find_failing_variants(mt, args, mode='final')
-
+        # TODO give following parameters
+        # Test that failing samples QC and pop outliers detected? Maybe?
+        # p_hwe = args.final_p_hwe
+        #call_rate = args.final_min_call_rate
+        #annotation_name = "variant_qc_thresholds_final"
+        #sex_aware_call_rate = "True"
+        #varqc_name = 'final_no_failing_samples_varqc'
 
         # Run case status-specific variant QC
         if args.pheno_col is not None:
