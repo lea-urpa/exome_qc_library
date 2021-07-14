@@ -648,7 +648,7 @@ def variant_quality_control(
     ############################################################################
     # Check that multiallelic variants have been split, define annotation name #
     ############################################################################
-    utils.test_multi_split(mt)
+    utils.check_multi_split(mt)
 
     if annotation_prefix is not None:
         failing_name = annotation_prefix + "_failing_variant_qc"

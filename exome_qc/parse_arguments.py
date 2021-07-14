@@ -30,7 +30,7 @@ def parse_arguments(arguments):
     params.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
     params.add_argument('--num_secondary_workers', type=int, default=20,
                         help='Number of secondary workers for scaling in applicable steps.')
-    params.add_argument('--force', type=bool, default=False, help="Force a re-run of all steps?")
+    params.add_argument('--force', action='store_true', help="Force a re-run of all steps?")
 
     # Pipeline inputs #
     inputs = parser.add_argument_group("Pipeline inputs and information.")
