@@ -648,7 +648,7 @@ def variant_quality_control(
         mt, checkpoint_name, annotation_prefix="", min_dp=10, min_gq=20,
         max_het_ref_reads=0.8, min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1,
         call_rate=0.8, p_hwe=1e-6, snp_qd=2, indel_qd=3, ab_allowed_dev_het=0.8,filter_missing_measures=False,
-        count_failing=True, sex_aware_call_rate=False, pheno_col=None, samples_qc=False):
+        count_failing=True, sex_aware_call_rate=False, pheno_col=None, samples_qc=False, force=False):
     """
     Function to find variants failing on QC measures, which can be run in 'low_pass' or 'final' mode, with varying
     filters given by args depending on the mode.
@@ -703,22 +703,35 @@ def variant_quality_control(
     # Find failing genotypes and do allelic balance annotation #
     ############################################################
     # Filter genotypes failing on depth + quality
-    mt_gtfilt = filter_failing_GTs_depth_quality(
-        mt, checkpoint_name, prefix=annotation_prefix, min_dp=min_dp, min_gq=min_gq,
-        filter_missing_measures=filter_missing_measures, count_failing=count_failing)
+    if (not utils.check_exists(checkpoint_name + "_DP_GQ_filtered.mt/")) or force:
+        mt_gtfilt = filter_failing_GTs_depth_quality(
+            mt, checkpoint_name, prefix=annotation_prefix, min_dp=min_dp, min_gq=min_gq,
+            filter_missing_measures=filter_missing_measures, count_failing=count_failing)
+    else:
+        logging.info("Detected DP + GQ filtered mt exists, loading that.")
+        mt_gtfilt = hl.read_matrix_table(checkpoint_name + "_DP_GQ_filtered.mt/")
 
     # Annotate variants failing het AB measure (percentage of het GT calls for that variant *in balance*)
-    mt_abannot = annotate_variant_het_ab(
-        mt_gtfilt, checkpoint_name, prefix=annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
-        max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
-        min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads
-    )
+    if (not utils.check_exists(checkpoint_name + "_variant_het_ab_annotated.mt/")) or force:
+        mt_abannot = annotate_variant_het_ab(
+            mt_gtfilt, checkpoint_name, prefix=annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
+            max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
+            min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads
+        )
+    else:
+        logging.info("Detected het AB annotated mt exists, loading that.")
+        mt_abannot = hl.read_matrix_table(checkpoint_name + "_variant_het_ab_annotated.mt/")
+
     # Filter genotypes failing on allelic balance
-    mt_gtfilt2 = find_failing_genotypes_ab(
-        mt_abannot, checkpoint_name, prefix=annotation_prefix, max_het_ref_reads=max_het_ref_reads,
-        min_het_ref_reads=min_het_ref_reads, min_hom_ref_ref_reads=min_hom_ref_ref_reads,
-        max_hom_alt_ref_reads=max_hom_alt_ref_reads, count_failing=count_failing
-    )
+    if (not utils.check_exists(checkpoint_name + "_GT_ab_filtered.mt/")) or force:
+        mt_gtfilt2 = find_failing_genotypes_ab(
+            mt_abannot, checkpoint_name, prefix=annotation_prefix, max_het_ref_reads=max_het_ref_reads,
+            min_het_ref_reads=min_het_ref_reads, min_hom_ref_ref_reads=min_hom_ref_ref_reads,
+            max_hom_alt_ref_reads=max_hom_alt_ref_reads, count_failing=count_failing
+        )
+    else:
+        logging.info("Detected genotype AB filtered mt exists, loading that.")
+        mt_gtfilt2 = hl.read_matrix_table(checkpoint_name + "_GT_ab_filtered.mt/")
 
     ###############################################
     # Filter matrix table to only passing samples #
@@ -734,10 +747,14 @@ def variant_quality_control(
     #####################################
     # Annotate rest of failing variants #
     #####################################
-    mt_varannot = find_failing_vars(mt_gtfilt2, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col,
-                                    count_failing=count_failing, snp_qd=snp_qd, indel_qd=indel_qd,
-                                    ab_allowed_dev_het=ab_allowed_dev_het, p_hwe=p_hwe, sex_aware=sex_aware_call_rate,
-                                    min_call_rate=call_rate)
+    if (not utils.check_exists(checkpoint_name + "_failing_vars_annotated.mt/")) or force:
+        mt_varannot = find_failing_vars(mt_gtfilt2, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col,
+                                        count_failing=count_failing, snp_qd=snp_qd, indel_qd=indel_qd,
+                                        ab_allowed_dev_het=ab_allowed_dev_het, p_hwe=p_hwe, sex_aware=sex_aware_call_rate,
+                                        min_call_rate=call_rate)
+    else:
+        logging.info("Detected failing variant mt exists, loading that.")
+        mt_varannot = hl.read_matrix_table(checkpoint_name + "_failing_vars_annotated.mt/")
 
     #########################################################################
     # Add annotations back to main matrix table (not filtered), return that #

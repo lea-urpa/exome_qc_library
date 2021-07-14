@@ -178,7 +178,7 @@ if __name__ == "__main__":
             min_hom_ref_ref_reads=args.min_hom_ref_ref_reads, max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
             call_rate=args.low_pass_min_call_rate, p_hwe=args.low_pass_p_hwe, snp_qd=args.snp_qd, indel_qd=args.indel_qd,
             ab_allowed_dev_het=args.ab_allowed_dev_het,count_failing=args.count_failing, sex_aware_call_rate=False,
-            pheno_col=args.pheno_col, samples_qc=False
+            pheno_col=args.pheno_col, samples_qc=False, force=args.force
         )
 
         logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")
