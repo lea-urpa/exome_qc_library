@@ -491,7 +491,11 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
         case_filters = (mt[pheno_col] == False) & hl.is_defined(mt[pheno_col])
         mt = mt.annotate_rows(
             hwe_ctrls_only=hl.agg.filter(case_filters, hl.agg.hardy_weinberg_test(mt.GT)))
-        logging.info('Calculated HWE with controls only (ignoring samples with missing phenotype information)')
+
+        num_controls = mt.aggregate_cols(hl.agg.count_where((mt[pheno_col] == False) & hl.is_defined(mt[pheno_col])))
+
+        logging.info(f'Calculated HWE with {num_controls} controls only '
+                     f'(ignoring samples with missing phenotype information)')
     else:
         logging.info('Phenotype column name not provided, calculating HWE for variants using all samples.')
 
@@ -779,21 +783,21 @@ def variant_quality_control(
 
     if (pheno_col is not None) and (samples_qc is True):
         case_het_gt_ab = annotation_prefix + 'case_frac_het_gts_in_ab'
-        mt = mt.annotate_rows(**{case_het_gt_ab: mt_varannot[case_het_gt_ab]})
+        mt = mt.annotate_rows(**{case_het_gt_ab: mt_varannot.index_rows(mt.row_key)[case_het_gt_ab]})
         cont_het_gt_ab = annotation_prefix + 'control_frac_het_gts_in_ab'
-        mt = mt.annotate_rows(**{cont_het_gt_ab: mt_varannot[cont_het_gt_ab]})
+        mt = mt.annotate_rows(**{cont_het_gt_ab: mt_varannot.index_rows(mt.row_key)[cont_het_gt_ab]})
 
     else:
         het_ab = annotation_prefix + 'frac_het_gts_in_ab'
-        mt = mt.annotate_rows(**{het_ab: mt_varannot[het_ab]})
+        mt = mt.annotate_rows(**{het_ab: mt_varannot.index_rows(mt.row_key)[het_ab]})
 
     if count_failing:
         dp_qc_name = annotation_prefix + "genotype_qc_failing_quality_depth"
-        mt = mt.annotate_globals(**{dp_qc_name: mt_varannot[dp_qc_name]})
+        mt = mt.annotate_globals(**{dp_qc_name: mt_varannot.index_globals()[dp_qc_name]})
         ab_name = annotation_prefix + "genotype_qc_failing_ab"
-        mt = mt.annotate_globals(**{ab_name: mt_varannot[ab_name]})
+        mt = mt.annotate_globals(**{ab_name: mt_varannot.index_globals()[ab_name]})
         var_name = annotation_prefix + "failing_variant_qc_counts"
-        mt = mt.annotate_globals(**{var_name: mt_varannot[var_name]})
+        mt = mt.annotate_globals(**{var_name: mt_varannot.index_globals()[var_name]})
 
     if pheno_col is not None:
         mt = mt.annotate_rows(hwe_ctrls_only=mt_varannot.index_rows(mt.row_key).hwe_ctrls_only)
