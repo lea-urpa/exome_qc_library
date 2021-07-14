@@ -347,7 +347,7 @@ def annotate_variant_het_ab(mt, checkpoint_name, prefix="", samples_qc=False, ph
     ################################################################################
     # Annotate het GT and het GT allelic balance for cases and controls separately #
     ################################################################################
-    if pheno_col is not None:
+    if (pheno_col is not None) and (samples_qc is True):
         mt = count_variant_ab(mt, checkpoint_name, prefix=prefix, samples_qc=samples_qc, pheno_col=pheno_col,
                               min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
                               min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
@@ -443,6 +443,20 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
                                     'het_missing_ad': [float(missing_ad_het)],
                                     'hom_ref_missing_ad': [float(missing_ad_homref)],
                                     'hom_alt_missing_ad': [float(missing_ad_homalt)]}})
+
+        #########################################################################
+        # re-define filter conditions, global annotation causes source mismatch #
+        #########################################################################
+        het_ab_cond = (
+                (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
+                & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT))
+        hom_ab_cond = (
+                ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
+                mt.GT.is_hom_ref() & hl.is_defined(mt.GT))
+        homalt_ab_cond = (
+                ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
+                mt.GT.is_hom_var() & hl.is_defined(mt.GT))
+
     ############################
     # Filter failing genotypes #
     ############################
@@ -712,15 +726,15 @@ def variant_quality_control(
         mt_gtfilt = hl.read_matrix_table(checkpoint_name + "_DP_GQ_filtered.mt/")
 
     # Annotate variants failing het AB measure (percentage of het GT calls for that variant *in balance*)
-    if (not utils.check_exists(checkpoint_name + "_variant_het_ab_annotated.mt/")) or force:
-        mt_abannot = annotate_variant_het_ab(
-            mt_gtfilt, checkpoint_name, prefix=annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
-            max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
-            min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads
-        )
-    else:
-        logging.info("Detected het AB annotated mt exists, loading that.")
-        mt_abannot = hl.read_matrix_table(checkpoint_name + "_variant_het_ab_annotated.mt/")
+    #if (not utils.check_exists(checkpoint_name + "_variant_het_ab_annotated.mt/")) or force:
+    mt_abannot = annotate_variant_het_ab(
+        mt_gtfilt, checkpoint_name, prefix=annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
+        max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
+        min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads
+    )
+    #else:
+    #    logging.info("Detected het AB annotated mt exists, loading that.")
+    #    mt_abannot = hl.read_matrix_table(checkpoint_name + "_variant_het_ab_annotated.mt/")
 
     # Filter genotypes failing on allelic balance
     if (not utils.check_exists(checkpoint_name + "_GT_ab_filtered.mt/")) or force:
