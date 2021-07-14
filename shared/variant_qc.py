@@ -96,7 +96,7 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
     :param filter_missing_measures: Filter out genotypes that are missing QC measures, or keep them in?
     :return:
     """
-    logging.info(f"Finding genotypes with min_dp < {min_dp}, or min GQ < {min_gq}.")
+    logging.info(f"Filtering genotypes with min_dp < {min_dp}, or min GQ < {min_gq}.")
     if (not prefix.endswith("_")) and (prefix != ""):
         prefix = prefix + "_"
 
