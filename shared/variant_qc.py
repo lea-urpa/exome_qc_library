@@ -777,7 +777,7 @@ def variant_quality_control(
     mt = mt.annotate_rows(**{varqc_name: mt_varannot.index_rows(mt.row_key)[varqc_name]})
     mt = mt.annotate_rows(**{failing_name: mt_varannot.index_rows(mt.row_key)[failing_name]})
 
-    if pheno_col is not None:
+    if (pheno_col is not None) and (samples_qc is True):
         case_het_gt_ab = annotation_prefix + 'case_frac_het_gts_in_ab'
         mt = mt.annotate_rows(**{case_het_gt_ab: mt_varannot[case_het_gt_ab]})
         cont_het_gt_ab = annotation_prefix + 'control_frac_het_gts_in_ab'
