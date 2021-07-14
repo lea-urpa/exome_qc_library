@@ -673,19 +673,19 @@ def variant_quality_control(
 
     var_thresholds = {'pval_hwe': str(p_hwe), 'hwe_excluded_in': str(hwe_tag),
                       'call_rate': str(call_rate),
-                      'sex_aware_call_rate': sex_aware_call_rate, 'snp_qd': str(snp_qd),
+                      'sex_aware_call_rate': str(sex_aware_call_rate), 'snp_qd': str(snp_qd),
                       'indel_qd': str(indel_qd),
                       'het_max_ref_reads_thresh': str(max_het_ref_reads),
                       'het_min_ref_reads_thresh': str(min_het_ref_reads),
                       'perc_het_reads_ab_allowed': str(ab_allowed_dev_het)}
 
-    mt = mt.annotate_globals(**{annotation_prefix + "variant_qc_thresholds": var_thresholds})
+    mt = mt.annotate_globals(**{annotation_prefix + "variant_qc_thresholds": hl.literal(var_thresholds)})
 
     gt_thresholds = {'min_DP': min_dp, 'min_GQ': min_gq, 'max_het_ref_reads': max_het_ref_reads,
                      'min_het_ref_reads': min_het_ref_reads, 'min_hom_ref_ref_reads': min_hom_ref_ref_reads,
                      'max_hom_alt_ref_reads': max_hom_alt_ref_reads }
 
-    mt = mt.annotate_globals(**{annotation_prefix + "genotype_qc_thresholds": gt_thresholds})
+    mt = mt.annotate_globals(**{annotation_prefix + "genotype_qc_thresholds": hl.literal(gt_thresholds)})
 
     ############################################################
     # Find failing genotypes and do allelic balance annotation #
