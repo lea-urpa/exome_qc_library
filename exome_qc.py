@@ -191,15 +191,10 @@ if __name__ == "__main__":
     relatedness_calculated = os.path.join(
         args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
 
-    logging.info("Tested up to low-pass variant QC, exiting now.")
-    exit(0)
-
     #########################
     # Calculate relatedness #
     #########################
     ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
-    logging.info("This part of the pipeline not implemented yet, exiting now!")
-    exit(0)
 
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
@@ -210,7 +205,12 @@ if __name__ == "__main__":
             utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
             # Filter failing samples, variants, and genotypes
-            mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=True, checkpoint=False)
+            mt_filtered = sq.filter_failing(
+                mt, ld_pruned, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=True,
+                pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+            )
 
             # Filter out low MAF variants
             mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, filter_ac0_after_pruning=True)
@@ -224,6 +224,9 @@ if __name__ == "__main__":
         else:
             logging.info("Detected LD pruned dataset written, loading that.")
             mt_ldpruned = hl.read_matrix_table(ld_pruned)
+
+        logging.info("Tested up until King relatedness calculation. Exiting now.")
+        exit(0)
 
         ## Calculate relatedness with King ##
         if not utils.check_exists(relatedness_calculated):
@@ -303,7 +306,12 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(sex_imputed)
 
         # Filter failing variants and genotypes, and pop outlier samples
-        mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
+        mt_filtered = sq.filter_failing(
+            mt, ld_pruned, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
+            pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+            min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+        )
 
         # Run samples QC
         mt = sq.samples_qc(mt_filtered, mt_to_annotate=mt, args=args)
@@ -363,7 +371,12 @@ if __name__ == "__main__":
 
         # Filter out failing samples, variants, genotypes for PC calculations
         if (not utils.check_exists(final_filtered)) or args.force:
-            mt_filtered = sq.filter_failing(mt, args, mode="final", unfilter_entries=True, pheno_qc=True)
+            mt_filtered = sq.filter_failing(
+                mt, pcs_calculated, prefix='final', entries=True, variants=True, samples=True, unfilter_entries=True,
+                pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+            )
             logging.info("Filtering to unrelated individuals for PC calculations.")
             mt_norelateds = mt_filtered.filter_cols(mt_filtered.related_to_remove == False, keep=True)
             mt_norelateds = mt_norelateds.checkpoint(final_filtered, overwrite=True)
