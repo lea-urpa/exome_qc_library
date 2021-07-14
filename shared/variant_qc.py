@@ -159,6 +159,18 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
         mt = mt.annotate_globals(
             **{globals_fail_annot: {'depth_excluded': failing_depth, 'quality_excluded': failing_gq}})
 
+        #############################################################
+        # Define filter conditions (again), or else source mismatch #
+        #############################################################
+        failing_dp_cond = ((mt.DP < min_dp) & hl.is_defined(mt.DP))
+        pl_cond = ((mt.GT.is_het() | mt.GT.is_hom_var()) & (mt.PL[0] < min_gq) &
+                   hl.is_defined(mt.GT) & hl.is_defined(mt.PL))
+        gq_cond = (mt.GT.is_hom_ref() & (mt.GQ < min_gq) & hl.is_defined(mt.GQ) & hl.is_defined(mt.GT))
+
+        missing_dp_cond = (~(hl.is_defined(mt.DP)) & hl.is_defined(mt.GT))
+        missing_gq_cond = (~(hl.is_defined(mt.GQ)) & hl.is_defined(mt.GT) & mt.GT.is_hom_ref())
+        missing_pl_cond = (~(hl.is_defined(mt.PL)) & (mt.GT.is_het() | mt.GT.is_hom_var()) & hl.is_defined(mt.GT))
+
     ############################
     # Filter failing genotypes #
     ############################
