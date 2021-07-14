@@ -132,7 +132,7 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
         failing_gq = mt.aggregate_entries(hl.agg.count_where(gq_cond))
         failing_pl = mt.aggregate_entries(hl.agg.count_where(pl_cond))
         missing_gq = mt.aggregate_entries(hl.agg.count_where(missing_gq_cond))
-        missing_pl = mt.aggregate_entries(missing_pl_cond)
+        missing_pl = mt.aggregate_entries(hl.agg.count_where(missing_pl_cond))
 
         logging.info(f"Number of GTs with depth < {min_dp}: {failing_depth} ({failing_depth_perc}%)")
         logging.info(f"Number of hom ref GTs with GQ < {min_gq}: {failing_gq} "
