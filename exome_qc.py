@@ -203,6 +203,7 @@ if __name__ == "__main__":
 
     logging.info("Tested up to low-pass variant QC, exiting now.")
     exit(0)
+
     #########################
     # Calculate relatedness #
     #########################

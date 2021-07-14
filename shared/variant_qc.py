@@ -86,8 +86,15 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
                                      filter_missing_measures=False):
     """
     Filter out genotypes with low depth and GQ values.
-    :param mt: GT-filtered matrix table
-    :return: returns filtered matrix table
+
+    :param mt: matrix table to filter
+   :param checkpoint_name: Name of checkpoint to write to, including bucket name or file dir to write to
+    :param prefix: prefix to add to variant annotations
+    :param min_dp: minimum allowed sequencing depth
+    :param min_gq: minimum allowed genotype quality
+    :param count_failing: Count number of genotypes that are failing QC measures? Slow but useful for troubleshooting
+    :param filter_missing_measures: Filter out genotypes that are missing QC measures, or keep them in?
+    :return:
     """
     logging.info(f"Finding genotypes with min_dp < {min_dp}, or min GQ < {min_gq}.")
     if (not prefix.endswith("_")) and (prefix != ""):
@@ -449,7 +456,7 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
     failing_name = prefix + "failing_variant_qc"
     varqc_name = prefix + "variant_qc"
 
-    mt = hl.variant_qc(mt, name= varqc_name)
+    mt = hl.variant_qc(mt, name=varqc_name)
 
     ######################################################
     # Set HWE calculation in either all or only controls #
@@ -669,7 +676,8 @@ def variant_quality_control(
                       'sex_aware_call_rate': sex_aware_call_rate, 'snp_qd': str(snp_qd),
                       'indel_qd': str(indel_qd),
                       'het_max_ref_reads_thresh': str(max_het_ref_reads),
-                      'het_min_ref_reads_thresh': str(min_het_ref_reads)}
+                      'het_min_ref_reads_thresh': str(min_het_ref_reads),
+                      'perc_het_reads_ab_allowed': str(ab_allowed_dev_het)}
 
     mt = mt.annotate_globals(**{annotation_prefix + "variant_qc_thresholds": var_thresholds})
 
@@ -689,7 +697,7 @@ def variant_quality_control(
 
     # Annotate variants failing het AB measure (percentage of het GT calls for that variant *in balance*)
     mt_abannot = annotate_variant_het_ab(
-        mt_gtfilt, checkpoint_name, annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
+        mt_gtfilt, checkpoint_name, prefix=annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
         max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
         min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads
     )
