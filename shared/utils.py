@@ -173,3 +173,23 @@ def check_multi_split(mt):
         logging.error("Error! Multi-allelic variants must be split before running.")
         logging.error(e)
         exit()
+
+
+def create_test_dataset(mt, reference_genome, mt_name, out_dir):
+    logging.info('Test flag given, filtering to chromosome 22 and chrom X.')
+
+    if reference_genome == "GRCh38":
+        chrom_codes = hl.array(["chr22", "chrX"])
+    else:
+        chrom_codes = hl.array(["22", "X"])
+
+    mt = mt.filter_rows(chrom_codes.contains(mt.locus.contig))
+
+    if mt_name.endswith(".mt/"):
+        test_mt = (mt_name.replace(".mt/", "") + "_test.mt").split("/")[-1]
+    else:
+        test_mt = (mt_name[:-1] + "_test.mt").split("/")[-1]
+
+    mt = mt.checkpoint(os.path.join(out_dir, test_mt), overwrite=True)
+
+    return mt

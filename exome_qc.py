@@ -72,21 +72,7 @@ if __name__ == "__main__":
 
         if args.test:
             utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
-
-            logging.info('Test flag given, filtering to chrom 22 and chrom X.')
-            if args.reference_genome == "GRCh38":
-                chrom_codes = hl.array(["chr22", "chrX"])
-            else:
-                chrom_codes = hl.array(["22", "X"])
-
-            mt = mt.filter_rows(chrom_codes.contains(mt.locus.contig))
-
-            if args.mt.endswith(".mt/"):
-                test_mt = (args.mt.replace(".mt/", "") + "_test.mt").split("/")[-1]
-            else:
-                test_mt = (args.mt[:-1] + "_test.mt").split("/")[-1]
-            mt = mt.checkpoint(os.path.join(args.out_dir, test_mt), overwrite=True)
-
+            mt = utils.create_test_dataset(mt, args.reference_genome, args.mt, args.out_dir)
             utils.remove_secondary(args.cluster_name, args.region)
 
         ## Annotate samples ##
