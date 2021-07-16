@@ -7,6 +7,7 @@ import logging
 import time
 import hail as hl
 from bokeh.io import output_file, save
+import networkx as nx
 
 
 def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True, variants=True, samples=True,
@@ -524,3 +525,115 @@ def project_pcs_relateds(mt_ldpruned, mt, covar_pc_num):
     # from the table related_scores
 
     return mt
+
+
+def filter_graph_cases(graph, cases):
+    return [elem for elem in graph.nodes() if elem in cases]
+
+
+def filter_node_cases(nodes, cases):
+    return [elem for elem in nodes if elem in cases]
+
+
+def sanity_check(g, nodes):
+    """
+    Given a list of nodes it makes sure that the algorithms are working properly.
+    That is, that the subgraph induced by the remaining nodes does not contain edges.
+    :param g: network x graph
+    :param nodes: notes of a networkx graph
+    :return:
+    """
+    assert g.subgraph(nodes).number_of_edges() == 0
+
+
+def connected_component_subgraphs(G):
+    for c in nx.connected_components(G):
+        yield G.subgraph(c).copy()
+
+
+def nx_algorithm(g, cases):
+    """
+    nx native based method for filtering cases. In each subgraph it maximizes the independent cases (read: disease
+    affected) first and then proceeds with the rest of the subgraph (by including these cases as required nodes in the
+    subsequent maximally independent graph)
+
+    :param g: nx graph
+    :param cases: list of cases
+    :return: list of related nodes that are discarded
+    """
+    #####################################################
+    # Report the number of highly connected individuals #
+    #####################################################
+    degrees = dict(g.degree())
+    high_degree_count = 0
+    for degree in degrees.values():
+        if degree > 100:
+            high_degree_count += 1
+
+    if high_degree_count > 0:
+        print(f"Warning! {high_degree_count} samples are connected to > 100 other samples. "
+              "This is likely from poorly calculated kinships, increase number of variants "
+              "used to calculate kinships and try again.")
+
+    ##########################################
+    # Loop through subgraphs in larger graph #
+    ##########################################
+    # Instantiate list of unrelated notes
+    unrelated_nodes = []
+    num_graphs = 0
+    for subgraph in connected_component_subgraphs(g):
+        num_graphs += 1
+        subcases = filter_graph_cases(subgraph, cases)  # list of local cases
+        if len(subcases) > 0:
+            # graph induced by local cases
+            case_graph = subgraph.subgraph(cases)
+            # get maximal set of cases in case graph
+            unrelated_subcases = nx.maximal_independent_set(case_graph)
+            # get maximal set of nodes in subgraph, giving unrelated cases to keep
+            unrelated_nodes += nx.maximal_independent_set(subgraph, unrelated_subcases)
+        else:
+            unrelated_nodes += nx.maximal_independent_set(subgraph)
+
+    logging.info(f"Number of groups of related individuals: {num_graphs}")
+
+    ####################
+    # result summaries #
+    ####################
+    related_nodes = list(set(g.nodes()) - set(unrelated_nodes))
+    unrelated_cases = filter_node_cases(unrelated_nodes, cases)
+
+    #####################################################################################
+    # sanity_check: makes sure that the unrelated cases/nodes are in fact not connected #
+    #####################################################################################
+    sanity_check(g, unrelated_nodes)
+    sanity_check(g, unrelated_cases)
+
+    return related_nodes, len(unrelated_cases), len(unrelated_nodes)
+
+
+def king_relatedness(mt, kinship_threshold=0.0883, pheno_col=None):
+
+    # Calculate kinship
+    kinship = hl.king(mt.GT)
+
+    # Get just pairs above threshold, convert to pandas df
+    relatives = kinship.filter_entries(kinship.phi > kinship_threshold)
+
+    rel_tab = relatives.entries()
+    rel_tab = rel_tab.key_by().select("s", "s_1")
+
+    rel_df = rel_tab.to_pandas()
+
+    # Create graph from pandas df
+    related_ind_g = nx.from_pandas_edgelist(rel_df, "s", "s_1")
+
+    if pheno_col is not None:
+        sample_info = mt.cols()
+        case_info = sample_info.filter(sample_info.is_case == True)
+        case_ids = case_info.s.take(case_info.count())
+    else:
+        case_ids = None
+
+    logging.info('Calculating maximal independent set.')
+    related_to_remove, num_ind_cases, num_ind_nodes = nx_algorithm(related_ind_g, case_ids)
+    logging.info('# of unrelated cases given king input: ' + str(num_ind_cases))
