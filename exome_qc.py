@@ -234,7 +234,6 @@ if __name__ == "__main__":
     ############################
     if (not utils.check_exists(pop_outliers_found)) or args.force:
         logging.info("Finding population outliers")
-        # TODO remove secondary workers if they possibly have been added for King relatedness step
 
         mt = hl.read_matrix_table(relatedness_calculated)
         mt_ldpruned = hl.read_matrix_table(ld_pruned)
