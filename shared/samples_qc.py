@@ -101,7 +101,7 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     return mt
 
 
-def find_pop_outliers(mt, mt_to_annotate, pop_sd_threshold=4, plots=True, max_iter=8, reference_genome="GRCh38",
+def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_iter=8, reference_genome="GRCh38",
                       pca_plot_annotations=None):
     """
     Takes an LD pruned matrix table and determines which individuals are not clustering with Finns,
@@ -109,42 +109,44 @@ def find_pop_outliers(mt, mt_to_annotate, pop_sd_threshold=4, plots=True, max_it
     Basically, calculates first two principal components, excludes outliers > 4 SD on those two
     components, recalculates, and repeats until there are no outliers.
 
-    :param mt_ldpruned: LD pruned matrix table from which to calculate principal components. Relatives should already
-    be removed!
-    :param mt_to_annotate:  Matrix table with full variants to annotate which individuals are outliers.
+    :param mt: matrix table from which to calculate principal components and find population outliers
     :param plots: plot the principal components for each round?
     :param max_iter: maximum number of iterations on running the PC plots, mostly for testing purposes.
     :return: returns the unfiltered, annotated matrix table
     """
-    # Instantiate counter
     outliers = 1
-    i = 1
+    round_num = 1
     datestr = time.strftime("%Y.%m.%d")
 
-    # Overwrite pop_outlier_sample annotation in mt to annotate
-    mt_to_annotate = mt_to_annotate.annotate_cols(pop_outlier_sample=False)
+    ##################
+    # Filter dataset #
+    ##################
 
-    # Remove related individuals for population outlier analysis
+    # Filter to autosomes
+    if reference_genome is "GRCh38":
+        autosomes = ["chr" + str(i) for i in range(1, 23)]
+    else:
+        autosomes = [str(i) for i in range(1, 23)]
+
+    mt_autosomes = mt.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
+    var_count = mt_autosomes.count_rows()
+    logging.info(f"Variant count after filtering to autosomes: {var_count}")
+
+    # Remove related individuals
     mt = mt.filter_cols(mt.related_to_remove == False)
     sample_count = mt.count_cols()
     logging.info(f'Sample count after removing related individuals: {sample_count}')
 
-    # Remove chromosome X
-    if reference_genome is "GRCh38":
-        autosomes = ["chr" + str(i) for i in range(1, 23)]
-    else:
-        autosomes = [str(i) for i in range(1,23)]
-
-    mt_autosomes = mt.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
-    var_count = mt_autosomes.count_rows()
-    logging.info(f"Variant count after removing chromosome x: {var_count}")
+    # Write checkpoint
+    mt_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_autosomes_norelatives"
+    mt = mt.checkpoint(mt_fn)
 
     #########################################################################
     # Calculate PCAs, detect outliers, and repeat until outliers count == 0 #
     #########################################################################
     while outliers > 0:
-        # Check if i is too big
-        if i > max_iter:
+        # Check if round is too big
+        if round_num > max_iter:
             logging.warning('Warning- number of iterations in PC plots too many. Check the PC plots and see '
                             'what is wrong! Cutting rest of iterations, moving on in pipeline.')
             outliers = 0
@@ -168,11 +170,11 @@ def find_pop_outliers(mt, mt_to_annotate, pop_sd_threshold=4, plots=True, max_it
 
             if pca_plot_annotations is not None:
                 for annotation in pca_annotations:
-                    output_file(f"{datestr}_find_population_outliers_pcsplots_round{i}_{annotation}.html")
+                    output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}_{annotation}.html")
                     p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=scores[annotation])
                     save(p)
             else:
-                output_file(f"{datestr}_find_population_outliers_pcsplots_round{i}.html")
+                output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
                 p = hl.plot.scatter(scores.scores[0], scores.scores[1])
                 save(p)
 
@@ -193,26 +195,30 @@ def find_pop_outliers(mt, mt_to_annotate, pop_sd_threshold=4, plots=True, max_it
         # Get iterator for number of failing individuals
         outliers = outlier_table.count()
         logging.info(f"Number of individuals outside mean +/- {pop_sd_threshold} standard deviations for PCS 1 or "
-                     f"2 in  round {i}: {outliers}")
+                     f"2 in  round {round_num}: {outliers}")
+
+        # Add round info to table and join to bigger table
+        outlier_table = outlier_table.annotate(round=round_num)
+        if round_num == 1:
+            all_outliers = outlier_table
+        else:
+            all_outliers = all_outliers.union(outlier_table)
 
         # Filter outlier samples from main table to run PCA calculation again
         mt_autosomes = mt_autosomes.anti_join_cols(outlier_table)
 
-        # Annotate main matrix table with outlier samples (if sample exists in outlier_table, mark as outlier in mt)
-        mt_to_annotate = mt_to_annotate.annotate_cols(
-            pop_outlier_sample=hl.cond(hl.is_defined(outlier_table[mt_to_annotate.s].scores),
-                                       True, mt_to_annotate.pop_outlier_sample))
-        i = i + 1
+        round_num += 1
+
+    # Write table of all outliers
+    pop_outliers_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_population_outliers.txt"
+    all_outliers.export(pop_outliers_fn)
+    pop_outliers = all_outliers.s.take(all_outliers.count())
 
     # Report total number of population outliers
-    total_outliers = mt_to_annotate.aggregate_cols(hl.agg.count_where(mt_to_annotate.pop_outlier_sample == True))
-    logging.info(f"Total number of population outliers: {total_outliers}")
-
-    logging.info('Samples identified as population outliers:')
-    mt_to_annotate.filter_cols(mt_to_annotate.pop_outlier_sample == True, keep=True).s.show()
+    logging.info(f"Total number of population outliers: {len(pop_outliers)}")
 
     # Return mt and samples list
-    return mt_to_annotate
+    return pop_outliers
 
 
 def samples_qc(mt, mt_to_annotate, args):
@@ -617,8 +623,21 @@ def nx_algorithm(g, cases):
 
 
 def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=None, force=False,
-                     cluster_name=None, num_secondary_workers=None, region=None,
-                     reference_genome="GRCh38"):
+                     cluster_name=None, num_secondary_workers=None, region=None, reference_genome="GRCh38"):
+    """
+
+    :param mt: matrix table to calculate kinship values from
+    :param checkpoint_name: checkpoint name (including bucket, if applicable)
+    :param kinship_threshold: kinship threshold to declare related pairs
+    :param pheno_col: column in matrix table (boolean) indicating case status
+    :param force: force re-analysis of checkpointed steps?
+    :param cluster_name: name of cluster to update with secondary workers during kinship calculation
+    :param num_secondary_workers: number of secondary workers to add
+    :param region: region of cluster
+    :param reference_genome: reference genome to use (for filtering to autosomes only)
+    :return:
+    """
+
     kinship_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_kinship.mt/"
     relatives_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.txt"
 
@@ -676,5 +695,4 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
 
     # Annotate matrix table with maximal unrelated individuals list
     mt = mt.annotate_cols(related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
-
-    return mt
+    return mt, related_to_remove

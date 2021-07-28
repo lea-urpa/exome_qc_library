@@ -214,14 +214,20 @@ if __name__ == "__main__":
         ## Calculate relatedness with King ##
         if not utils.check_exists(relatedness_calculated):
 
-            mt = sq.king_relatedness(mt_ldpruned,relatedness_calculated, kinship_threshold=args.kinship_threshold,
-                                     pheno_col=args.pheno_col, force=args.force, cluster_name=args.cluster_name,
-                                     num_secondary_workers=args.num_secondary_workers, region=args.region,
-                                     reference_genome=args.reference_genome)
+            mt_ldpruned, related_to_remove = sq.king_relatedness(
+                mt_ldpruned, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
+                force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
+                region=args.region, reference_genome=args.reference_genome)
+
+            mt = mt.annotate_cols(
+                related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
 
             logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
             mt = mt.checkpoint(relatedness_calculated, overwrite=True)
+            mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
             utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+    else:
+        logging.info("Detected mt with relatives annotated exists, skipping relatedness calculation.")
 
     stepcount += 1
     pop_outliers_found = os.path.join(
@@ -236,9 +242,12 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(relatedness_calculated)
         mt_ldpruned = hl.read_matrix_table(ld_pruned)
 
-        mt = sq.find_pop_outliers(mt_ldpruned, mt_to_annotate=mt, pop_sd_threshold=args.pop_sd_threshold,
-                                  plots=args.pca_plots, max_iter=args.max_iter, reference_genome=args.reference_genome,
-                                  pca_plot_annotations=args.pca_plot_annotations)
+        pop_outliers = sq.find_pop_outliers(
+            mt_ldpruned, pop_outliers_found, mt_to_annotate=mt, pop_sd_threshold=args.pop_sd_threshold,
+            plots=args.pca_plots, max_iter=args.max_iter, reference_genome=args.reference_genome,
+            pca_plot_annotations=args.pca_plot_annotations)
+
+        mt = mt.annotate_cols(pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt.s), True, False))
 
         logging.info(f"Writing checkpoint {stepcount}: population outliers annotated")
         mt = mt.checkpoint(pop_outliers_found, overwrite=True)
