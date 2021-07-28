@@ -171,11 +171,13 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
             if pca_plot_annotations is not None:
                 for annotation in pca_annotations:
                     output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}_{annotation}.html")
-                    p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=scores[annotation])
+                    p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=scores[annotation],
+                                        title=f"PCA plot round {round_num}", collect_all=True)
                     save(p)
             else:
                 output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
-                p = hl.plot.scatter(scores.scores[0], scores.scores[1])
+                p = hl.plot.scatter(scores.scores[0], scores.scores[1], title=f"PCA plot round {round_num}",
+                                    collect_all=True)
                 save(p)
 
         # Calculate upper and lower limits for each principal component
