@@ -611,7 +611,8 @@ def nx_algorithm(g, cases):
     return related_nodes, len(unrelated_cases), len(unrelated_nodes)
 
 
-def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=None):
+def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=None, force=False,
+                     cluster_name=None, num_secondary_workers=None, region=None):
     kinship_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_kinship.mt/"
     relatives_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.txt"
 
@@ -626,10 +627,14 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
                         f"left after removing sex chromosomes: {var_count}.")
 
     # Calculate kinship
-    if not utils.check_exists(kinship_fn):
+    if (not utils.check_exists(kinship_fn)) or force:
+        if (cluster_name is not None) and (num_secondary_workers is not None) and (region is not None):
+            utils.add_secondary(cluster_name, num_secondary_workers, region)
         kinship = hl.king(mt_autosomes.GT)
         logging.info(f"Writing kinship matrix table to file: {kinship_fn}")
         kinship = kinship.checkpoint(kinship_fn, overwrite=True)
+        if (cluster_name is not None) and (num_secondary_workers is not None) and (region is not None):
+            utils.remove_secondary(cluster_name, region)
     else:
         logging.info(f"Detected kinship file exists {kinship_fn}, loading that.")
         kinship = hl.read_matrix_table(kinship_fn)
