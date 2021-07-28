@@ -244,7 +244,7 @@ if __name__ == "__main__":
         mt_ldpruned = hl.read_matrix_table(ld_pruned_annot)
 
         pop_outliers = sq.find_pop_outliers(
-            mt_ldpruned, pop_outliers_found, mt_to_annotate=mt, pop_sd_threshold=args.pop_sd_threshold,
+            mt_ldpruned, pop_outliers_found, pop_sd_threshold=args.pop_sd_threshold,
             plots=args.pca_plots, max_iter=args.max_iter, reference_genome=args.reference_genome,
             pca_plot_annotations=args.pca_plot_annotations)
 
