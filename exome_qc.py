@@ -211,9 +211,6 @@ if __name__ == "__main__":
             logging.info("Detected LD pruned dataset written, loading that.")
             mt_ldpruned = hl.read_matrix_table(ld_pruned)
 
-        logging.info("Tested up until King relatedness calculation. Exiting now.")
-        exit(0)
-
         ## Calculate relatedness with King ##
         if not utils.check_exists(relatedness_calculated):
 
@@ -228,6 +225,9 @@ if __name__ == "__main__":
     stepcount += 1
     pop_outliers_found = os.path.join(
         args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
+
+    logging.info("Tested until after King relatedness calculation. Exiting now.")
+    exit(0)
 
     ############################
     # Find population outliers #
