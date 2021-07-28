@@ -217,10 +217,8 @@ if __name__ == "__main__":
         ## Calculate relatedness with King ##
         if not utils.check_exists(relatedness_calculated):
             # TODO find out if I can add secondary workers here- does it trigger a shuffle?
-            relatedness = hl.king_or_whatever(mt_ldpruned) # TODO figure out how to implement this
-
-            # Annotate with relatedness
-            # TODO implement this
+            mt = sq.king_relatedness(mt_ldpruned,relatedness_calculated, kinship_threshold=args.kinship_threshold,
+                                     pheno_col=args.pheno_col)
 
             logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
             mt = mt.checkpoint(relatedness_calculated, overwrite=True)

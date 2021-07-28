@@ -6,6 +6,7 @@ Author: Lea Urpa, August 2020
 import logging
 import time
 import hail as hl
+import utils
 from bokeh.io import output_file, save
 import networkx as nx
 
@@ -571,9 +572,8 @@ def nx_algorithm(g, cases):
             high_degree_count += 1
 
     if high_degree_count > 0:
-        print(f"Warning! {high_degree_count} samples are connected to > 100 other samples. "
-              "This is likely from poorly calculated kinships, increase number of variants "
-              "used to calculate kinships and try again.")
+        print(f"Warning! {high_degree_count} samples are connected to > 100 other samples. This is likely from poorly "
+              f"calculated kinships, increase number of variants used to calculate kinships and try again.")
 
     ##########################################
     # Loop through subgraphs in larger graph #
@@ -611,17 +611,39 @@ def nx_algorithm(g, cases):
     return related_nodes, len(unrelated_cases), len(unrelated_nodes)
 
 
-def king_relatedness(mt, kinship_threshold=0.0883, pheno_col=None):
+def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=None):
+    kinship_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_kinship.mt/"
+    relatives_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.txt"
+
+    # Filter to autosomes
+    autosomes = ["chr" + str(i) for i in range(1, 23)]
+    mt_autosomes = mt.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
+
+    var_count = mt_autosomes.count_rows()
+    if var_count < 10000:
+        logging.warning("Warning! Number of variants to calculate kinship is less than 10 000, it is likely that "
+                        "kinship calculations will be incorrect (more relatedness than reality). Number of variants "
+                        f"left after removing sex chromosomes: {var_count}.")
 
     # Calculate kinship
-    kinship = hl.king(mt.GT)
+    if not utils.check_exists(kinship_fn):
+        kinship = hl.king(mt_autosomes.GT)
+        logging.info(f"Writing kinship matrix table to file: {kinship_fn}")
+        kinship = kinship.checkpoint(kinship_fn, overwrite=True)
+    else:
+        logging.info(f"Detected kinship file exists {kinship_fn}, loading that.")
+        kinship = hl.read_matrix_table(kinship_fn)
 
     # Get just pairs above threshold, convert to pandas df
     relatives = kinship.filter_entries(kinship.phi > kinship_threshold)
 
     rel_tab = relatives.entries()
-    rel_tab = rel_tab.key_by().select("s", "s_1")
+    rel_tab = rel_tab.filter(rel_tab.s != rel_tab.s_1)  # remove diagonal
+    logging.info(f"Writing kinship pairs above threshold table to file: {relatives_fn}")
+    rel_tab.export(relatives_fn)
 
+    # Select just edges and convert to pandas df
+    rel_tab = rel_tab.key_by().select("s", "s_1")
     rel_df = rel_tab.to_pandas()
 
     # Create graph from pandas df
@@ -637,3 +659,8 @@ def king_relatedness(mt, kinship_threshold=0.0883, pheno_col=None):
     logging.info('Calculating maximal independent set.')
     related_to_remove, num_ind_cases, num_ind_nodes = nx_algorithm(related_ind_g, case_ids)
     logging.info('# of unrelated cases given king input: ' + str(num_ind_cases))
+
+    # Annotate matrix table with maximal unrelated individuals list
+    mt = mt.annotate_cols(related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
+
+    return mt

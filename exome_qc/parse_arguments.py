@@ -99,8 +99,8 @@ def parse_arguments(arguments):
     kin_thresh = parser.add_argument_group("Kinship thresholds.")
     kin_thresh.add_argument("--ind_maf", default=0.001, type=float,
                             help="Minor allele frequency cutoff for calculating kinship.")
-    kin_thresh.add_argument("--relatives_removal_file", type=str,
-                            help="File of related individuals to remove, one sample per line.")
+    kin_thresh.add_argument("--kinship_threshold", default=0.0883,
+                            help="Threshold for kinship coefficient, above which individuals are defined as related.")
 
     # Pop outlier options #
     pop_opts = parser.add_argument_group("Options for population outlier removal")
