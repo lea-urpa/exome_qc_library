@@ -181,6 +181,7 @@ if __name__ == "__main__":
     # Calculate relatedness #
     #########################
     ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
+    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned_annot{args.test_str}.mt/")
 
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
@@ -224,7 +225,7 @@ if __name__ == "__main__":
 
             logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
             mt = mt.checkpoint(relatedness_calculated, overwrite=True)
-            mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
+            mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
             utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
     else:
         logging.info("Detected mt with relatives annotated exists, skipping relatedness calculation.")
@@ -240,7 +241,7 @@ if __name__ == "__main__":
         logging.info("Finding population outliers")
 
         mt = hl.read_matrix_table(relatedness_calculated)
-        mt_ldpruned = hl.read_matrix_table(ld_pruned)
+        mt_ldpruned = hl.read_matrix_table(ld_pruned_annot)
 
         pop_outliers = sq.find_pop_outliers(
             mt_ldpruned, pop_outliers_found, mt_to_annotate=mt, pop_sd_threshold=args.pop_sd_threshold,
@@ -422,6 +423,10 @@ if __name__ == "__main__":
         mtrows = mt.rows()
         mtrows = mtrows.flatten()
         mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv'))
+
+    ##############################
+    # Annotate with CADD, Gnomad #
+    ##############################
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
