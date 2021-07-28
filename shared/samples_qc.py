@@ -583,14 +583,17 @@ def nx_algorithm(g, cases):
     num_graphs = 0
     for subgraph in connected_component_subgraphs(g):
         num_graphs += 1
-        subcases = filter_graph_cases(subgraph, cases)  # list of local cases
-        if len(subcases) > 0:
-            # graph induced by local cases
-            case_graph = subgraph.subgraph(cases)
-            # get maximal set of cases in case graph
-            unrelated_subcases = nx.maximal_independent_set(case_graph)
-            # get maximal set of nodes in subgraph, giving unrelated cases to keep
-            unrelated_nodes += nx.maximal_independent_set(subgraph, unrelated_subcases)
+        if cases is not None:
+            subcases = filter_graph_cases(subgraph, cases)  # list of local cases
+            if len(subcases) > 0:
+                # graph induced by local cases
+                case_graph = subgraph.subgraph(cases)
+                # get maximal set of cases in case graph
+                unrelated_subcases = nx.maximal_independent_set(case_graph)
+                # get maximal set of nodes in subgraph, giving unrelated cases to keep
+                unrelated_nodes += nx.maximal_independent_set(subgraph, unrelated_subcases)
+            else:
+                unrelated_nodes += nx.maximal_independent_set(subgraph)
         else:
             unrelated_nodes += nx.maximal_independent_set(subgraph)
 
