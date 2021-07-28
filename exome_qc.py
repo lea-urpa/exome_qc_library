@@ -216,7 +216,8 @@ if __name__ == "__main__":
 
             mt = sq.king_relatedness(mt_ldpruned,relatedness_calculated, kinship_threshold=args.kinship_threshold,
                                      pheno_col=args.pheno_col, force=args.force, cluster_name=args.cluster_name,
-                                     num_secondary_workers=args.num_secondary_workers, region=args.region)
+                                     num_secondary_workers=args.num_secondary_workers, region=args.region,
+                                     reference_genome=args.reference_genome)
 
             logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
             mt = mt.checkpoint(relatedness_calculated, overwrite=True)
@@ -225,9 +226,6 @@ if __name__ == "__main__":
     stepcount += 1
     pop_outliers_found = os.path.join(
         args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
-
-    logging.info("Tested until after King relatedness calculation. Exiting now.")
-    exit(0)
 
     ############################
     # Find population outliers #
@@ -238,7 +236,9 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(relatedness_calculated)
         mt_ldpruned = hl.read_matrix_table(ld_pruned)
 
-        mt = sq.find_pop_outliers(mt_ldpruned, mt_to_annotate=mt, args=args)
+        mt = sq.find_pop_outliers(mt_ldpruned, mt_to_annotate=mt, pop_sd_threshold=args.pop_sd_threshold,
+                                  plots=args.pca_plots, max_iter=args.max_iter, reference_genome=args.reference_genome,
+                                  pca_plot_annotations=args.pca_plot_annotations)
 
         logging.info(f"Writing checkpoint {stepcount}: population outliers annotated")
         mt = mt.checkpoint(pop_outliers_found, overwrite=True)
@@ -246,6 +246,9 @@ if __name__ == "__main__":
 
     stepcount += 1
     sex_imputed = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_sex_imputed{args.test_str}.mt/")
+
+    logging.info("Tested until after poplation outlier detection. Exiting now.")
+    exit(0)
 
     ####################################
     # Annotate variants and impute sex #
