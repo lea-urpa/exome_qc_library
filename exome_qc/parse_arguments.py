@@ -111,7 +111,7 @@ def parse_arguments(arguments):
                           help="column annotations with which to annotate PCA plots, comma separated if > 1.")
     pop_opts.add_argument("--pca_plots", default=True,
                           help="Plot PCA plots for each round in the population outlier detection?")
-    pop_opts.add_argument("--max_iter", default=8, help="Max iteration rounds for PCA outlier detection, for debugging.")
+    pop_opts.add_argument("--max_iter", default=5, help="Max iteration rounds for PCA outlier detection, for debugging.")
 
     # Samples removal options #
     samples_removal = parser.add_argument_group("Arbitrary sample removal options.")
