@@ -611,13 +611,13 @@ def nx_algorithm(g, cases):
     # result summaries #
     ####################
     related_nodes = list(set(g.nodes()) - set(unrelated_nodes))
-    unrelated_cases = filter_node_cases(unrelated_nodes, cases)
-
-    #####################################################################################
-    # sanity_check: makes sure that the unrelated cases/nodes are in fact not connected #
-    #####################################################################################
     sanity_check(g, unrelated_nodes)
-    sanity_check(g, unrelated_cases)
+
+    if cases is not None:
+        unrelated_cases = filter_node_cases(unrelated_nodes, cases)
+        sanity_check(g, unrelated_cases)
+    else:
+        unrelated_cases = 0
 
     return related_nodes, len(unrelated_cases), len(unrelated_nodes)
 
@@ -691,7 +691,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
 
     logging.info('Calculating maximal independent set.')
     related_to_remove, num_ind_cases, num_ind_nodes = nx_algorithm(related_ind_g, case_ids)
-    logging.info('# of unrelated cases given king input: ' + str(num_ind_cases))
+    logging.info('# of unrelated cases: ' + str(num_ind_cases))
 
     # Annotate matrix table with maximal unrelated individuals list
     mt = mt.annotate_cols(related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
