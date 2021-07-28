@@ -194,8 +194,7 @@ def check_inputs(parsed_args):
     ################################
     # Check that input files exist #
     ################################
-    files = ['bam_metadata', 'relatives_removal_file', 'sample_removal_list', 'mt', 'scripts_dir',
-             'samples_annotation_files']
+    files = ['bam_metadata', 'sample_removal_list', 'mt', 'scripts_dir', 'samples_annotation_files']
 
     for f in files:
         f1 = getattr(parsed_args, f)
