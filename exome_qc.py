@@ -230,8 +230,8 @@ if __name__ == "__main__":
             mt = mt.annotate_cols(
                 related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
 
-            mt_ldpruned = mt.annotate_cols(
-                related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
+            mt_ldpruned = mt_ldpruned.annotate_cols(
+                related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned.s), True, False))
 
             logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
             mt = mt.checkpoint(relatedness_calculated, overwrite=True)
