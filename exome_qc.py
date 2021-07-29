@@ -229,6 +229,9 @@ if __name__ == "__main__":
             mt = mt.annotate_cols(
                 related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
 
+            mt_ldpruned = mt.annotate_cols(
+                related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
+
             logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
             mt = mt.checkpoint(relatedness_calculated, overwrite=True)
             mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
@@ -243,6 +246,9 @@ if __name__ == "__main__":
     ############################
     # Find population outliers #
     ############################
+    ld_pruned_popannot = os.path.join(args.out_dir,
+                                      f"{stepcount}-1_{args.out_name}_ld_pruned_popoutliers{args.test_str}.mt/")
+
     if (not utils.check_exists(pop_outliers_found)) or args.force:
         logging.info("Finding population outliers")
 
@@ -255,9 +261,12 @@ if __name__ == "__main__":
             pca_plot_annotations=args.pca_plot_annotations)
 
         mt = mt.annotate_cols(pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt.s), True, False))
+        mt_ldpruned = mt_ldpruned.annotate_cols(
+            pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt.s), True, False))
 
         logging.info(f"Writing checkpoint {stepcount}: population outliers annotated")
         mt = mt.checkpoint(pop_outliers_found, overwrite=True)
+        mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_popannot, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
     stepcount += 1
@@ -278,8 +287,13 @@ if __name__ == "__main__":
         # Annotate variants
         mt = va.annotate_variants(mt)
 
-        # Filter out failing samples, rare variants
-        mt_filtered = sq.filter_failing(mt, args, mode='low_pass', unfilter_entries=False)
+        # Filter out failing variants, genotypes, rare variants
+        mt_filtered = sq.filter_failing(
+            mt, sex_imputed, prefix='low_pass', variants=True, entries=True, samples=False, unfilter_entries=False,
+            pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+            min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+        )
         # TODO fix this so it doesn't take out hardy-weinberg failing variants!
         mt_maf = vq.maf_filter(mt_filtered, 0.05)
 
