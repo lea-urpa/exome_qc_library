@@ -232,7 +232,7 @@ if __name__ == "__main__":
 
     stepcount += 1
     pop_outliers_found = os.path.join(
-        args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
+        args.out_dir, f"{stepcount}_{args.out_name}_pop_outliers_found{args.test_str}.mt/")
 
     ############################
     # Find population outliers #
