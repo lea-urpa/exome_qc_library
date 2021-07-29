@@ -315,9 +315,20 @@ if __name__ == "__main__":
         mt = mt.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
                                                           'male_threshold': args.male_threshold})
 
+        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female)
+        mt = mt.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
+                                                            'male_threshold': args.male_threshold})
+        args.sex_col = "is_female_imputed"
+        args.male_tag = False
+        args.female_tag = True
+
         # Annotate sex-aware variant annotations
         mt = va.sex_aware_variant_annotations(mt_filtered, mt_to_annotate=mt, args=args)
-        mt = sa.sex_aware_sample_annotations(mt_filtered, mt_to_annotate=mt, args=args)
+
+
+        mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
+        mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
+
         # TODO check if this triggers a shuffle
 
         logging.info(f"Writing checkpoint {stepcount}: variants annotated and sex imputed")
