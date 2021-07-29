@@ -650,14 +650,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     kinship_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_kinship.mt/"
     relatives_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.txt"
 
-    # Filter to autosomes
-    if reference_genome is "GRCh38":
-        autosomes = ["chr" + str(i) for i in range(1, 23)]
-    else:
-        autosomes = [str(i) for i in range(1,23)]
-    mt_autosomes = mt.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
-
-    var_count = mt_autosomes.count_rows()
+    var_count = mt.count_rows()
     if var_count < 10000:
         logging.warning("Warning! Number of variants to calculate kinship is less than 10 000, it is likely that "
                         "kinship calculations will be incorrect (more relatedness than reality). Number of variants "
@@ -667,7 +660,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     if (not utils.check_exists(kinship_fn)) or force:
         if (cluster_name is not None) and (num_secondary_workers is not None) and (region is not None):
             utils.add_secondary(cluster_name, num_secondary_workers, region)
-        kinship = hl.king(mt_autosomes.GT)
+        kinship = hl.king(mt.GT)
         logging.info(f"Writing kinship matrix table to file: {kinship_fn}")
         kinship = kinship.checkpoint(kinship_fn, overwrite=True)
         if (cluster_name is not None) and (num_secondary_workers is not None) and (region is not None):
@@ -702,6 +695,4 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     related_to_remove, num_ind_cases, num_ind_nodes = nx_algorithm(related_ind_g, case_ids)
     logging.info('# of unrelated cases: ' + str(num_ind_cases))
 
-    # Annotate matrix table with maximal unrelated individuals list
-    mt = mt.annotate_cols(related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
-    return mt, related_to_remove
+    return related_to_remove

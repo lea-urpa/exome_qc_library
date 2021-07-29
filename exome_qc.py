@@ -181,7 +181,7 @@ if __name__ == "__main__":
     # Calculate relatedness #
     #########################
     ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
-    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned_annot{args.test_str}.mt/")
+    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
 
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
@@ -215,8 +215,14 @@ if __name__ == "__main__":
         ## Calculate relatedness with King ##
         if not utils.check_exists(relatedness_calculated):
 
-            mt_ldpruned, related_to_remove = sq.king_relatedness(
-                mt_ldpruned, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
+            if args.reference_genome is "GRCh38":
+                autosomes = ["chr" + str(i) for i in range(1, 23)]
+            else:
+                autosomes = [str(i) for i in range(1, 23)]
+            mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
+
+            related_to_remove = sq.king_relatedness(
+                mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
                 force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
                 region=args.region, reference_genome=args.reference_genome)
 
