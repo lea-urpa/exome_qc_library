@@ -263,7 +263,7 @@ if __name__ == "__main__":
 
         mt = mt.annotate_cols(pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt.s), True, False))
         mt_ldpruned = mt_ldpruned.annotate_cols(
-            pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt.s), True, False))
+            pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt_ldpruned.s), True, False))
 
         logging.info(f"Writing checkpoint {stepcount}: population outliers annotated")
         mt = mt.checkpoint(pop_outliers_found, overwrite=True)
