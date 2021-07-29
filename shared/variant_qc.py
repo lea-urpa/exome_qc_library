@@ -101,10 +101,11 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
         prefix = prefix + "_"
 
     # Get starting genotypes count, instantiate genotype annotation
-    gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
-    gt_het_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) &
-                                                            (mt.GT.is_hom_var() | mt.GT.is_het())))
-    gt_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
+    if count_failing:
+        gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
+        gt_het_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) &
+                                                                (mt.GT.is_hom_var() | mt.GT.is_het())))
+        gt_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
 
     ############################
     # Define filter conditions #
@@ -184,10 +185,11 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
     mt = mt.filter_entries(filter_condition)
     mt = mt.checkpoint(checkpoint_name + "_DP_GQ_filtered.mt/", overwrite=True)
 
-    passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
-    passing_gts_perc = round(passing_gts / gt_total * 100, 2)
+    if count_failing:
+        passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
+        passing_gts_perc = round(passing_gts / gt_total * 100, 2)
 
-    logging.info(f"Number of passing genotypes: {passing_gts} ({passing_gts_perc}%)")
+        logging.info(f"Number of passing genotypes: {passing_gts} ({passing_gts_perc}%)")
 
     return mt
 
