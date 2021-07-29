@@ -181,7 +181,7 @@ def annotate_variants(mt):
     return mt
 
 
-def sex_aware_variant_annotations(mt, mt_to_annotate, args):
+def sex_aware_variant_annotations(mt, pheno_col=None):
     '''
     Creates sex-aware variant annotations for call rate, allele count, and allele number.
 
@@ -196,8 +196,8 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
     # Do sex-aware variant annotations #
     ####################################
     logging.info('Annotating sex-aware variant annotations.')
-    is_female = (mt[args.sex_col] == args.female_tag) & hl.is_defined(mt[args.sex_col])
-    is_male = (mt[args.sex_col] == args.male_tag) & hl.is_defined(mt[args.sex_col])
+    is_female = (mt.is_female_imputed == True) & hl.is_defined(mt.is_female_imputed)
+    is_male = (mt.is_female_imputed == False) & hl.is_defined(mt.is_female_imputed)
 
     num_males = mt.aggregate_cols(hl.agg.count_where(is_male))
     num_females = mt.aggregate_cols(hl.agg.count_where(is_female))
@@ -224,21 +224,16 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
                                        .when(mt.locus.in_x_nonpar(), mt.male_calls + 2*mt.female_calls)
                                        .default(2*mt.male_calls + 2*mt.female_calls)))
 
-    mt_rows = mt.rows()
-
     annotations_to_transfer = ['male_hets', 'male_homvars', 'male_calls', 'female_hets', 'female_homvars',
                                'female_calls', 'sexaware_call_rate', 'sexaware_AC', 'sexaware_AN']
-
-    for annotation in annotations_to_transfer:
-        mt_to_annotate = mt_to_annotate.annotate_rows(**{annotation: mt_rows[mt_to_annotate.row_key][annotation]})
 
     ##################################################
     # Do case-specific sex-aware variant annotations #
     ##################################################
-    if args.pheno_col is not None:
+    if pheno_col is not None:
         logging.info("Annotating sex-aware variant annotations, taking case/control status into account.")
-        case_female = (mt[args.sex_col] == args.female_tag) & (mt[args.pheno_col] == True)
-        case_male = (mt[args.sex_col] == args.male_tag) & (mt[args.pheno_col] == True)
+        case_female = (mt.is_female_imputed == True) & (mt[pheno_col] == True)
+        case_male = (mt.is_female_imputed == False) & (mt[pheno_col] == True)
 
         num_case_females = mt.aggregate_cols(hl.agg.count_where(case_female))
         num_case_males = mt.aggregate_cols(hl.agg.count_where(case_male))
@@ -272,12 +267,12 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
                                  .when(mt.locus.in_x_nonpar(), mt.case_male_calls + 2 * mt.case_female_calls)
                                  .default(2 * mt.case_male_calls + 2 * mt.case_female_calls)))
 
-        case_annots_to_transfer = ['case_male_hets', 'case_male_homvars', 'case_male_calls', 'case_female_hets',
-                                   'case_female_homvars', 'case_female_calls', 'sexaware_case_call_rate',
-                                   'sexaware_case_AC', 'sexaware_case_AN']
+        annotations_to_transfer.extend(
+            ['case_male_hets', 'case_male_homvars', 'case_male_calls', 'case_female_hets','case_female_homvars',
+             'case_female_calls', 'sexaware_case_call_rate', 'sexaware_case_AC', 'sexaware_case_AN'])
 
-        cont_female = (mt[args.sex_col] == args.female_tag) & (mt[args.pheno_col] == False)
-        cont_male = (mt[args.sex_col] == args.male_tag) & (mt[args.pheno_col] == False)
+        cont_female = (mt.is_female_imputed == True) & (mt[pheno_col] == False)
+        cont_male = (mt.is_female_imputed == False) & (mt[pheno_col] == False)
 
         num_cont_females = mt.aggregate_cols(hl.agg.count_where(cont_female))
         num_cont_males = mt.aggregate_cols(hl.agg.count_where(cont_male))
@@ -312,16 +307,11 @@ def sex_aware_variant_annotations(mt, mt_to_annotate, args):
                                .when(mt.locus.in_x_nonpar(), mt.cont_male_calls + 2 * mt.cont_female_calls)
                                .default(2 * mt.cont_male_calls + 2 * mt.cont_female_calls)))
 
-        mt_rows = mt.rows()
-
-        case_annots_to_transfer.extend(['cont_male_hets', 'cont_male_homvars', 'cont_male_calls', 'cont_female_hets',
+        annotations_to_transfer.extend(['cont_male_hets', 'cont_male_homvars', 'cont_male_calls', 'cont_female_hets',
                                         'cont_female_homvars', 'cont_female_calls', 'sexaware_cont_call_rate',
                                         'sexaware_cont_AC', 'sexaware_cont_AN'])
 
-        for annotation in case_annots_to_transfer:
-            mt_to_annotate = mt_to_annotate.annotate_rows(**{annotation: mt_rows[mt_to_annotate.row_key][annotation]})
-
-    return mt_to_annotate
+    return mt, annotations_to_transfer
 
 
 def annotate_variants_gnomad(mt, gnomad_ht):

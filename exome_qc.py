@@ -323,13 +323,13 @@ if __name__ == "__main__":
         args.female_tag = True
 
         # Annotate sex-aware variant annotations
-        mt = va.sex_aware_variant_annotations(mt_filtered, mt_to_annotate=mt, args=args)
-
-
-        mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
-        mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
+        mt_filtered, annotations_to_transfer = va.sex_aware_variant_annotations(mt_filtered, pheno_col=args.pheno_col)
+        for annotation in annotations_to_transfer:
+            mt = mt.annotate_rows(**{annotation: mt_filtered.rows()[mt.row_key][annotation]})
 
         # TODO check if this triggers a shuffle
+        mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
+        mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
 
         logging.info(f"Writing checkpoint {stepcount}: variants annotated and sex imputed")
         mt = mt.checkpoint(sex_imputed, overwrite=True)
