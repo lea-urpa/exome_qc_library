@@ -157,23 +157,21 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
         logging.info(f"Count of samples and variants for matrix table PCA is calculated on: {mt_count}")
         eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_autosomes.GT, k=2)
 
-        # Parse column annotations for PCA plots
-        if pca_plot_annotations is not None:
-            pca_annotations = pca_plot_annotations.strip().split(",")
-
         # Do PCA plots, if specified
         if plots:
             coldata = mt.cols()
+
             if pca_plot_annotations is not None:
+                pca_annotations = pca_plot_annotations.strip().split(",")
+                label_dict = {i: scores[i] for i in pca_annotations}
+
                 for annotation in pca_annotations:
                     scores = scores.annotate(**{annotation: coldata[scores.s][annotation]})
 
-            if pca_plot_annotations is not None:
-                for annotation in pca_annotations:
-                    output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}_{annotation}.html")
-                    p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=scores[annotation],
-                                        title=f"PCA plot round {round_num}", collect_all=True)
-                    save(p)
+                output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}_{annotation}.html")
+                p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=label_dict,
+                                    title=f"PCA plot round {round_num}", collect_all=True)
+                save(p)
             else:
                 output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
                 p = hl.plot.scatter(scores.scores[0], scores.scores[1], title=f"PCA plot round {round_num}",
