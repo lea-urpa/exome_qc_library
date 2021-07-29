@@ -181,7 +181,7 @@ if __name__ == "__main__":
     # Calculate relatedness #
     #########################
     ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
-    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
+    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
 
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
@@ -272,12 +272,14 @@ if __name__ == "__main__":
     stepcount += 1
     sex_imputed = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_sex_imputed{args.test_str}.mt/")
 
-    logging.info("Tested until after poplation outlier detection. Exiting now.")
+    logging.info("Tested until after pop outliers step. Exiting now.")
     exit(0)
 
     ####################################
     # Annotate variants and impute sex #
     ####################################
+    filtered_nohwe = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_filtered_except_hwe{args.test_str}.mt/")
+
     if (not utils.check_exists(sex_imputed)) or args.force:
         logging.info("Annotating variants and imputing sex")
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
@@ -289,13 +291,15 @@ if __name__ == "__main__":
 
         # Filter out failing variants, genotypes, rare variants
         mt_filtered = sq.filter_failing(
-            mt, sex_imputed, prefix='low_pass', variants=True, entries=True, samples=False, unfilter_entries=False,
-            pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+            mt, sex_imputed, prefix='low_pass', variants=True, entries=True, samples=False,
+            unfilter_entries=False, skip_hwe_fails=True, pheno_qc=False, min_dp=args.min_dp,
+            min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
         )
-        # TODO fix this so it doesn't take out hardy-weinberg failing variants!
         mt_maf = vq.maf_filter(mt_filtered, 0.05)
+
+        mt_maf = mt_maf.checkpoint(filtered_nohwe, overwrite=True)
 
         # Impute sex
         #TODO check if this triggers a shuffle
