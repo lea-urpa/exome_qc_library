@@ -25,31 +25,67 @@ def annotate_variants(mt):
     # give the gene corresponding to the most severe consequence.
     # If there is a canonical and protein-coding transcript consequence for that variant,
     # give the gene symbol associated with that transcript consequence.
-    canon_pc = mt.row.vep.transcript_consequences.filter(lambda x:
-                                                         (x.canonical == 1) & (x.biotype == 'protein_coding'))
-    most_severe = mt.row.vep.transcript_consequences.filter(lambda x:
-                                                            x.consequence_terms.contains(
-                                                                mt.row.vep.most_severe_consequence))
+    # Also, if the consequence terms do not contain upstream or downstream gene variant, these can still be canonical.
+    canon_pc = mt.row.vep.transcript_consequences.filter(
+        lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding') &
+                  (x.gene_symbol_source != "Clone_based_ensembl_gene") &
+                  ~x.consequence_terms.contains("downstream_gene_variant") &
+                  ~x.consequence_terms.contains("upstream_gene_variant") &
+                  ~x.consequence_terms.contains("intron_variant")
+    )
 
-    mt = mt.annotate_rows(gene=hl.if_else(hl.any(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding'),
-                                       mt.row.vep.transcript_consequences),
-                                       canon_pc.map(lambda x: x.gene_symbol),
-                                       most_severe.map(lambda x: x.gene_symbol)))
+    most_severe = mt.row.vep.transcript_consequences.filter(
+        lambda x: x.consequence_terms.contains(mt.row.vep.most_severe_consequence) &
+                  (x.biotype == "protein_coding") & (x.gene_symbol_source != "Clone_based_ensembl_gene") &
+                  ~x.consequence_terms.contains("downstream_gene_variant") &
+                  ~x.consequence_terms.contains("upstream_gene_variant") &
+                  ~x.consequence_terms.contains("intron_variant")
+    )
 
-    # The above returns gene symbols for all canonical and protein coding transcripts, not just the one related to the
-    # most severe consequence. So we will keep the above, but annotate also the gene corresponding to the most severe
-    # consequence as well (useful for synonymous, missense, and LOF annotations)
+    mt = mt.annotate_rows(
+        gene=hl.if_else(hl.any(
+            lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding') &
+                      (x.gene_symbol_source != "Clone_based_ensembl_gene") &
+                      ~x.consequence_terms.contains("downstream_gene_variant") &
+                      ~x.consequence_terms.contains("upstream_gene_variant") &
+                      ~x.consequence_terms.contains("intron_variant"),
+            mt.row.vep.transcript_consequences),
+            canon_pc.map(lambda x:
+                         hl.struct(gene_symbol=x.gene_symbol, gene_id=x.gene_id, consequence=x.consequence_terms)),
+            most_severe.map(lambda x:
+                            hl.struct(gene_symbol=x.gene_symbol, gene_id=x.gene_id, consequence=x.consequence_terms))),
+    )
 
-    canon_pc = mt.row.vep.transcript_consequences.filter(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding')
-                                                         & x.consequence_terms.contains(mt.vep.most_severe_consequence))
-    most_severe = mt.vep.transcript_consequences.filter(lambda x:
-                                                        x.consequence_terms.contains(mt.row.vep.most_severe_consequence))
+    # Same thing but for variants predicted to be noncoding in that transcript
+    canon_pc = mt.row.vep.transcript_consequences.filter(
+        lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding') &
+                  (x.gene_symbol_source != "Clone_based_ensembl_gene") &
+                  (x.consequence_terms.contains("downstream_gene_variant") |
+                   x.consequence_terms.contains("upstream_gene_variant") |
+                   x.consequence_terms.contains("intron_variant"))
+    )
 
-    mt = mt.annotate_rows(gene_most_severe_conseq=
-                          hl.if_else(hl.any(lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding'),
-                                         mt.vep.transcript_consequences),
-                                  canon_pc.map(lambda x: x.gene_symbol),
-                                  most_severe.map(lambda x: x.gene_symbol)))
+    most_severe = mt.row.vep.transcript_consequences.filter(
+        lambda x: x.consequence_terms.contains(mt.row.vep.most_severe_consequence) &
+                  (x.biotype == "protein_coding") & (x.gene_symbol_source != "Clone_based_ensembl_gene") &
+                  (x.consequence_terms.contains("downstream_gene_variant") |
+                   x.consequence_terms.contains("upstream_gene_variant") |
+                   x.consequence_terms.contains("intron_variant"))
+    )
+
+    mt = mt.annotate_rows(
+        gene_noncoding=hl.if_else(hl.any(
+            lambda x: (x.canonical == 1) & (x.biotype == 'protein_coding') &
+                      (x.gene_symbol_source != "Clone_based_ensembl_gene") &
+                      (x.consequence_terms.contains("downstream_gene_variant") |
+                       x.consequence_terms.contains("upstream_gene_variant") |
+                       x.consequence_terms.contains("intron_variant")),
+            mt.row.vep.transcript_consequences),
+            canon_pc.map(lambda x:
+                         hl.struct(gene_symbol=x.gene_symbol, gene_id=x.gene_id, consequence=x.consequence_terms)),
+            most_severe.map(lambda x:
+                            hl.struct(gene_symbol=x.gene_symbol, gene_id=x.gene_id, consequence=x.consequence_terms))),
+    )
 
     # either if there is a canonical and protein coding transcript consequence for that variant,
     # and the lof annotation is not missing and equal to HC, and the lof flag is missing or is blank,
