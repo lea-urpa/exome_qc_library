@@ -139,7 +139,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
 
     # Write checkpoint
     mt_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_autosomes_norelatives"
-    mt = mt.checkpoint(mt_fn)
+    mt = mt.checkpoint(mt_fn, overwrite=True)
 
     #########################################################################
     # Calculate PCAs, detect outliers, and repeat until outliers count == 0 #
