@@ -219,7 +219,8 @@ if __name__ == "__main__":
                 autosomes = ["chr" + str(i) for i in range(1, 23)]
             else:
                 autosomes = [str(i) for i in range(1, 23)]
-            mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
+
+            mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
 
             related_to_remove = sq.king_relatedness(
                 mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
@@ -268,6 +269,9 @@ if __name__ == "__main__":
         mt = mt.checkpoint(pop_outliers_found, overwrite=True)
         mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_popannot, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+
+    else:
+        logging.info("Detected mt with population outliers annotated exists, skipping finding pop outliers.")
 
     stepcount += 1
     sex_imputed = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_sex_imputed{args.test_str}.mt/")
