@@ -162,16 +162,26 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
             coldata = mt.cols()
 
             if pca_plot_annotations is not None:
-                pca_annotations = pca_plot_annotations.strip().split(",")
-                label_dict = {i: scores[i] for i in pca_annotations}
+                try:
+                    pca_annotations = pca_plot_annotations.strip().split(",")
+                    label_dict = {i: scores[i] for i in pca_annotations}
 
-                for annotation in pca_annotations:
-                    scores = scores.annotate(**{annotation: coldata[scores.s][annotation]})
+                    for annotation in pca_annotations:
+                        scores = scores.annotate(**{annotation: coldata[scores.s][annotation]})
 
-                output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}_{annotation}.html")
-                p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=label_dict,
-                                    title=f"PCA plot round {round_num}", collect_all=True)
-                save(p)
+                    output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}_{annotation}.html")
+                    p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=label_dict,
+                                        title=f"PCA plot round {round_num}", collect_all=True)
+                    save(p)
+                except Exception as e:
+                    logging.error(f"Error! Creating PCA plots with labels failed. Are the label categories you provided"
+                                  f" really in the data? labels provided: {pca_plot_annotations}. Plotting without "
+                                  f"labels")
+                    logging.error(e)
+                    output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
+                    p = hl.plot.scatter(scores.scores[0], scores.scores[1], title=f"PCA plot round {round_num}",
+                                        collect_all=True)
+                    save(p)
             else:
                 output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
                 p = hl.plot.scatter(scores.scores[0], scores.scores[1], title=f"PCA plot round {round_num}",
