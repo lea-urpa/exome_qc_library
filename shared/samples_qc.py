@@ -454,7 +454,7 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
     return mt_to_annotate
 
 
-def impute_sex_plot(mt, args, mt_to_annotate=None):
+def impute_sex_plot(mt, female_threshold=0.2, male_threshold=0.8):
     """
     Impute sex of individuals and plot resultant f stat values
     :param mt: maf pruned matrix table to caculate f stat values
@@ -463,7 +463,7 @@ def impute_sex_plot(mt, args, mt_to_annotate=None):
     or else just the imputed sex Hail table.
     """
     datestr = time.strftime("%Y.%m.%d")
-    imputed_sex = hl.impute_sex(mt.GT, female_threshold=args.female_threshold, male_threshold=args.male_threshold)
+    imputed_sex = hl.impute_sex(mt.GT, female_threshold=female_threshold, male_threshold=male_threshold)
 
     sex_count = imputed_sex.aggregate(hl.agg.counter(imputed_sex.is_female))
 
@@ -476,23 +476,7 @@ def impute_sex_plot(mt, args, mt_to_annotate=None):
     p = hl.plot.histogram(fstat_hist, legend='F stat', title='F stat histogram')
     save(p)
 
-    if mt_to_annotate is not None:
-        mt_to_annotate = mt_to_annotate.annotate_cols(is_female_imputed=imputed_sex[mt_to_annotate.s].is_female,
-                                                      f_stat=imputed_sex[mt_to_annotate.s].f_stat)
-        mt_to_annotate = mt_to_annotate.annotate_globals(sex_imputation_thresholds=
-                                                         {'female_threshold': args.female_threshold,
-                                                          'male_threshold': args.male_threshold})
-
-        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female)
-        mt = mt.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
-                                                            'male_threshold': args.male_threshold})
-        args.sex_col = "is_female_imputed"
-        args.male_tag = False
-        args.female_tag = True
-
-        return mt, imputed_sex, mt_to_annotate
-    else:
-        return mt, imputed_sex
+    return imputed_sex
 
 
 def pc_project(mt, loadings_ht, loading_location="loadings", af_location="pca_af"):

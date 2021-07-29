@@ -307,7 +307,13 @@ if __name__ == "__main__":
 
         # Impute sex
         #TODO check if this triggers a shuffle
-        mt_maf, imputed_sex, mt = sq.impute_sex_plot(mt_maf, mt_to_annotate=mt, args=args)
+        imputed_sex = sq.impute_sex_plot(mt_maf, female_threshold=args.female_threshold,
+                                         male_threshold=args.male_threshold)
+
+        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female,
+                              f_stat=imputed_sex[mt.s].f_stat)
+        mt = mt.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
+                                                          'male_threshold': args.male_threshold})
 
         # Annotate sex-aware variant annotations
         mt = va.sex_aware_variant_annotations(mt_filtered, mt_to_annotate=mt, args=args)
@@ -317,6 +323,8 @@ if __name__ == "__main__":
         logging.info(f"Writing checkpoint {stepcount}: variants annotated and sex imputed")
         mt = mt.checkpoint(sex_imputed, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+    else:
+        logging.info("Detected variant annotation and sex imputation completed, skipping this step.")
 
     stepcount += 1
     samples_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_samples_qcd{args.test_str}.mt/")
@@ -339,11 +347,18 @@ if __name__ == "__main__":
         )
 
         # Run samples QC
-        mt = sq.samples_qc(mt_filtered, mt_to_annotate=mt, args=args)
+        mt = sq.samples_qc(
+            mt_filtered, mt, samples_qcd, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
+            chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
+            contamination_max=args.contamination_max, batch_col_name=args.batch_col_name,
+            sample_sd_threshold=args.sample_sd_threshold, pheno_col=args.pheno_col
+        )
 
         logging.info(f"Writing checkpoint {stepcount}: sample QC")
         mt = mt.checkpoint(samples_qcd, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+    else:
+        logging.info("Detected samples QC completed, skipping this step.")
 
     stepcount += 1
     variant_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_variant_qcd{args.test_str}.mt/")
