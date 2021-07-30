@@ -29,10 +29,7 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     if not prefix.endswith("_"):
         prefix = prefix + "_"
 
-    if checkpoint_name.endswith(".mt"):
-        checkpoint_name = checkpoint_name.replace(".mt", "")
-    elif checkpoint_name.endswith(".mt/"):
-        checkpoint_name = checkpoint_name.replace(".mt/", "")
+    checkpoint_name = checkpoint_name.rstrip("/").replace(".mt", "")
 
     start_count = mt.count()
     tag = []
