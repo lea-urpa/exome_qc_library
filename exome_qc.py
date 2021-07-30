@@ -280,6 +280,7 @@ if __name__ == "__main__":
     # Annotate variants and impute sex #
     ####################################
     filtered_nohwe = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_filtered_except_hwe{args.test_str}.mt/")
+    filtered_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_filtered_sex_annotated{args.test_str}.mt/")
 
     if (not utils.check_exists(sex_imputed)) or args.force:
         logging.info("Annotating variants and imputing sex")
@@ -320,11 +321,12 @@ if __name__ == "__main__":
         mt_gt_filt = mt_gt_filt.annotate_cols(is_female_imputed=imputed_sex[mt_gt_filt.s].is_female)
 
         mt_filtered, annotations_to_transfer = va.sex_aware_variant_annotations(mt_gt_filt, pheno_col=args.pheno_col)
+        mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
+
+        mt_filtered = mt_filtered.checkpoint(filtered_annot, overwrite=True)
+
         for annotation in annotations_to_transfer:
             mt = mt.annotate_rows(**{annotation: mt_filtered.rows()[mt.row_key][annotation]})
-
-        # Annotate sex-aware sample annotations
-        mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
         mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
 
         logging.info(f"Writing checkpoint {stepcount}: variants annotated and sex imputed")
@@ -336,15 +338,12 @@ if __name__ == "__main__":
     stepcount += 1
     samples_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_samples_qcd{args.test_str}.mt/")
 
-    logging.info("Tested until after sex imputation step. Exiting now.")
-    exit(0)
-
     ##############
     # Samples QC #
     ##############
     if (not utils.check_exists(samples_qcd)) or args.force:
         logging.info("Running sample QC")
-        utils.remove_secondary(args.cluster_name, args.num_secondary_workers, args.region)
+        utils.remove_secondary(args.cluster_name, args.region)
 
         mt = hl.read_matrix_table(sex_imputed)
 
@@ -372,6 +371,9 @@ if __name__ == "__main__":
 
     stepcount += 1
     variant_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_variant_qcd{args.test_str}.mt/")
+
+    logging.info("Tested until after samples QC step. Exiting now.")
+    exit(0)
 
     ##############
     # Variant QC #

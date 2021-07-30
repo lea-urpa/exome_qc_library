@@ -42,19 +42,20 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
         gq_cond = hl.is_defined(mt.GQ) & (mt.GQ > min_gq)
 
         het_ab_cond = (
-                (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
+                (((mt.AD[0] / hl.sum(mt.AD)) > min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) < max_het_ref_reads))
                 & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
         )
         hom_ab_cond = (
-                ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
+                ((mt.AD[0] / hl.sum(mt.AD)) > min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
                 mt.GT.is_hom_ref() & hl.is_defined(mt.GT)
         )
         homalt_ab_cond = (
-                ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
+                ((mt.AD[0] / hl.sum(mt.AD)) < max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
                 mt.GT.is_hom_var() & hl.is_defined(mt.GT)
         )
 
-        mt = mt.filter_entries(hl.is_defined(mt.GT) & dp_cond & gq_cond & (het_ab_cond | hom_ab_cond | homalt_ab_cond))
+        mt = mt.filter_entries(hl.is_defined(mt.GT) & dp_cond & gq_cond & (het_ab_cond | hom_ab_cond | homalt_ab_cond),
+                               keep=True)
         mt = mt.checkpoint(checkpoint_name + "_GT_filtered.mt/", overwrite=True)
         tag.append("entries")
 
