@@ -299,32 +299,33 @@ if __name__ == "__main__":
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
                 max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
             )
-            mt_maf = vq.maf_filter(mt_filtered, 0.05)
 
-            mt_maf = mt_maf.checkpoint(filtered_nohwe, overwrite=True)
+            mt_filtered = mt_filtered.checkpoint(filtered_nohwe, overwrite=True)
         else:
-            mt_maf = hl.read_matrix_table(filtered_nohwe)
+            mt_filtered = hl.read_matrix_table(filtered_nohwe)
 
         # Impute sex
-        #TODO check if this triggers a shuffle
-        imputed_sex = sq.impute_sex_plot(mt_maf, female_threshold=args.female_threshold,
-                                         male_threshold=args.male_threshold)
+        imputed_sex = sq.impute_sex_plot(mt_filtered, female_threshold=args.female_threshold,
+                                         male_threshold=args.male_threshold, aaf_threshold=0.05)
 
+        # Annotate unfiltered + filtered mt with imputed sex values
         mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female,
                               f_stat=imputed_sex[mt.s].f_stat)
-        mt = mt.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
-                                                          'male_threshold': args.male_threshold})
+        mt = mt.annotate_globals(
+            sex_imputation_thresholds={'female_threshold': args.female_threshold,'male_threshold': args.male_threshold})
 
         mt_filtered = mt_filtered.annotate_cols(is_female_imputed=imputed_sex[mt_filtered.s].is_female)
-        mt_filtered = mt_filtered.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
-                                                            'male_threshold': args.male_threshold})
+        mt_filtered = mt_filtered.annotate_globals(
+            sex_imputation_thresholds={'female_threshold': args.female_threshold,'male_threshold': args.male_threshold})
 
         # Annotate sex-aware variant annotations
+        #TODO think about this: since we input the filtered mt, all the variants failing will be missing these
+        # annotations. Filter only genotypes, and run this?
         mt_filtered, annotations_to_transfer = va.sex_aware_variant_annotations(mt_filtered, pheno_col=args.pheno_col)
         for annotation in annotations_to_transfer:
             mt = mt.annotate_rows(**{annotation: mt_filtered.rows()[mt.row_key][annotation]})
 
-        # TODO check if this triggers a shuffle
+        # Annotate sex-aware sample annotations
         mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
         mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
 
