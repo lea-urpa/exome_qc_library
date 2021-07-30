@@ -315,12 +315,9 @@ if __name__ == "__main__":
         mt = mt.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
                                                           'male_threshold': args.male_threshold})
 
-        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female)
-        mt = mt.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
+        mt_filtered = mt_filtered.annotate_cols(is_female_imputed=imputed_sex[mt_filtered.s].is_female)
+        mt_filtered = mt_filtered.annotate_globals(sex_imputation_thresholds={'female_threshold': args.female_threshold,
                                                             'male_threshold': args.male_threshold})
-        args.sex_col = "is_female_imputed"
-        args.male_tag = False
-        args.female_tag = True
 
         # Annotate sex-aware variant annotations
         mt_filtered, annotations_to_transfer = va.sex_aware_variant_annotations(mt_filtered, pheno_col=args.pheno_col)
