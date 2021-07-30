@@ -481,6 +481,12 @@ if __name__ == "__main__":
     # Annotate with CADD, Gnomad #
     ##############################
 
+
+    ########################################################
+    # Export column and row data as tables (hail and text) #
+    ########################################################
+    # remove vep input column (fucks up input reading in R) and flatten all columns
+
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
     utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)

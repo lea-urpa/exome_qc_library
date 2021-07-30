@@ -451,7 +451,7 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
     return mt_to_annotate
 
 
-def impute_sex_plot(mt, female_threshold=0.2, male_threshold=0.8):
+def impute_sex_plot(mt, female_threshold=0.2, male_threshold=0.8, aaf_threshold=0.05):
     """
     Impute sex of individuals and plot resultant f stat values
     :param mt: maf pruned matrix table to caculate f stat values
@@ -460,7 +460,8 @@ def impute_sex_plot(mt, female_threshold=0.2, male_threshold=0.8):
     or else just the imputed sex Hail table.
     """
     datestr = time.strftime("%Y.%m.%d")
-    imputed_sex = hl.impute_sex(mt.GT, female_threshold=female_threshold, male_threshold=male_threshold)
+    imputed_sex = hl.impute_sex(mt.GT, female_threshold=female_threshold, male_threshold=male_threshold,
+                                aaf_threshold=aaf_threshold)
 
     sex_count = imputed_sex.aggregate(hl.agg.counter(imputed_sex.is_female))
 
