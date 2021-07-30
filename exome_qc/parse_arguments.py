@@ -141,7 +141,7 @@ def parse_arguments(arguments):
 
     # Impute sex thresholds #
     sex_thresh = parser.add_argument_group("Impute sex thresholds.")
-    sex_thresh.add_argument("--female_threshold", default=0.4, type=float, help="F-stat cutoff for defining female")
+    sex_thresh.add_argument("--female_threshold", default=0.2, type=float, help="F-stat cutoff for defining female")
     sex_thresh.add_argument("--male_threshold", default=0.8, type=float, help="F-stat cutoff for defining male")
 
     # Filter by phenotype thresholds #
