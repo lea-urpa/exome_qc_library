@@ -309,19 +309,17 @@ if __name__ == "__main__":
                                          male_threshold=args.male_threshold, aaf_threshold=0.05)
 
         # Annotate unfiltered + filtered mt with imputed sex values
-        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female,
-                              f_stat=imputed_sex[mt.s].f_stat)
+        mt_filtered = mt_filtered.annotate_cols(is_female_imputed=imputed_sex[mt_filtered.s].is_female)
+        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female, f_stat=imputed_sex[mt.s].f_stat)
         mt = mt.annotate_globals(
             sex_imputation_thresholds={'female_threshold': args.female_threshold,'male_threshold': args.male_threshold})
 
-        mt_filtered = mt_filtered.annotate_cols(is_female_imputed=imputed_sex[mt_filtered.s].is_female)
-        mt_filtered = mt_filtered.annotate_globals(
-            sex_imputation_thresholds={'female_threshold': args.female_threshold,'male_threshold': args.male_threshold})
+        # Annotate sex-aware variant annotations (gt filt only to have for all
+        gt_filt_fn = sex_imputed.rstrip("/").replace(".mt", "") + "_GT_filtered.mt/"
+        mt_gt_filt = hl.read_matrix_table(gt_filt_fn)
+        mt_gt_filt = mt_gt_filt.annotate_cols(is_female_imputed=imputed_sex[mt_gt_filt.s].is_female)
 
-        # Annotate sex-aware variant annotations
-        #TODO think about this: since we input the filtered mt, all the variants failing will be missing these
-        # annotations. Filter only genotypes, and run this?
-        mt_filtered, annotations_to_transfer = va.sex_aware_variant_annotations(mt_filtered, pheno_col=args.pheno_col)
+        mt_filtered, annotations_to_transfer = va.sex_aware_variant_annotations(mt_gt_filt, pheno_col=args.pheno_col)
         for annotation in annotations_to_transfer:
             mt = mt.annotate_rows(**{annotation: mt_filtered.rows()[mt.row_key][annotation]})
 
