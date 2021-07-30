@@ -383,15 +383,15 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
     # Define filter conditions #
     ############################
     het_ab_cond = (
-            (((mt.AD[0] / hl.sum(mt.AD)) > min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) < max_het_ref_reads))
+            (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
             & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
     )
     hom_ab_cond = (
-            ((mt.AD[0] / hl.sum(mt.AD)) > min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
+            ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
             mt.GT.is_hom_ref() & hl.is_defined(mt.GT)
     )
     homalt_ab_cond = (
-            ((mt.AD[0] / hl.sum(mt.AD)) < max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
+            ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
             mt.GT.is_hom_var() & hl.is_defined(mt.GT)
     )
 
@@ -450,19 +450,19 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
         # re-define filter conditions, global annotation causes source mismatch #
         #########################################################################
         het_ab_cond = (
-                (((mt.AD[0] / hl.sum(mt.AD)) > min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) < max_het_ref_reads))
+                (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
                 & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT))
         hom_ab_cond = (
-                ((mt.AD[0] / hl.sum(mt.AD)) > min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
+                ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
                 mt.GT.is_hom_ref() & hl.is_defined(mt.GT))
         homalt_ab_cond = (
-                ((mt.AD[0] / hl.sum(mt.AD)) < max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
+                ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
                 mt.GT.is_hom_var() & hl.is_defined(mt.GT))
 
     ############################
     # Filter failing genotypes #
     ############################
-    mt = mt.filter_entries(het_ab_cond | hom_ab_cond | homalt_ab_cond, keep=True)
+    mt = mt.filter_entries(het_ab_cond | hom_ab_cond | homalt_ab_cond, keep=False)
     mt = mt.checkpoint(checkpoint_name + "_GT_ab_filtered.mt/", overwrite=True)
 
     passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
