@@ -276,9 +276,6 @@ if __name__ == "__main__":
     stepcount += 1
     sex_imputed = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_sex_imputed{args.test_str}.mt/")
 
-    logging.info("Tested until after pop outliers step. Exiting now.")
-    exit(0)
-
     ####################################
     # Annotate variants and impute sex #
     ####################################
@@ -293,17 +290,20 @@ if __name__ == "__main__":
         # Annotate variants
         mt = va.annotate_variants(mt)
 
-        # Filter out failing variants, genotypes, rare variants
-        mt_filtered = sq.filter_failing(
-            mt, sex_imputed, prefix='low_pass', variants=True, entries=True, samples=False,
-            unfilter_entries=False, skip_hwe_fails=True, pheno_qc=False, min_dp=args.min_dp,
-            min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
-            min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
-        )
-        mt_maf = vq.maf_filter(mt_filtered, 0.05)
+        if (not utils.check_exists(filtered_nohwe)) or args.force:
+            # Filter out failing variants, genotypes, rare variants
+            mt_filtered = sq.filter_failing(
+                mt, sex_imputed, prefix='low_pass', variants=True, entries=True, samples=False,
+                unfilter_entries=False, skip_hwe_fails=True, pheno_qc=False, min_dp=args.min_dp,
+                min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+            )
+            mt_maf = vq.maf_filter(mt_filtered, 0.05)
 
-        mt_maf = mt_maf.checkpoint(filtered_nohwe, overwrite=True)
+            mt_maf = mt_maf.checkpoint(filtered_nohwe, overwrite=True)
+        else:
+            mt_maf = hl.read_matrix_table(filtered_nohwe)
 
         # Impute sex
         #TODO check if this triggers a shuffle
@@ -339,6 +339,9 @@ if __name__ == "__main__":
 
     stepcount += 1
     samples_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_samples_qcd{args.test_str}.mt/")
+
+    logging.info("Tested until after sex imputation step. Exiting now.")
+    exit(0)
 
     ##############
     # Samples QC #
