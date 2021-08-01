@@ -385,14 +385,15 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(samples_qcd)
 
         # Run variant QC
-        mt = vq.find_failing_variants(mt, args, mode='final')
-        # TODO give following parameters
-        # Test that failing samples QC and pop outliers detected? Maybe?
-        # p_hwe = args.final_p_hwe
-        #call_rate = args.final_min_call_rate
-        #annotation_name = "variant_qc_thresholds_final"
-        #sex_aware_call_rate = "True"
-        #varqc_name = 'final_no_failing_samples_varqc'
+        mt = vq.variant_quality_control(
+            mt, variant_qcd, annotation_prefix="final", min_dp=args.min_dp, min_gq=args.min_gq,
+            max_het_ref_reads=args.max_het_ref_reads, min_het_ref_reads=args.min_het_ref_reads,
+            min_hom_ref_ref_reads=args.min_hom_ref_ref_reads, max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
+            call_rate=args.final_min_call_rate, p_hwe=args.final_p_hwe, snp_qd=args.snp_qd, indel_qd=args.indel_qd,
+            ab_allowed_dev_het=args.ab_allowed_dev_het,
+            count_failing=args.count_failing, sex_aware_call_rate=True, pheno_col=args.pheno_col,
+            samples_qc=True, force=args.force
+        )
 
         # Run case status-specific variant QC
         if args.pheno_col is not None:
