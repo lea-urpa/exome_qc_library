@@ -361,7 +361,7 @@ if __name__ == "__main__":
             mt_filtered, mt, samples_qcd, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
             chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
             contamination_max=args.contamination_max, batch_col_name=args.batch_col_name,
-            sample_sd_threshold=args.sampleqc_sd_threshold, pheno_col=args.pheno_col
+            sampleqc_sd_threshold=args.sampleqc_sd_threshold, pheno_col=args.pheno_col
         )
 
         logging.info(f"Writing checkpoint {stepcount}: sample QC")
