@@ -348,6 +348,7 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(sex_imputed)
 
         # Filter failing variants and genotypes, and pop outlier samples
+        logging.info("Filtering out failing genotypes and variants.")
         mt_filtered = sq.filter_failing(
             mt, ld_pruned, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
             pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
@@ -461,6 +462,7 @@ if __name__ == "__main__":
         mt = sq.project_pcs_relateds(mt_ldpruned, mt, args.pc_num)
 
         if args.pca_plot_annotations is not None:
+            # TODO change this to the drop-down plot type
             pca_annotations = args.pca_plot_annotations.strip().split(",")
             for annotation in pca_annotations:
                 output_file(f"{datestr}_final_pcs_plot_{annotation}.html")
@@ -468,7 +470,7 @@ if __name__ == "__main__":
                 save(p)
         else:
             output_file(f'{datestr}_final_pcs_plot.html')
-            pcplot = hl.plot.scatter(mt.pc1, mt.pc2)
+            pcplot = hl.plot.scatter(mt.pc1, mt.pc2) # TODO add title
             save(pcplot)
 
     ##############################
