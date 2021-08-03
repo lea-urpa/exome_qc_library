@@ -360,7 +360,7 @@ if __name__ == "__main__":
             mt_filtered, mt, samples_qcd, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
             chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
             contamination_max=args.contamination_max, batch_col_name=args.batch_col_name,
-            sample_sd_threshold=args.sample_sd_threshold, pheno_col=args.pheno_col
+            sample_sd_threshold=args.sampleqc_sd_threshold, pheno_col=args.pheno_col
         )
 
         logging.info(f"Writing checkpoint {stepcount}: sample QC")
@@ -471,15 +471,6 @@ if __name__ == "__main__":
             pcplot = hl.plot.scatter(mt.pc1, mt.pc2)
             save(pcplot)
 
-        # Export rows and columns
-        mtcols = mt.cols()
-        mtcols = mtcols.flatten()
-        mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv'))
-
-        mtrows = mt.rows()
-        mtrows = mtrows.flatten()
-        mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv'))
-
     ##############################
     # Annotate with CADD, Gnomad #
     ##############################
@@ -488,7 +479,16 @@ if __name__ == "__main__":
     ########################################################
     # Export column and row data as tables (hail and text) #
     ########################################################
-    # remove vep input column (fucks up input reading in R) and flatten all columns
+    # TODO remove vep input column (fucks up input reading in R) and flatten all columns
+    # Export rows and columns
+    mtcols = mt.cols()
+    mtcols = mtcols.flatten()
+    mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv'))
+
+    mtrows = mt.rows()
+    mtrows = mtrows.drop("")
+    mtrows = mtrows.flatten()
+    mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv'))
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
