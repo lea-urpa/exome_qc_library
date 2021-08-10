@@ -461,16 +461,25 @@ if __name__ == "__main__":
         mt = sq.project_pcs_relateds(mt_ldpruned, mt, args.pc_num)
 
         if args.pca_plot_annotations is not None:
-            # TODO change this to the drop-down plot type
-            pca_annotations = args.pca_plot_annotations.strip().split(",")
-            for annotation in pca_annotations:
-                output_file(f"{datestr}_final_pcs_plot_{annotation}.html")
-                p = hl.plot.scatter(mt.pc1, mt.pc2, label=mt[annotation])
+            try:
+                pca_annotations = args.pca_plot_annotations.strip().split(",")
+                label_dict = {i: mt[i] for i in pca_annotations}
+
+                output_file(f"{datestr}_final_pcs_plot.html")
+                p = hl.plot.scatter(mt.pc1, mt.pc2, label=label_dict, title="Final PCs", collect_all=True)
+                save(p)
+            except Exception as e:
+                logging.error(f"Error! Creating PCA plots with labels failed. Are the label categories you provided"
+                              f" really in the data? labels provided: {args.pca_plot_annotations}. Plotting without "
+                              f"labels")
+                logging.error(e)
+                output_file(f"{datestr}_final_pcs_plot.html")
+                p = hl.plot.scatter(mt.pc1, mt.pc2, title="Final principal components", collect_all=True)
                 save(p)
         else:
-            output_file(f'{datestr}_final_pcs_plot.html')
-            pcplot = hl.plot.scatter(mt.pc1, mt.pc2) # TODO add title
-            save(pcplot)
+            output_file(f"{datestr}_final_pcs_plot.html")
+            p = hl.plot.scatter(mt.pc1, mt.pc2, title="Final principal components", collect_all=True)
+            save(p)
 
     logging.info("Tested until after final PC plotting step. Exiting now.")
     exit(0)
