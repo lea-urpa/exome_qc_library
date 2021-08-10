@@ -9,7 +9,7 @@ import samples_qc as sq
 import utils
 
 
-def downsample_variants(mt, target_count):
+def downsample_variants(mt, target_count, r2=0.2, bp_window_size=500000, ld_prune=False):
     """
     Takes a matrix table, checks if the variant count is above a target count, and if so downsamples the matrix table.
     :param mt: matrix table to downsample
@@ -18,9 +18,14 @@ def downsample_variants(mt, target_count):
     """
     var_count = mt.count_rows()
     if var_count > target_count:
-        logging.info(f"Matrix table has more than {target_count} variants, randomly downsampling to {target_count} variants.")
-        keep_fraction = target_count/var_count
-        mt = mt.sample_rows(keep_fraction)
+        if ld_prune:
+            logging.info(f"Matrix table has more than {target_count} variants, LD pruning dataset with r2 {r2} and "
+                         f"bp window size {bp_window_size}")
+            ld_prune(mt, r2=r2, bp_window_size=bp_window_size)
+        else:
+            logging.info(f"Matrix table has more than {target_count} variants, randomly downsampling to {target_count} variants.")
+            keep_fraction = target_count/var_count
+            mt = mt.sample_rows(keep_fraction)
 
         count = mt.count()
         logging.info(f"Matrix table count after downsampling: {count}")
@@ -48,21 +53,21 @@ def maf_filter(mt, maf, filter_ac0_after_pruning=False):
     # Filter MAF
     logging.info(f'Filtering out variants with minor allele frequency < {maf}')
     mt = mt.filter_rows(mt.row.variant_qc.AF[1] > maf, keep=True)
-    mt = mt.annotate_globals(maf_threshold_LDpruning=maf)
+    mt = mt.annotate_globals(maf_threshold=maf)
 
     if filter_ac0_after_pruning:
         logging.info('Removing variants with alt allele count = 0 (monomorphic variants).')
         mt = hl.variant_qc(mt)
         mt = mt.filter_rows(hl.sum(mt.row.variant_qc.AC) == hl.int(0), keep=False)
-        count = mt.count()
+        count = mt.count_rows()
         logging.info(f"MT count after removing monomorphic variants and MAF filtering: {count}")
     else:
-        logging.info("MAF pruned mt count:" + str(mt.count()))
+        logging.info("MAF pruned mt count:" + str(mt.count_rows()))
 
     return mt
 
 
-def ld_prune(mt, args):
+def ld_prune(mt, r2=0.2, bp_window_size=500000):
     """
      LD prune a matrix table, for calculating kinship and principal components
 
@@ -71,13 +76,11 @@ def ld_prune(mt, args):
     :return: returns the ld pruned matrix table
     """
 
-    pruned_variant_table = hl.ld_prune(mt.GT, r2=args.r2, bp_window_size=args.bp_window_size)
+    pruned_variant_table = hl.ld_prune(mt.GT, r2=r2, bp_window_size=bp_window_size)
     mt_ldpruned = mt.filter_rows(hl.is_defined(pruned_variant_table[mt.row_key]))
 
-    logging.info(f"Variant and sample count after LD pruning: {mt_ldpruned.count()}")
-
     mt_ldpruned = mt_ldpruned.annotate_globals(
-        ld_pruning_parameters={'r2': args.r2, 'bp_window_size': args.bp_window_size})
+        ld_pruning_parameters={'r2': r2, 'bp_window_size': bp_window_size})
 
     return mt_ldpruned
 

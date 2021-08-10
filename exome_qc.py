@@ -204,7 +204,8 @@ if __name__ == "__main__":
 
             # LD prune if row count >80k
             utils.remove_secondary(args.cluster_name, args.region)
-            mt_ldpruned = vq.downsample_variants(mt_maffilt, 80000)
+            mt_ldpruned = vq.downsample_variants(mt_maffilt, 80000, r2=args.r2, bp_window_size=args.bp_window_size,
+                                                 ld_prune=True)
 
             logging.info(f"Writing checkpoint {stepcount}-1: LD pruned dataset")
             mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
@@ -373,9 +374,6 @@ if __name__ == "__main__":
     stepcount += 1
     variant_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_variant_qcd{args.test_str}.mt/")
 
-    logging.info("Tested until after samples QC step. Exiting now.")
-    exit(0)
-
     ##############
     # Variant QC #
     ##############
@@ -406,6 +404,8 @@ if __name__ == "__main__":
         logging.info(f"Writing checkpoint {stepcount}: variant QC")
         mt = mt.checkpoint(variant_qcd, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+    else:
+        logging.info("Detected that final variant QC has been run. Skipping this step.")
 
     stepcount += 1
     pcs_calculated = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_final_with_PCs{args.test_str}.mt/")
@@ -431,28 +431,27 @@ if __name__ == "__main__":
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
                 max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
             )
-            logging.info("Filtering to unrelated individuals for PC calculations.")
-            mt_norelateds = mt_filtered.filter_cols(mt_filtered.related_to_remove == False, keep=True)
-            mt_norelateds = mt_norelateds.checkpoint(final_filtered, overwrite=True)
+            mt_filtered = mt_filtered.checkpoint(final_filtered, overwrite=True)
 
         else:
             logging.info("Detected final failing sample, variant, and genotype mt exists. Loading that.")
-            mt_norelateds = hl.read_matrix_table(final_filtered)
+            mt_filtered = hl.read_matrix_table(final_filtered)
 
         # MAF filter
         if (not utils.check_exists(final_maffilt)) or args.force:
             logging.info("Filtering to common variants and LD pruning dataset.")
-            mt_mafpruned = vq.maf_filter(mt_norelateds, 0.05)
-            mt_mafpruned = mt_mafpruned.checkpoint(final_maffilt)
+            mt_maffilt = vq.maf_filter(mt_filtered, 0.05)
+            mt_maffilt = mt_maffilt.checkpoint(final_maffilt)
         else:
             logging.info("Detected final MAF filtered mt exists. Loading that.")
-            mt_mafpruned = hl.read_matrix_table(final_maffilt)
+            mt_maffilt = hl.read_matrix_table(final_maffilt)
 
         # LD prune
         if (not utils.check_exists(final_ldpruned)) or args.force:
             logging.info('LD pruning final dataset for PC calculation')
             utils.remove_secondary(args.cluster_name, args.region)
-            mt_ldpruned = vq.ld_prune(mt_mafpruned, args)
+            mt_ldpruned = vq.downsample_variants(mt_maffilt, 80000, r2=args.r2, bp_window_size=args.bp_window_size,
+                                                 ld_prune=True)
             mt_ldpruned = mt_ldpruned.checkpoint(final_ldpruned)
         else:
             logging.info("Detected final LDpruned mt exists. Loading that.")
@@ -472,6 +471,9 @@ if __name__ == "__main__":
             output_file(f'{datestr}_final_pcs_plot.html')
             pcplot = hl.plot.scatter(mt.pc1, mt.pc2) # TODO add title
             save(pcplot)
+
+    logging.info("Tested until after final PC plotting step. Exiting now.")
+    exit(0)
 
     ##############################
     # Annotate with CADD, Gnomad #
