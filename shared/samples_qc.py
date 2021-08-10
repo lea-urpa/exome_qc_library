@@ -512,38 +512,33 @@ def pc_project(mt, loadings_ht, loading_location="loadings", af_location="pca_af
     return mt.cols().select('scores')
 
 
-def project_pcs_relateds(mt_ldpruned, mt, covar_pc_num):
+def project_pcs_relateds(mt, covar_pc_num):
     """
     Tales LD pruned matrix table, calculates PCs, and projects those PCs back to related individuals included in mt
-    :param mt_ldpruned: matrix table with relatives removed, maf and ld pruned
-    :param mt: matrix table with relatives included
+    :param mt: matrix table, with bad variants and samples removed, relatives and popluation outliers annotated
     :param covar_pc_num: Number of principal components as covariates to calculate
     :return: returns matrix table with relatives, with PCs annotated
     """
+    logging.info("Filtering to unrelated individuals for PC calculations.")
+    mt_norelateds = mt.filter_cols(mt.related_to_remove == False, keep=True)
+
     logging.info('Calculating principal components, annotating main dataset.')
-    eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_ldpruned.GT, k=covar_pc_num, compute_loadings=True)
+    eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_norelateds.GT, k=covar_pc_num, compute_loadings=True)
 
     # Project PCs to related individuals
-    # mt of related individuals only, not pop outliers or failing samples QC
-    related_mt = mt.filter_cols((mt.related_to_remove == True) & (mt.pop_outlier_sample == False) &
-                                (hl.len(mt.failing_samples_qc) == 0), keep=True)
-    mt_ldpruned = mt_ldpruned.annotate_rows(pca_af=hl.agg.mean(mt_ldpruned.GT.n_alt_alleles()) / 2)
-    mtrows = mt_ldpruned.rows()
+    related_mt = mt.filter_cols((mt.related_to_remove == True), keep=True)
+    mt = mt.annotate_rows(pca_af=hl.agg.mean(mt.GT.n_alt_alleles()) / 2)
+    mtrows = mt.rows()
     loadings = loadings.annotate(pca_af=mtrows[loadings.locus, loadings.alleles].pca_af)
     related_scores = pc_project(related_mt, loadings)
 
     # Add pcs as annotations to main table
     mt = mt.annotate_cols(**{'pc' + str(k+1): scores[mt.s].scores[k]
                              for k in range(covar_pc_num)})
-    # Explanation: for k principal components in range 0 to covar_pc_num-1,
-    # make pc k+1 (to start at pc1 instead of pc0) be the corresponding score (keyed by mt.s) from the table scores
 
     # Add pcs for related individuals
     mt = mt.annotate_cols(**{'pc' + str(k+1): hl.or_else(mt['pc'+str(k+1)], related_scores[mt.s].scores[k])
                              for k in range(covar_pc_num)})
-    # Explanation: for k principal components in range from 0 to (covar_pc_num-1)
-    # give either the existing pcX, or if missing give the corresponding score (keyed by mt.s)
-    # from the table related_scores
 
     return mt
 
