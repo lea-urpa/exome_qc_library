@@ -152,6 +152,8 @@ def parse_arguments(arguments):
     pheno_thresh.add_argument("--pheno_call_rate", default=0.95, type=float,
                               help="Min call rate for variant, in cases + controls separately.")
 
+
+
     parsed_args = parser.parse_args(arguments)
 
     # Add argument for columns to check n samples input files

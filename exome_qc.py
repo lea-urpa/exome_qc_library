@@ -397,7 +397,8 @@ if __name__ == "__main__":
         # Run case status-specific variant QC
         if args.pheno_col is not None:
             logging.info("Running case-status specific variant QC")
-            mt = vq.find_variants_failing_by_pheno(mt, args)
+            mt = vq.find_variants_failing_by_pheno(mt, ab_allowed_dev_het=args.ab_allowed_dev_het,
+                                                   pheno_call_rate=args.pheno_call_rate)
         else:
             logging.info("Phenotype column not given, skipping filtering variants by phenotype.")
 
@@ -458,7 +459,7 @@ if __name__ == "__main__":
             mt_ldpruned = hl.read_matrix_table(final_ldpruned)
 
         # Calculate PCs and project to relatives, plot
-        mt = sq.project_pcs_relateds(mt_ldpruned, mt, args.pc_num)
+        mt = sq.project_pcs_relateds(mt_ldpruned, args.pc_num)
 
         if args.pca_plot_annotations is not None:
             try:
@@ -481,12 +482,29 @@ if __name__ == "__main__":
             p = hl.plot.scatter(mt.pc1, mt.pc2, title="Final principal components", collect_all=True)
             save(p)
 
+        mt = mt.checkpoint(pcs_calculated, overwrite=True)
+        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+
+    else:
+        logging.info("Detected that final PCs have been calculated. Skipping this step.")
+
+    stepcount += 1
+    variant_annotated = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_variants_annotated{args.test_str}.mt/")
     logging.info("Tested until after final PC plotting step. Exiting now.")
     exit(0)
 
     ##############################
     # Annotate with CADD, Gnomad #
     ##############################
+
+    if (not utils.check_exists(pcs_calculated)) or args.force:
+        mt = hl.read_matrix_table(pcs_calculated)
+
+        mt = mt.annotate_variants_mpc(mt, args.mpc_ht)
+
+    else:
+        logging.info("Detected final annotated mt exists. Skipping this step.")
+
 
 
     ########################################################
