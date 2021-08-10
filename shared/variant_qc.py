@@ -233,7 +233,7 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
         )
         if pheno_col is not None:
             case_filter = sample_filter & (mt[pheno_col] == True) & (hl.is_defined(mt[pheno_col]))
-            cont_filter = sample_filter + (mt[pheno_col] == False) & (hl.is_defined(mt[pheno_col]))
+            cont_filter = sample_filter & (mt[pheno_col] == False) & (hl.is_defined(mt[pheno_col]))
 
             mt = mt.annotate_rows(**{case_het_gt_count: hl.agg.filter(case_filter, hl.agg.count_where(het_gt_filters))})
             mt = mt.annotate_rows(**{cont_het_gt_count: hl.agg.filter(cont_filter, hl.agg.count_where(het_gt_filters))})
