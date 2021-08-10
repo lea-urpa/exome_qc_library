@@ -490,8 +490,6 @@ if __name__ == "__main__":
 
     stepcount += 1
     variant_annotated = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_variants_annotated{args.test_str}.mt/")
-    logging.info("Tested until after final PC plotting step. Exiting now.")
-    exit(0)
 
     ##############################
     # Annotate with CADD, Gnomad #
@@ -500,25 +498,36 @@ if __name__ == "__main__":
     if (not utils.check_exists(pcs_calculated)) or args.force:
         mt = hl.read_matrix_table(pcs_calculated)
 
-        mt = mt.annotate_variants_mpc(mt, args.mpc_ht)
+        if args.mpc_ht is not None:
+            logging.info("Annotating variants with MPC info.")
+            mt = va.annotate_variants_mpc(mt, args.mpc_ht)
+        if args.cadd_ht is not None:
+            logging.info("Annotating variants with CADD info.")
+            mt = va.annotate_variants_cadd(mt, args.cadd_ht)
+        if args.gnomad_ht is not None:
+            logging.info("Annotating variants with Gnomad.")
+            mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
+        if args.gnomad_mismatch_ht is not None:
+            logging.info("Annotating variants with gnomad mismatch info.")
+            mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
+
+        mt = mt.checkpoint(variant_annotated, overwrite=True)
+        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
     else:
         logging.info("Detected final annotated mt exists. Skipping this step.")
 
-
-
     ########################################################
     # Export column and row data as tables (hail and text) #
     ########################################################
-    # TODO remove vep input column (fucks up input reading in R) and flatten all columns
     # Export rows and columns
     mtcols = mt.cols()
     mtcols = mtcols.flatten()
     mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv'))
 
     mtrows = mt.rows()
-    mtrows = mtrows.drop("")
     mtrows = mtrows.flatten()
+    mtrows = mtrows.key_by().drop("vep.input")
     mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv'))
 
     # Send logs and finish-up notice

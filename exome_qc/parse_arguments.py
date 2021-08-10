@@ -153,6 +153,13 @@ def parse_arguments(arguments):
                               help="Min call rate for variant, in cases + controls separately.")
 
 
+    # Variant annotation arguments #
+    variant_qc = parser.add_argument_group("Inputs for variant filtering")
+    variant_qc.add_argument("--mpc_ht", type=str, help="Location of Hail table with MPC annotations.")
+    variant_qc.add_argument("--cadd_ht", type=str, help="Location of Hail table with cadd annotations")
+    variant_qc.add_argument("--gnomad_ht", type=str, help="Location of Hail table with gnomad annotations")
+    variant_qc.add_argument("--gnomad_mismatch_ht", type=str,
+                            help="Location of Hail table with gnomad mismatch annotations.")
 
     parsed_args = parser.parse_args(arguments)
 
