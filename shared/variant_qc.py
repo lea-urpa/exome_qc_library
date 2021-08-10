@@ -225,7 +225,6 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
     # Get total # of het GTs per variant in passing samples (or all samples) #
     ##########################################################################
     het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT)
-
     if samples_qc:
         sample_filter = (
                 (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) &
@@ -235,8 +234,8 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
             case_filter = sample_filter & (mt[pheno_col] == True) & (hl.is_defined(mt[pheno_col]))
             cont_filter = sample_filter & (mt[pheno_col] == False) & (hl.is_defined(mt[pheno_col]))
 
-            mt = mt.annotate_rows(**{case_het_gt_count: hl.agg.filter(case_filter, hl.agg.count_where(het_gt_filters))})
-            mt = mt.annotate_rows(**{cont_het_gt_count: hl.agg.filter(cont_filter, hl.agg.count_where(het_gt_filters))})
+            mt = mt.annotate_rows(**{case_het_gt_count: hl.agg.filter(case_filter, hl.agg.count_where(het_gt_filters))},
+                                  **{cont_het_gt_count: hl.agg.filter(cont_filter, hl.agg.count_where(het_gt_filters))})
 
         else:
             mt = mt.annotate_rows(**{het_gt_cnt: hl.agg.filter(sample_filter, hl.agg.count_where(het_gt_filters))})
@@ -269,18 +268,16 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
                          hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc))
 
         if pheno_col is not None:
-            case_filter = sample_filter + (mt[pheno_col] == True) & (hl.is_defined(mt[pheno_col]))
-            cont_filter = sample_filter + (mt[pheno_col] == False) & (hl.is_defined(mt[pheno_col]))
+            case_filter = sample_filter & (mt[pheno_col] == True) & (hl.is_defined(mt[pheno_col]))
+            cont_filter = sample_filter & (mt[pheno_col] == False) & (hl.is_defined(mt[pheno_col]))
 
             mt = mt.annotate_rows(**{
                 case_het_gt_ab: hl.agg.filter(case_filter,
                                               hl.cond(
                                                   (mt[case_het_gt_count] > 0) & hl.is_defined(mt[case_het_gt_count]),
                                                   hl.agg.count_where(passing_het_gts) / mt[case_het_gt_count],
-                                                  hl.null(hl.tfloat)))})
-
-            mt = mt.annotate_rows(**{
-                cont_het_gt_ab: hl.agg.filter(cont_filter,
+                                                  hl.null(hl.tfloat)))},
+                                  **{cont_het_gt_ab: hl.agg.filter(cont_filter,
                                               hl.cond(
                                                   (mt[cont_het_gt_count] > 0) & hl.is_defined(mt[cont_het_gt_count]),
                                                   hl.agg.count_where(passing_het_gts) / mt[cont_het_gt_count],
@@ -317,8 +314,6 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
         if undefined_cont_het_ab > 0:
             logging.info(f"Warning- {undefined_cont_het_ab} variants have undefined cont het GT allelic balance.")
 
-    mt = mt.checkpoint(checkpoint_name + "_variant_het_ab_annotated.mt/", overwrite=True)
-
     return mt
 
 
@@ -349,6 +344,8 @@ def annotate_variant_het_ab(mt, checkpoint_name, prefix="", samples_qc=False, ph
                           min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
                           min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
 
+    mt = mt.checkpoint(checkpoint_name + "_variant_het_ab_annotated.mt/", overwrite=True)
+
     ################################################################################
     # Annotate het GT and het GT allelic balance for cases and controls separately #
     ################################################################################
@@ -356,6 +353,8 @@ def annotate_variant_het_ab(mt, checkpoint_name, prefix="", samples_qc=False, ph
         mt = count_variant_ab(mt, checkpoint_name, prefix=prefix, samples_qc=samples_qc, pheno_col=pheno_col,
                               min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
                               min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
+
+        mt = mt.checkpoint(checkpoint_name + "_variant_het_ab_case_annotated.mt/", overwrite=True)
 
     return mt
 
