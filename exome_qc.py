@@ -494,8 +494,7 @@ if __name__ == "__main__":
     ##############################
     # Annotate with CADD, Gnomad #
     ##############################
-
-    if (not utils.check_exists(pcs_calculated)) or args.force:
+    if (not utils.check_exists(variant_annotated)) or args.force:
         mt = hl.read_matrix_table(pcs_calculated)
 
         if args.mpc_ht is not None:
@@ -514,21 +513,19 @@ if __name__ == "__main__":
         mt = mt.checkpoint(variant_annotated, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
+        # Export rows and columns
+        mtcols = mt.cols()
+        mtcols = mtcols.flatten()
+        mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv'))
+
+        mtrows = mt.rows()
+        mtrows = mtrows.flatten()
+        mtrows = mtrows.key_by().drop("vep.input")
+        mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv'))
+
     else:
         logging.info("Detected final annotated mt exists. Skipping this step.")
 
-    ########################################################
-    # Export column and row data as tables (hail and text) #
-    ########################################################
-    # Export rows and columns
-    mtcols = mt.cols()
-    mtcols = mtcols.flatten()
-    mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv'))
-
-    mtrows = mt.rows()
-    mtrows = mtrows.flatten()
-    mtrows = mtrows.key_by().drop("vep.input")
-    mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv'))
 
     # Send logs and finish-up notice
     logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
