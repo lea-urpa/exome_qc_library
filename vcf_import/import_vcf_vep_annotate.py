@@ -83,7 +83,7 @@ if __name__ == "__main__":
     if args.out_file is None:
         basename = os.path.basename(vcf_files[0]).replace(".vcf","").replace(".gz", "").replace(".bgz", "")
     else:
-        basename = args.out_file.rstrip("/").replace(".mt")
+        basename = args.out_file.rstrip("/").replace(".mt", "")
 
     out_basename = os.path.join(args.out_dir, basename)
     combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
