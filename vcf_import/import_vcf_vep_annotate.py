@@ -52,7 +52,7 @@ if __name__ == "__main__":
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
     # Add file handler
-    fh = logging.FileHandler(args.log_file)
+    fh = logging.FileHandler(log_file)
     fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     root.addHandler(fh)
