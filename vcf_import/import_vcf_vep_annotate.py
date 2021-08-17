@@ -106,7 +106,7 @@ if __name__ == "__main__":
             # Write MT first, then read it from disk #
             vcf_name = os.path.join(args.data_dir, vcf)
 
-            vcf_stem = os.path.basename(vcf).replace(".vcf","").replace(".gz", "").replace(".bgz", "")
+            vcf_stem = os.path.basename(vcf).replace(".vcf","").replace(".gz", "").replace(".bgz", "").replace("*","")
             mt_name = os.path.join(args.data_dir, vcf_stem + f"{test_str}.mt/")
 
             # If MT does not already exist, load in VCF and then write it to disk
@@ -122,7 +122,7 @@ if __name__ == "__main__":
                         reference_genome=args.reference_genome, contig_recoding=recode)
 
                 if args.test:
-                    logging.info('Test flag given, filtering to on chrom 22.')
+                    logging.info('Test flag given, filtering to chrom 22.')
                     if args.reference_genome == "GRCh38":
                         chrom_code = "chr22"
                     else:
