@@ -684,7 +684,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
 
     if pheno_col is not None:
         sample_info = mt.cols()
-        case_info = sample_info.filter(sample_info.is_case == True)
+        case_info = sample_info.filter(sample_info[pheno_col] == True)
         case_ids = case_info.s.take(case_info.count())
     else:
         case_ids = None
