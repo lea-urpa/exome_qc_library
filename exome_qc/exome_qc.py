@@ -442,7 +442,7 @@ if __name__ == "__main__":
         if (not utils.check_exists(final_maffilt)) or args.force:
             logging.info("Filtering to common variants and LD pruning dataset.")
             mt_maffilt = vq.maf_filter(mt_filtered, 0.05)
-            mt_maffilt = mt_maffilt.checkpoint(final_maffilt)
+            mt_maffilt = mt_maffilt.checkpoint(final_maffilt, overwrite=True)
         else:
             logging.info("Detected final MAF filtered mt exists. Loading that.")
             mt_maffilt = hl.read_matrix_table(final_maffilt)
@@ -453,7 +453,7 @@ if __name__ == "__main__":
             utils.remove_secondary(args.cluster_name, args.region)
             mt_ldpruned = vq.downsample_variants(mt_maffilt, 80000, r2=args.r2, bp_window_size=args.bp_window_size,
                                                  ld_prune=True)
-            mt_ldpruned = mt_ldpruned.checkpoint(final_ldpruned)
+            mt_ldpruned = mt_ldpruned.checkpoint(final_ldpruned, overwrite=True)
         else:
             logging.info("Detected final LDpruned mt exists. Loading that.")
             mt_ldpruned = hl.read_matrix_table(final_ldpruned)
