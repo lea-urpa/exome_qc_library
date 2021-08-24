@@ -107,7 +107,7 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
 
 
 def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_iter=8, reference_genome="GRCh38",
-                      pca_plot_annotations=None):
+                      pca_plot_annotations=None, collect_all=False):
     """
     Takes an LD pruned matrix table and determines which individuals are not clustering with Finns,
     with the principal components standard-deviation method, a la the FinnGen genotype team.
@@ -175,7 +175,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
 
                     output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
                     p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=label_dict,
-                                        title=f"PCA plot round {round_num}", collect_all=True)
+                                        title=f"PCA plot round {round_num}", collect_all=collect_all)
                     save(p)
                 except Exception as e:
                     logging.error(f"Error! Creating PCA plots with labels failed. Are the label categories you provided"
