@@ -21,7 +21,7 @@ def downsample_variants(mt, target_count, r2=0.2, bp_window_size=500000, ld_prun
         if ld_prune:
             logging.info(f"Matrix table has more than {target_count} variants, LD pruning dataset with r2 {r2} and "
                          f"bp window size {bp_window_size}")
-            ld_prune(mt, r2=r2, bp_window_size=bp_window_size)
+            ld_prune_mt(mt, r2=r2, bp_window_size=bp_window_size)
         else:
             logging.info(f"Matrix table has more than {target_count} variants, randomly downsampling to {target_count} variants.")
             keep_fraction = target_count/var_count
@@ -67,7 +67,7 @@ def maf_filter(mt, maf, filter_ac0_after_pruning=False):
     return mt
 
 
-def ld_prune(mt, r2=0.2, bp_window_size=500000):
+def ld_prune_mt(mt, r2=0.2, bp_window_size=500000):
     """
      LD prune a matrix table, for calculating kinship and principal components
 
@@ -185,7 +185,7 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
         logging.info("Filtering only genotypes failing QC measures, leaving genotypes missing those measures.")
         filter_condition = failing_dp_cond | pl_cond | gq_cond
 
-    mt = mt.filter_entries(filter_condition)
+    mt = mt.filter_entries(filter_condition, keep=False)
     mt = mt.checkpoint(checkpoint_name + "_DP_GQ_filtered.mt/", overwrite=True)
 
     if count_failing:
