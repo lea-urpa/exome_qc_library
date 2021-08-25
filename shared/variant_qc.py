@@ -21,7 +21,8 @@ def downsample_variants(mt, target_count, r2=0.2, bp_window_size=500000, ld_prun
         if ld_prune:
             logging.info(f"Matrix table has more than {target_count} variants, LD pruning dataset with r2 {r2} and "
                          f"bp window size {bp_window_size}")
-            ld_prune_mt(mt, r2=r2, bp_window_size=bp_window_size)
+            mt = ld_prune_mt(mt, r2=r2, bp_window_size=bp_window_size)
+
         else:
             logging.info(f"Matrix table has more than {target_count} variants, randomly downsampling to {target_count} variants.")
             keep_fraction = target_count/var_count
