@@ -6,30 +6,20 @@ August 2021
 import utils
 import logging
 import hail as hl
+import variant_annotation as va
 
 
 def count_case_control_carriers(mt, checkpoint_name, pheno_col='is_case_final', female_col='is_female_imputed'):
     """
     Annotate het and hom var carriers for variants in matrix table.
 
-    :param mt: matrix table to annotate/filter
-    :param args: arguments for pheno column, etc
-    :return: returns annotated matrix table
+    :param mt: matrix table to annotate
+    :param checkpoint_name: checkpoint name
+    :param pheno_col: column ID name for case control status (must be boolean)
+    :param female_col: column ID name for female/male status (must be boolean, female = True)
+    :return:
     """
-    ############################################################
-    # Get count of samples that are cases and controls, report #
-    ############################################################
     logging.info("Annotating het and hom var carrier counts in controls to variants.")
-
-    case_count = mt.aggregate_cols(hl.agg.count_where(mt[pheno_col] == True))
-    control_count = mt.aggregate_cols(hl.agg.count_where(mt[pheno_col] == False))
-    missing = mt.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt[pheno_col])))
-
-    logging.info(f"Number of controls in dataset: {control_count}")
-    logging.info(f"Number of cases in dataset: {case_count}")
-    logging.info(f"Samples missing case/control information: {missing}")
-    if missing > 0:
-        logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
 
     ##################################################
     # Annotate control/case het count + homvar count #
@@ -75,42 +65,44 @@ def count_case_control_carriers(mt, checkpoint_name, pheno_col='is_case_final', 
     return mt
 
 
-def annotate_variants(mt, args):
+def check_variants_annotated(mt, checkpoint_name, cadd_ht, mpc_ht, gnomad_ht, gnomad_mismatch_ht):
+    """
+    Checks if matrix table is already annotated with CADD, MPC, and gnomad, and annotates if not.
+
+    :param mt: matrix table to annotate
+    :param checkpoint_name: checkpoint
+    :param cadd_ht:
+    :param mpc_ht:
+    :param gnomad_ht:
+    :param gnomad_mismatch_ht:
+    :return:
+    """
     """
     Annotates matrix table variants with CADD, MPC and gnomad info.
     :param mt: matrix table to annotate
     :param args: arguments for cadd, mpc, and gnomad hail table locations
     :return: returns annotated matrix table
     """
-    # TODO change output to depend on initial input name, but in output directory
-    temp_filename = args.output_stem + "_cadd_mpc_gnomad_annotated_tmp.mt"
+    # TODO figure out how to check if gnomad/cadd/mpc variables are already annotated
+    cadd_not_annot = False
+    mpc_not_annot = False
+    gnomad_not_annot = False
+    gnomad_mismatch_not_annot = False
 
-    if utils.check_exists(temp_filename) and (args.force == False):
-        logging.info(f"Detected that matrix table annotated with CADD, MPC and Gnomad exist: {temp_filename}. "
-                     f"Loading this.")
-        mt = hl.read_matrix_table(temp_filename)
-    else:
-        args.force = True
-        logging.info("Annotating matrix table with CADD, MPC and Gnomad.")
+    if cadd_not_annot:
+        logging.info("Annotating matrix table with CADD")
+        mt = va.annotate_variants_cadd(mt, cadd_ht)
+    if mpc_not_annot:
+        logging.info("Annotating matrix table with MPC")
+        mt = va.annotate_variants_mpc(mt, mpc_ht)
+    if gnomad_not_annot:
+        logging.info("Annotating matrix table with gnomad variant information")
+        mt = va.annotate_variants_gnomad(mt, gnomad_ht)
+    if gnomad_mismatch_not_annot:
+        mt = va.annotate_variants_gnomad_mismatch(mt, gnomad_mismatch_ht)
 
-        h.add_preemptibles(args.cluster_name, args.num_preemptibles)
-
-        #####################################
-        # Annotate variants with CADD + MPC #
-        #####################################
-        mt = va.annotate_variants_cadd(mt, args.cadd_ht)
-        mt = va.annotate_variants_mpc(mt, args.mpc_ht)
-
-        #######################################################
-        # Annotate variants with Gnomad population + mismatch #
-        #######################################################
-        mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
-        args.gnomad_idx = mt.gnomad_popmax_index_dict.take(1)[0][args.gnomad_population]
-        mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
-
-        mt = mt.checkpoint(temp_filename, overwrite=True)
-
-        h.remove_preemptibles(args.cluster_name)
+    if any(cadd_not_annot, mpc_not_annot, gnomad_not_annot, gnomad_mismatch_not_annot):
+        mt = mt.checkpoint(checkpoint_name, overwrite=True)
 
     return mt
 

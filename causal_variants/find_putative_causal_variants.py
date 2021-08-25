@@ -507,7 +507,7 @@ if __name__ == "__main__":
     ########################################################
     # Read in matrix table and remove monomorphic variants #
     ########################################################
-    h.add_preemptibles(args.cluster_name, args.num_preemptibles)
+    utils.add_secondary(args.cluster_name, args.num_secondary, region=args.region)
     full_mt = hl.read_matrix_table(args.mt)
 
     monomorphic_checkpoint = args.output_name + "_non_monomorphic_variants.mt"
@@ -522,28 +522,38 @@ if __name__ == "__main__":
     ##################################################
     # Annotate matrix table with various annotations #
     ##################################################
-    # Annotate mt with het/homvar case/control counts
-    utils.add_secondary(args.cluster_name, args.num_secondary, region=args.region)
-    annot_checkpoint =  args.output_name + "_carriers_annotated.mt"
-    if (not utils.check_exists(annot_checkpoint)) or args.force:
-        mt_case_count = cv.count_case_control_carriers(var_mt, annot_checkpoint, pheno_col=args.pheno_col,
-                                                       female_col=args.female_col)
+    ## Annotate mt with het/homvar case/control counts ##
+    case_annot_checkpoint = args.output_name + "_carriers_annotated.mt"
+
+    if (not utils.check_exists(case_annot_checkpoint)) or args.force:
+        mt_case_count = cv.count_case_control_carriers(
+            var_mt, case_annot_checkpoint, pheno_col=args.pheno_col, female_col=args.female_col)
     else:
-        logging.info(f"Detected file with carriers annotated exists: {annot_checkpoint}. Loading this file.")
-        mt_case_count = hl.read_matrix_table(annot_checkpoint)
+        logging.info(f"Detected file with carriers annotated exists: {case_annot_checkpoint}. Loading this file.")
+        mt_case_count = hl.read_matrix_table(case_annot_checkpoint)
 
-    case_count = mt_case_count.aggregate_cols(hl.agg.count_where(mt_case_count[args.pheno_col] == True))
     control_count = mt_case_count.aggregate_cols(hl.agg.count_where(mt_case_count[args.pheno_col] == False))
-    missing = mt_case_count.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt_case_count[args.pheno_col])))
-
     logging.info(f"Number of controls in dataset: {control_count}")
+    case_count = mt_case_count.aggregate_cols(hl.agg.count_where(mt_case_count[args.pheno_col] == True))
     logging.info(f"Number of cases in dataset: {case_count}")
+    missing = mt_case_count.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt_case_count[args.pheno_col])))
     logging.info(f"Samples missing case/control information: {missing}")
+
     if missing > 0:
         logging.info(
             f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
 
-    var_mt = annotate_variants(var_mt, args)
+    ## Annotate variants, if not already annotated ##
+    var_annot_checkpoint = args.output_name + "_cadd_mpc_gnomad_annot.mt/"
+
+    if (not utils.check_exists(var_annot_checkpoint)) or args.force:
+        mt_var_annot = cv.check_variants_annotated(mt_case_count)
+    else:
+        mt_var_annot = hl.read_matrix_table(var_annot_checkpoint)
+
+    gnomad_idx = mt_var_annot.gnomad_popmax_index_dict.take(1)[0][args.gnomad_population]
+
+
     var_mt = annotate_population_thresholds(var_mt, args)
     h.remove_preemptibles(args.cluster_name)
     var_mt = annotate_genes(var_mt, args)  # Triggers shuffles
