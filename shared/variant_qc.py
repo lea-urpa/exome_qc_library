@@ -9,6 +9,28 @@ import samples_qc as sq
 import utils
 
 
+def remove_monomorphic(mt, checkpoint_name):
+    """
+    Takes matrix table and counts the number of non-reference genotypes per variant, removes variants with non-ref GT
+    count == 0.
+    :param mt: Matrix table to filter
+    :param args: arguments for checkpoint output location and name
+    :return: returns filtered matrix table
+    """
+    start0_count = mt.count_rows()
+    logging.info(f"Starting number of variants: {start0_count}")
+    mt = mt.annotate_rows(non_ref_gt_count=hl.agg.count_where(mt.GT.is_non_ref()))
+    mt = mt.filter_rows(mt.non_ref_gt_count > 0, keep=True)
+
+    mt = mt.checkpoint(checkpoint_name, overwrite=True)
+
+    start_count = mt.count_rows()
+    logging.info(f"Number of remaining variants after removing monomorphic variants: {start_count} "
+                 f"({round(start_count / start0_count * 100, 2)}% of all variants)")
+
+    return mt
+
+
 def downsample_variants(mt, target_count, r2=0.2, bp_window_size=500000, ld_prune=False):
     """
     Takes a matrix table, checks if the variant count is above a target count, and if so downsamples the matrix table.
