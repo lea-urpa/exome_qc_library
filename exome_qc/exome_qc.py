@@ -186,10 +186,10 @@ if __name__ == "__main__":
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
         mt = hl.read_matrix_table(low_pass_qcd)
+        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         ## LD prune and checkpoint ##
         if not utils.check_exists(ld_pruned):
-            utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
             # Filter failing samples, variants, and genotypes
             mt_filtered = sq.filter_failing(
@@ -203,7 +203,6 @@ if __name__ == "__main__":
             mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, filter_ac0_after_pruning=True)
 
             # LD prune if row count >80k
-            utils.remove_secondary(args.cluster_name, args.region)
             mt_ldpruned = vq.downsample_variants(mt_maffilt, 80000, r2=args.r2, bp_window_size=args.bp_window_size,
                                                  ld_prune=True)
 
@@ -253,6 +252,7 @@ if __name__ == "__main__":
 
     if (not utils.check_exists(pop_outliers_found)) or args.force:
         logging.info("Finding population outliers")
+        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         mt = hl.read_matrix_table(relatedness_calculated)
         mt_ldpruned = hl.read_matrix_table(ld_pruned_annot)
