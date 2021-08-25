@@ -551,11 +551,24 @@ if __name__ == "__main__":
     else:
         mt_var_annot = hl.read_matrix_table(var_annot_checkpoint)
 
-    gnomad_idx = mt_var_annot.gnomad_popmax_index_dict.take(1)[0][args.gnomad_population]
+    ## Annotate population thresholds ##
+    pop_thresh_checkpoint = args.output_name +  "_gnomad_control_thresholds_annotated_tmp.mt"
+
+    if (not utils.check_exists(pop_thresh_checkpoint)) or args.force:
+        mt_pop_annot = cv.annotate_control_thresholds(
+            var_mt, pop_thresh_checkpoint, args.gnomad_population,
+            max_allowed_carrier_dominant=args.max_allowed_carrier_dominant,
+            max_allowed_homozygotes_recessive=args.max_allowed_homozygotes_recessive,
+            gnomad_AF_cutoff_recessive=args.gnomad_AF_cutoff_recessive
+        )
+
+    else:
+        logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {pop_thresh_checkpoint}. "
+                     f"Loading this file.")
+        mt_pop_annot = hl.read_matrix_table(pop_thresh_checkpoint)
 
 
-    var_mt = annotate_population_thresholds(var_mt, args)
-    h.remove_preemptibles(args.cluster_name)
+    utils.remove_secondary(args.cluster_name)
     var_mt = annotate_genes(var_mt, args)  # Triggers shuffles
 
     ##########################################
