@@ -509,12 +509,40 @@ if __name__ == "__main__":
     ########################################################
     h.add_preemptibles(args.cluster_name, args.num_preemptibles)
     full_mt = hl.read_matrix_table(args.mt)
-    var_mt = remove_monomorphic(full_mt, args)
+
+    monomorphic_checkpoint = args.output_name + "_non_monomorphic_variants.mt"
+    if (not utils.check_exists(monomorphic_checkpoint)) or args.force:
+        var_mt = vq.remove_monomorphic(full_mt, monomorphic_checkpoint)
+    else:
+        logging.info(f"Detected file with monomorphic variants filtered out: {monomorphic_checkpoint}. Loading this file.")
+        var_mt = hl.read_matrix_table(monomorphic_checkpoint)
+        start_count = var_mt.count_rows()
+        logging.info(f"Number of remaining variants after removing monomorphic variants: {start_count}")
 
     ##################################################
     # Annotate matrix table with various annotations #
     ##################################################
-    var_mt = count_case_control_carriers(var_mt, args)
+    # Annotate mt with het/homvar case/control counts
+    utils.add_secondary(args.cluster_name, args.num_secondary, region=args.region)
+    annot_checkpoint =  args.output_name + "_carriers_annotated.mt"
+    if (not utils.check_exists(annot_checkpoint)) or args.force:
+        mt_case_count = cv.count_case_control_carriers(var_mt, annot_checkpoint, pheno_col=args.pheno_col,
+                                                       female_col=args.female_col)
+    else:
+        logging.info(f"Detected file with carriers annotated exists: {annot_checkpoint}. Loading this file.")
+        mt_case_count = hl.read_matrix_table(annot_checkpoint)
+
+    case_count = mt_case_count.aggregate_cols(hl.agg.count_where(mt_case_count[args.pheno_col] == True))
+    control_count = mt_case_count.aggregate_cols(hl.agg.count_where(mt_case_count[args.pheno_col] == False))
+    missing = mt_case_count.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt_case_count[args.pheno_col])))
+
+    logging.info(f"Number of controls in dataset: {control_count}")
+    logging.info(f"Number of cases in dataset: {case_count}")
+    logging.info(f"Samples missing case/control information: {missing}")
+    if missing > 0:
+        logging.info(
+            f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
+
     var_mt = annotate_variants(var_mt, args)
     var_mt = annotate_population_thresholds(var_mt, args)
     h.remove_preemptibles(args.cluster_name)
