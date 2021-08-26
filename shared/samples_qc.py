@@ -143,7 +143,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
     logging.info(f'Sample count after removing related individuals: {sample_count}')
 
     # Write checkpoint
-    mt_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_autosomes_norelatives"
+    mt_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_autosomes_norelatives.mt/"
     mt_unrelated = mt_unrelated.checkpoint(mt_fn, overwrite=True)
 
     #########################################################################
