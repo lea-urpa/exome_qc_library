@@ -218,6 +218,7 @@ if __name__ == "__main__":
             mt_ldpruned = hl.read_matrix_table(ld_pruned)
 
         ## Calculate relatedness with King ##
+        # THIS triggers shuffles, think about removing secondaries... seemed to run ok though
         if not utils.check_exists(relatedness_calculated):
 
             if args.reference_genome is "GRCh38":

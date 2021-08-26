@@ -138,13 +138,13 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
     logging.info(f"Variant count after filtering to autosomes: {var_count}")
 
     # Remove related individuals
-    mt = mt.filter_cols(mt.related_to_remove == False)
-    sample_count = mt.count_cols()
+    mt_unrelated = mt_autosomes.filter_cols(mt_autosomes.related_to_remove == False)
+    sample_count = mt_unrelated.count_cols()
     logging.info(f'Sample count after removing related individuals: {sample_count}')
 
     # Write checkpoint
     mt_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_autosomes_norelatives"
-    mt = mt.checkpoint(mt_fn, overwrite=True)
+    mt_unrelated = mt_unrelated.checkpoint(mt_fn, overwrite=True)
 
     #########################################################################
     # Calculate PCAs, detect outliers, and repeat until outliers count == 0 #
@@ -158,13 +158,13 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
             continue
 
         # Calculate pcs
-        mt_count = mt_autosomes.count()
+        mt_count = mt_unrelated.count()
         logging.info(f"Count of samples and variants for matrix table PCA is calculated on: {mt_count}")
-        eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_autosomes.GT, k=2)
+        eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_unrelated.GT, k=2)
 
         # Do PCA plots, if specified
         if plots:
-            coldata = mt.cols()
+            coldata = mt_unrelated.cols()
 
             if pca_plot_annotations is not None:
                 try:
@@ -219,7 +219,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
             all_outliers = all_outliers.union(outlier_table)
 
         # Filter outlier samples from main table to run PCA calculation again
-        mt_autosomes = mt_autosomes.anti_join_cols(outlier_table)
+        mt_unrelated = mt_unrelated.anti_join_cols(outlier_table)
 
         round_num += 1
 
