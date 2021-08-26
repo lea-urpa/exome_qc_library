@@ -181,7 +181,8 @@ if __name__ == "__main__":
     # Calculate relatedness #
     #########################
     ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
-    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
+    ld_pruned_maffilt = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_maf_filt{args.test_str}.mt/")
+    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-3_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
 
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
@@ -189,7 +190,7 @@ if __name__ == "__main__":
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         ## LD prune and checkpoint ##
-        if not utils.check_exists(ld_pruned):
+        if (not utils.check_exists(ld_pruned)) or args.force:
 
             # Filter failing samples, variants, and genotypes
             mt_filtered = sq.filter_failing(
@@ -200,11 +201,15 @@ if __name__ == "__main__":
             )
 
             # Filter out low MAF variants
-            mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, filter_ac0_after_pruning=True)
+            if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
+                mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, filter_ac0_after_pruning=True)
+                mt_maffilt = mt_maffilt.checkpoint(ld_pruned_maffilt, overwrite=True)
+            else:
+                mt_maffilt = hl.read_matrix_table(ld_pruned_maffilt)
 
             # LD prune if row count >80k
-            mt_ldpruned = vq.downsample_variants(mt_maffilt, 80000, r2=args.r2, bp_window_size=args.bp_window_size,
-                                                 ld_prune=True)
+            mt_ldpruned = vq.downsample_variants(
+                mt_maffilt, 80000, ld_pruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
 
             logging.info(f"Writing checkpoint {stepcount}-1: LD pruned dataset")
             mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
@@ -454,8 +459,8 @@ if __name__ == "__main__":
         if (not utils.check_exists(final_ldpruned)) or args.force:
             logging.info('LD pruning final dataset for PC calculation')
             utils.remove_secondary(args.cluster_name, args.region)
-            mt_ldpruned = vq.downsample_variants(mt_maffilt, 80000, r2=args.r2, bp_window_size=args.bp_window_size,
-                                                 ld_prune=True)
+            mt_ldpruned = vq.downsample_variants(
+                mt_maffilt, 80000, final_ldpruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
             mt_ldpruned = mt_ldpruned.checkpoint(final_ldpruned, overwrite=True)
         else:
             logging.info("Detected final LDpruned mt exists. Loading that.")

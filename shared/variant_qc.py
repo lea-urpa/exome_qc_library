@@ -31,13 +31,14 @@ def remove_monomorphic(mt, checkpoint_name):
     return mt
 
 
-def downsample_variants(mt, target_count, r2=0.2, bp_window_size=500000, ld_prune=False):
+def downsample_variants(mt, target_count, checkpoint_name, r2=0.2, bp_window_size=500000, ld_prune=False):
     """
     Takes a matrix table, checks if the variant count is above a target count, and if so downsamples the matrix table.
     :param mt: matrix table to downsample
     :param target_count: target number of variants the matrix table should be
     :return: downsampled matrix table, if mt count > target count, or original matrix table if not.
     """
+    downsample_checkpoint = checkpoint_name.rstrip("/").replace(".mt", "") + "_pruned_before_downsample.mt/"
     var_count = mt.count_rows()
     if var_count > target_count:
         if ld_prune:
@@ -51,7 +52,9 @@ def downsample_variants(mt, target_count, r2=0.2, bp_window_size=500000, ld_prun
                 keep_fraction = target_count/ld_prune_count
                 mt = mt.sample_rows(keep_fraction)
         else:
-            logging.info(f"Matrix table has more than {target_count} variants, randomly downsampling to {target_count} variants.")
+            logging.info(f"Matrix table has more than {target_count} variants, "
+                         f"checkpointing and then randomly downsampling to {target_count} variants.")
+            mt = mt.checkpoint(downsample_checkpoint, overwrite=True)
             keep_fraction = target_count/var_count
             mt = mt.sample_rows(keep_fraction)
 
