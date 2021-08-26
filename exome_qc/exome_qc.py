@@ -182,7 +182,7 @@ if __name__ == "__main__":
     #########################
     ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
     ld_pruned_maffilt = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_maf_filt{args.test_str}.mt/")
-    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-3_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
+    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
 
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
