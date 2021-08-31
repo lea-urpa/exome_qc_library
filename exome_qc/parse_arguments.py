@@ -97,7 +97,7 @@ def parse_arguments(arguments):
 
     # Kinship thresholds #
     kin_thresh = parser.add_argument_group("Kinship thresholds.")
-    kin_thresh.add_argument("--ind_maf", default=0.001, type=float,
+    kin_thresh.add_argument("--ind_maf", default=0.05, type=float,
                             help="Minor allele frequency cutoff for calculating kinship.")
     kin_thresh.add_argument("--kinship_threshold", default=0.0883,
                             help="Threshold for kinship coefficient, above which individuals are defined as related.")
