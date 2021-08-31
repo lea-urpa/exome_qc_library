@@ -253,8 +253,9 @@ if __name__ == "__main__":
     ############################
     # Find population outliers #
     ############################
+    ld_pruned_maf = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned_maf_0.05{args.test_str}.mt/")
     ld_pruned_popannot = os.path.join(args.out_dir,
-                                      f"{stepcount}-1_{args.out_name}_ld_pruned_popoutliers{args.test_str}.mt/")
+                                      f"{stepcount}-2_{args.out_name}_ld_pruned_popoutliers{args.test_str}.mt/")
 
     if (not utils.check_exists(pop_outliers_found)) or args.force:
         logging.info("Finding population outliers")
@@ -262,6 +263,11 @@ if __name__ == "__main__":
 
         mt = hl.read_matrix_table(relatedness_calculated)
         mt_ldpruned = hl.read_matrix_table(ld_pruned_annot)
+
+        if args.ind_maf < 0.05:
+            logging.info("Further excluding variants with MAF < 0.05 to calculate principal components.")
+            mt_ldpruned = mt_ldpruned.filter_rows(mt_ldpruned.variant_qc.AF[1] >= 0.05, keep=True)
+            mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_maf, overwrite=True)
 
         pop_outliers = sq.find_pop_outliers(
             mt_ldpruned, pop_outliers_found, pop_sd_threshold=args.pop_sd_threshold,
