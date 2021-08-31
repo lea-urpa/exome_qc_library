@@ -264,7 +264,9 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(relatedness_calculated)
         mt_ldpruned = hl.read_matrix_table(ld_pruned_annot)
 
-        if args.ind_maf < 0.05:
+        maf_stats = mt_ldpruned.aggregate_rows(hl.agg.stats(mt_ldpruned.variant_qc.AF[1]))
+
+        if maf_stats.min < 0.05:
             logging.info("Further excluding variants with MAF < 0.05 to calculate principal components.")
             mt_ldpruned = mt_ldpruned.filter_rows(mt_ldpruned.variant_qc.AF[1] >= 0.05, keep=True)
             mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_maf, overwrite=True)
