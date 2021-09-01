@@ -308,12 +308,18 @@ if __name__ == "__main__":
 
         if (not utils.check_exists(filtered_nohwe)) or args.force:
             # Filter out failing variants, genotypes, rare variants
-            mt_filtered = sq.filter_failing(
-                mt, sex_imputed, prefix='low_pass', variants=True, entries=True, samples=False,
-                unfilter_entries=False, skip_hwe_fails=True, pheno_qc=False, min_dp=args.min_dp,
+            mt_gt_filt= sq.filter_failing(
+                mt, sex_imputed, prefix='low_pass', variants=False, entries=True, samples=False,
+                unfilter_entries=False, pheno_qc=False, min_dp=args.min_dp,
                 min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
                 max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+            )
+
+            mt_filtered = mt_gt_filt.filter_rows(
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_QD") |
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_VQSR_filters") |
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate"), keep=False
             )
 
             mt_filtered = mt_filtered.checkpoint(filtered_nohwe, overwrite=True)
