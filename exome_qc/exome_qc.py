@@ -374,7 +374,7 @@ if __name__ == "__main__":
         # Filter failing variants and genotypes, and pop outlier samples
         logging.info("Filtering out failing genotypes and variants.")
         mt_filtered = sq.filter_failing(
-            mt, ld_pruned, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
+            mt, samples_qcd, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
             pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
