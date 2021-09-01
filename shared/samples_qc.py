@@ -13,8 +13,7 @@ import networkx as nx
 
 def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True, variants=True, samples=True,
                    unfilter_entries=False, pheno_qc=False, min_dp=10, min_gq=20, max_het_ref_reads=0.8,
-                   min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1,
-                   skip_hwe_fails=False):
+                   min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
     """
     Filters failing samples, variants, and entries from a given matrix table
     :param mt: matrix table to filter
@@ -63,14 +62,8 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     # Filter variants #
     ###################
     if variants:
-        if skip_hwe_fails:
-            # Passing or only failing on hwe cutoff, for imputing sex
-            pass_or_hwe = ((hl.len(mt[prefix + 'failing_variant_qc']) == 0) |
-                           (mt[prefix + "failing_variant_qc"] == ["failing_hwe"]))
-            mt = mt.filter_rows(pass_or_hwe, keep=True)
-        else:
-            mt = mt.filter_rows((hl.len(mt[prefix + 'failing_variant_qc']) == 0) &
-                                hl.is_defined(mt[prefix + "failing_variant_qc"]), keep=True)
+        mt = mt.filter_rows((hl.len(mt[prefix + 'failing_variant_qc']) == 0) &
+                            hl.is_defined(mt[prefix + "failing_variant_qc"]), keep=True)
         tag.append("variants")
 
         if (pheno_col is not None) and (pheno_qc is True):
