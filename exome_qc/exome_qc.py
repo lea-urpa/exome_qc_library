@@ -367,7 +367,7 @@ if __name__ == "__main__":
     ##############
     if (not utils.check_exists(samples_qcd)) or args.force:
         logging.info("Running sample QC")
-        utils.remove_secondary(args.cluster_name, args.region)
+        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         mt = hl.read_matrix_table(sex_imputed)
 
@@ -379,7 +379,7 @@ if __name__ == "__main__":
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
         )
-
+        utils.remove_secondary(args.cluster_name, args.region)
         # Run samples QC
         mt = sq.samples_qc(
             mt_filtered, mt, samples_qcd, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
