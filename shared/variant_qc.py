@@ -316,6 +316,15 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
                                                  hl.agg.count_where(passing_het_gts) / mt[het_gt_cnt],
                                                  hl.null(hl.tfloat))})
 
+    # Check if het ab is missing for some samples, report if there are
+    ab_0 = mt.aggregate_rows(hl.agg.count_where(mt[het_gt_cnt] == 0))
+    if ab_0 > 0:
+        logging.warning(f"{ab_0} variants where het GT count is undefined- something is wrong!")
+    ab_undefined = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_ab]))))
+    if ab_undefined > 0:
+        logging.info(f"Note! {het_ab} annotation missing for {ab_undefined} variants. Of these, "
+                     f"{ab_0} variants have het GT count of zero (no het GTs for any sample at that varinat)-")
+
     if pheno_col is not None:
         # Check annotations defined for all variants
         undefined_case_het_ct = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[case_het_gt_count]))))
@@ -634,18 +643,6 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
         failing_ab = mt.aggregate_rows(hl.agg.count_where(mt[failing_name].contains("failing_het_ab")))
         failing_ab_perc = round(failing_ab / total_variants * 100, 2)
         filter_dict["failing_het_allelic_balance"] = failing_ab
-
-        ab_defined = mt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt[failing_het_ab_name])))
-        if ab_defined < total_variants:
-            logging.info(f"Note! mt.{failing_het_ab_name} annotation defined for only {ab_defined} variants! "
-                          f"Variants missing this annotation not filtered on this measure.")
-
-            het_gt_cnt = prefix + 'n_het'
-            ab_0 = mt.aggregate_rows(hl.agg.count_where(mt[het_gt_cnt] == 0))
-            logging.info(f"Number of variants where het GT count is zero (no het genotypes for any sample): "
-                         f"{ab_0}")
-
-
 
         # Hardy-Weinberg equilibrium filters
         if pheno_col is not None:
