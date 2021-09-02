@@ -761,7 +761,7 @@ def variant_quality_control(
         logging.info("Filtering out samples failing QC.")
         mt = sq.filter_failing(
             mt, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col, entries=False, variants=False,
-            samples=True, pheno_qc=False)
+            samples=True, pheno_qc=False, force=force)
 
     ############################################################
     # Find failing genotypes and do allelic balance annotation #

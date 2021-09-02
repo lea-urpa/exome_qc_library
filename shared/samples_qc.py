@@ -13,7 +13,7 @@ import networkx as nx
 
 def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True, variants=True, samples=True,
                    unfilter_entries=False, pheno_qc=False, min_dp=10, min_gq=20, max_het_ref_reads=0.8,
-                   min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
+                   min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1, force=False):
     """
     Filters failing samples, variants, and entries from a given matrix table
     :param mt: matrix table to filter
@@ -37,50 +37,69 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     # Filter entries #
     ##################
     if entries:
-        dp_cond = hl.is_defined(mt.DP) & (mt.DP > min_dp)
-        gq_cond = hl.is_defined(mt.GQ) & (mt.GQ > min_gq)
+        if (not utils.check_exists(checkpoint_name + "_GT_filtered.mt/")) or force:
+            dp_cond = hl.is_defined(mt.DP) & (mt.DP > min_dp)
+            gq_cond = hl.is_defined(mt.GQ) & (mt.GQ > min_gq)
 
-        het_ab_cond = (
-                (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
-                & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
-        )
-        hom_ab_cond = (
-                ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
-                mt.GT.is_hom_ref() & hl.is_defined(mt.GT)
-        )
-        homalt_ab_cond = (
-                ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
-                mt.GT.is_hom_var() & hl.is_defined(mt.GT)
-        )
+            het_ab_cond = (
+                    (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
+                    & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
+            )
+            hom_ab_cond = (
+                    ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
+                    mt.GT.is_hom_ref() & hl.is_defined(mt.GT)
+            )
+            homalt_ab_cond = (
+                    ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
+                    mt.GT.is_hom_var() & hl.is_defined(mt.GT)
+            )
 
-        mt = mt.filter_entries(hl.is_defined(mt.GT) & dp_cond & gq_cond & (het_ab_cond | hom_ab_cond | homalt_ab_cond),
-                               keep=False)
-        mt = mt.checkpoint(checkpoint_name + "_GT_filtered.mt/", overwrite=True)
+            mt = mt.filter_entries(hl.is_defined(mt.GT) & dp_cond & gq_cond & (het_ab_cond | hom_ab_cond | homalt_ab_cond),
+                                   keep=False)
+            mt = mt.checkpoint(checkpoint_name + "_GT_filtered.mt/", overwrite=True)
+        else:
+            logging.info(f"Detected GT filtered checkpoint {checkpoint_name}_GT_filtered.mt/ exists, loading that.")
+            mt = hl.read_matrix_table(checkpoint_name + "_GT_filtered.mt/")
+
         tag.append("entries")
 
     ###################
     # Filter variants #
     ###################
     if variants:
-        mt = mt.filter_rows((hl.len(mt[prefix + 'failing_variant_qc']) == 0) &
-                            hl.is_defined(mt[prefix + "failing_variant_qc"]), keep=True)
+        if (not utils.check_exists(checkpoint_name + "_variants_filtered.mt/")) or force:
+            mt = mt.filter_rows((hl.len(mt[prefix + 'failing_variant_qc']) == 0) &
+                                hl.is_defined(mt[prefix + "failing_variant_qc"]), keep=True)
+
+            if (pheno_col is not None) and (pheno_qc is True):
+                mt = mt.filter_rows((hl.len(mt.failing_pheno_varqc) == 0) & hl.is_defined(mt.failing_pheno_varqc),
+                                    keep=True)
+
+            mt = mt.checkpoint(checkpoint_name + "_variants_filtered.mt/", overwrite=True)
+        else:
+            logging.info(f"Detected variant filtered checkpoint {checkpoint_name}_variants_filtered.mt/ exists,"
+                         f"loading that.")
+            mt = hl.read_matrix_table(checkpoint_name + "_variants_filtered.mt/")
+
         tag.append("variants")
-
         if (pheno_col is not None) and (pheno_qc is True):
-            mt = mt.filter_rows((hl.len(mt.failing_pheno_varqc) == 0) & hl.is_defined(mt.failing_pheno_varqc),
-                                keep=True)
             tag.append("variants by phenotype")
-
-        mt = mt.checkpoint(checkpoint_name + "_variants_filtered.mt/", overwrite=True)
 
     ##################
     # Filter samples #
     ##################
     if samples:
-        mt = mt.filter_cols((hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc) &
-                            (mt.pop_outlier_sample == False) & hl.is_defined(mt.pop_outlier_sample), keep=True)
+        if (not utils.check_exists(checkpoint_name + "_samples_filtered.mt/")) or force:
+            mt = mt.filter_cols((hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc) &
+                                (mt.pop_outlier_sample == False) & hl.is_defined(mt.pop_outlier_sample), keep=True)
 
-        mt = mt.checkpoint(checkpoint_name + "_samples_filtered.mt/", overwrite=True)
+            mt = mt.checkpoint(checkpoint_name + "_samples_filtered.mt/", overwrite=True)
+        else:
+            logging.info(f"Detected sample filtered checkpoint {checkpoint_name}_samples_filtered.mt/ exists, loading"
+                         f"that.")
+
+            mt = hl.read_matrix_table(checkpoint_name + "_samples_filtered.mt/")
+
         tag.append("samples")
 
     final_count = mt.count()

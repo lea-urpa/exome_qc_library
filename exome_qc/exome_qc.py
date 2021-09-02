@@ -2,6 +2,7 @@
 Script for doing exome sequencing data quality control from a Hail matrix table input that has been VEP annotated.
 
 Author: Lea Urpa, August 2020
+This pipeline is dedicated to Thao and the Get Down Stay Down, whose album A Man Alive was the mojo for writing
 """
 import sys
 import os
@@ -197,7 +198,7 @@ if __name__ == "__main__":
                 mt, ld_pruned, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=True,
                 pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
             )
 
             # Filter out low MAF variants
@@ -313,7 +314,7 @@ if __name__ == "__main__":
                 unfilter_entries=False, pheno_qc=False, min_dp=args.min_dp,
                 min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
             )
 
             mt_filtered = mt_gt_filt.filter_rows(
@@ -377,7 +378,7 @@ if __name__ == "__main__":
             mt, samples_qcd, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
             pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
         )
         utils.remove_secondary(args.cluster_name, args.region)
         # Run samples QC
@@ -453,7 +454,7 @@ if __name__ == "__main__":
                 mt, pcs_calculated, prefix='final', entries=True, variants=True, samples=True, unfilter_entries=True,
                 pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads
+                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
             )
             mt_filtered = mt_filtered.checkpoint(final_filtered, overwrite=True)
 
