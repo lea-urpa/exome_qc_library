@@ -83,11 +83,29 @@ def check_variants_annotated(mt, checkpoint_name, cadd_ht, mpc_ht, gnomad_ht, gn
     :param args: arguments for cadd, mpc, and gnomad hail table locations
     :return: returns annotated matrix table
     """
-    # TODO figure out how to check if gnomad/cadd/mpc variables are already annotated
-    cadd_not_annot = False
-    mpc_not_annot = False
-    gnomad_not_annot = False
-    gnomad_mismatch_not_annot = False
+    try:
+        test = hl.is_defined(mt.CADD_PHRED)
+        cadd_not_annot = False
+    except:
+        cadd_not_annot = True
+
+    try:
+        test = hl.is_defined(mt.MPC)
+        mpc_not_annot = False
+    except:
+        mpc_not_annot = True
+
+    try:
+        test = hl.is_defined(mt.gnomad_freq)
+        gnomad_not_annot = False
+    except:
+        gnomad_not_annot = True
+
+    try:
+        test = hl.is_defined(mt.gnomad_mismatch_pvalue)
+        gnomad_mismatch_not_annot = False
+    except:
+        gnomad_mismatch_not_annot = True
 
     if cadd_not_annot:
         logging.info("Annotating matrix table with CADD")

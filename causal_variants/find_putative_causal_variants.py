@@ -516,13 +516,14 @@ if __name__ == "__main__":
     else:
         logging.info(f"Detected file with monomorphic variants filtered out: {monomorphic_checkpoint}. Loading this file.")
         var_mt = hl.read_matrix_table(monomorphic_checkpoint)
-        start_count = var_mt.count_rows()
-        logging.info(f"Number of remaining variants after removing monomorphic variants: {start_count}")
+
+    start_count = var_mt.count_rows()
+    logging.info(f"Number of remaining variants after removing monomorphic variants: {start_count}")
 
     ##################################################
-    # Annotate matrix table with various annotations #
+    # Annotate matrix table with case/control counts #
     ##################################################
-    ## Annotate mt with het/homvar case/control counts ##
+    # Annotate mt with het/homvar case/control counts
     case_annot_checkpoint = args.output_name + "_carriers_annotated.mt"
 
     if (not utils.check_exists(case_annot_checkpoint)) or args.force:
@@ -543,7 +544,9 @@ if __name__ == "__main__":
         logging.info(
             f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
 
-    ## Annotate variants, if not already annotated ##
+    ###############################################################
+    ## Annotate variants with gnomad, mpc, CADD, gnomad mismatch ##
+    ###############################################################
     var_annot_checkpoint = args.output_name + "_cadd_mpc_gnomad_annot.mt/"
 
     if (not utils.check_exists(var_annot_checkpoint)) or args.force:
@@ -551,7 +554,9 @@ if __name__ == "__main__":
     else:
         mt_var_annot = hl.read_matrix_table(var_annot_checkpoint)
 
-    ## Annotate population thresholds ##
+    ###########################################################################
+    ## Annotate whether variants are sufficiently rare in gnomad or controls ##
+    ###########################################################################
     pop_thresh_checkpoint = args.output_name +  "_gnomad_control_thresholds_annotated_tmp.mt"
 
     if (not utils.check_exists(pop_thresh_checkpoint)) or args.force:
