@@ -323,6 +323,9 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
 
         if undefined_case_het_ct > 0:
             logging.info(f"Warning- {undefined_case_het_ct} variants have undefined case het GT count.")
+            case_het_ct_0 = mt.aggregate_rows(hl.agg.count_where(mt[case_het_gt_count] == 0))
+            logging.info(f"{case_het_ct_0} of these variants have case het GT count = 0 "
+                         f"(no het genotypes for any cases)")
 
         if undefined_case_het_ab > 0:
             logging.info(f"Warning- {undefined_case_het_ab} variants have undefined case het GT allelic balance.")
@@ -332,6 +335,9 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
 
         if undefined_cont_het_ct > 0:
             logging.info(f"Warning- {undefined_cont_het_ct} variants have undefined cont het GT count.")
+            cont_het_ct_0 = mt.aggregate_rows(hl.agg.count_where(mt[cont_het_gt_count] == 0))
+            logging.info(f"{cont_het_ct_0} of these variants have controlhet GT count = 0 "
+                         f"(no het genotypes for any controls)")
 
         if undefined_cont_het_ab > 0:
             logging.info(f"Warning- {undefined_cont_het_ab} variants have undefined cont het GT allelic balance.")
@@ -633,6 +639,13 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
         if ab_defined < total_variants:
             logging.info(f"Note! mt.{failing_het_ab_name} annotation defined for only {ab_defined} variants! "
                           f"Variants missing this annotation not filtered on this measure.")
+
+            het_gt_cnt = prefix + 'n_het'
+            ab_0 = mt.aggregate_rows(hl.agg.count_where(mt[het_gt_cnt] == 0))
+            logging.info(f"Number of variants where het GT count is zero (no het genotypes for any sample): "
+                         f"{ab_0}")
+
+
 
         # Hardy-Weinberg equilibrium filters
         if pheno_col is not None:
