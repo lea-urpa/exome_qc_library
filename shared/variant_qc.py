@@ -227,8 +227,8 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
     return mt
 
 
-def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2, max_het_ref_reads=0.8,
-                     min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
+def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2,
+                     max_het_ref_reads=0.8, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
     """
     :param mt: matrix table to annotate
     :param checkpoint_name: Name of checkpoint to write to, including bucket name or file dir to write to
@@ -279,19 +279,11 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
             (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
             & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
     )
-    hom_ab_cond = (
-            ((mt.AD[0] / hl.sum(mt.AD)) < min_hom_ref_ref_reads) & hl.is_defined(mt.AD) &
-            mt.GT.is_hom_ref() & hl.is_defined(mt.GT)
-    )
-    homalt_ab_cond = (
-            ((mt.AD[0] / hl.sum(mt.AD)) > max_hom_alt_ref_reads) & hl.is_defined(mt.AD) &
-            mt.GT.is_hom_var() & hl.is_defined(mt.GT)
-    )
 
     #####################################################
     # Get percent of het gts in AB if het gt count != 0 #
     #####################################################
-    passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & (het_ab_cond | hom_ab_cond | homalt_ab_cond)
+    passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & het_ab_cond
 
     if samples_qc:
         sample_filter = ((mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) &
