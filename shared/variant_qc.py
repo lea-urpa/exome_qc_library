@@ -9,7 +9,7 @@ import samples_qc as sq
 import utils
 
 
-def remove_monomorphic(mt, checkpoint_name):
+def remove_monomorphic(mt):
     """
     Takes matrix table and counts the number of non-reference genotypes per variant, removes variants with non-ref GT
     count == 0.
@@ -21,12 +21,6 @@ def remove_monomorphic(mt, checkpoint_name):
     logging.info(f"Starting number of variants: {start0_count}")
     mt = mt.annotate_rows(non_ref_gt_count=hl.agg.count_where(mt.GT.is_non_ref()))
     mt = mt.filter_rows(mt.non_ref_gt_count > 0, keep=True)
-
-    mt = mt.checkpoint(checkpoint_name, overwrite=True)
-
-    start_count = mt.count_rows()
-    logging.info(f"Number of remaining variants after removing monomorphic variants: {start_count} "
-                 f"({round(start_count / start0_count * 100, 2)}% of all variants)")
 
     return mt
 

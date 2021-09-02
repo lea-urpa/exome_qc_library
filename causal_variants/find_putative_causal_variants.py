@@ -7,6 +7,7 @@ import logging
 import argparse
 import sys
 import causal_variant_functions as cv
+import samples_qc as sq
 import variant_qc as vq
 import subprocess
 import hail as hl
@@ -512,12 +513,14 @@ if __name__ == "__main__":
 
     monomorphic_checkpoint = args.output_name + "_non_monomorphic_variants.mt"
     if (not utils.check_exists(monomorphic_checkpoint)) or args.force:
-        var_mt = vq.remove_monomorphic(full_mt, monomorphic_checkpoint)
+        non_mono_mt = vq.remove_monomorphic(full_mt, monomorphic_checkpoint)
+        non_mono_mt = non_mono_mt.checkpoint(monomorphic_checkpoint, overwrite=True)
+
     else:
         logging.info(f"Detected file with monomorphic variants filtered out: {monomorphic_checkpoint}. Loading this file.")
-        var_mt = hl.read_matrix_table(monomorphic_checkpoint)
+        non_mono_mt = hl.read_matrix_table(monomorphic_checkpoint)
 
-    start_count = var_mt.count_rows()
+    start_count = non_mono_mt.count_rows()
     logging.info(f"Number of remaining variants after removing monomorphic variants: {start_count}")
 
     ##################################################
@@ -527,8 +530,11 @@ if __name__ == "__main__":
     case_annot_checkpoint = args.output_name + "_carriers_annotated.mt"
 
     if (not utils.check_exists(case_annot_checkpoint)) or args.force:
-        mt_case_count = cv.count_case_control_carriers(
+        mt_case_counted, annotations_to_transfer = cv.count_case_control_carriers(
             var_mt, case_annot_checkpoint, pheno_col=args.pheno_col, female_col=args.female_col)
+
+
+
     else:
         logging.info(f"Detected file with carriers annotated exists: {case_annot_checkpoint}. Loading this file.")
         mt_case_count = hl.read_matrix_table(case_annot_checkpoint)
