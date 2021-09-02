@@ -401,7 +401,7 @@ if __name__ == "__main__":
     # Variant QC #
     ##############
     if (not utils.check_exists(variant_qcd)) or args.force:
-        logging.info("Running variant QC")
+        logging.info("Running final variant QC")
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         mt = hl.read_matrix_table(samples_qcd)
