@@ -317,11 +317,12 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
                                                  hl.null(hl.tfloat))})
 
     # Check if het ab is missing for some samples, report if there are
-    ab_0 = mt.aggregate_rows(hl.agg.count_where(mt[het_gt_cnt] == 0))
-    if ab_0 > 0:
-        logging.warning(f"{ab_0} variants where het GT count is undefined- something is wrong!")
     ab_undefined = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_ab]))))
     if ab_undefined > 0:
+        logging.warning(f"{ab_undefined} variants where het GT count is undefined- something is wrong!")
+
+    ab_0 = mt.aggregate_rows(hl.agg.count_where(mt[het_gt_cnt] == 0))
+    if ab_0 > 0:
         logging.info(f"Note! {het_ab} annotation missing for {ab_undefined} variants. Of these, "
                      f"{ab_0} variants have het GT count of zero (no het GTs for any sample at that varinat)-")
 
