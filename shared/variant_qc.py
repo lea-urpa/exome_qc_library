@@ -743,6 +743,15 @@ def variant_quality_control(
 
     mt = mt.annotate_globals(**{annotation_prefix + "genotype_qc_thresholds": hl.literal(gt_thresholds)})
 
+    ###############################################
+    # Filter matrix table to only passing samples #
+    ###############################################
+    if samples_qc:
+        logging.info("Filtering out samples failing QC.")
+        mt = sq.filter_failing(
+            mt, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col, entries=False, variants=False,
+            samples=True, pheno_qc=False)
+
     ############################################################
     # Find failing genotypes and do allelic balance annotation #
     ############################################################
@@ -776,17 +785,6 @@ def variant_quality_control(
     else:
         logging.info("Detected genotype AB filtered mt exists, loading that.")
         mt_gtfilt2 = hl.read_matrix_table(checkpoint_name + "_GT_ab_filtered.mt/")
-
-    ###############################################
-    # Filter matrix table to only passing samples #
-    ###############################################
-    if samples_qc:
-        logging.info("Filtering out samples failing QC.")
-        mt_gtfilt2 = sq.filter_failing(
-            mt_gtfilt2, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col, entries=False, variants=False,
-            samples=True, pheno_qc=False, min_dp=min_dp, max_het_ref_reads=max_het_ref_reads,
-            min_het_ref_reads=min_het_ref_reads, min_hom_ref_ref_reads=min_hom_ref_ref_reads,
-            max_hom_alt_ref_reads=max_hom_alt_ref_reads)
 
     #####################################
     # Annotate rest of failing variants #
