@@ -194,11 +194,17 @@ if __name__ == "__main__":
         if (not utils.check_exists(ld_pruned)) or args.force:
 
             # Filter failing samples, variants, and genotypes
-            mt_filtered = sq.filter_failing(
-                mt, ld_pruned, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=True,
+            mt_gt_filt = sq.filter_failing(
+                mt, ld_pruned, prefix='low_pass', entries=True, variants=False, samples=False, unfilter_entries=True,
                 pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
                 max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+            )
+
+            mt_filtered = mt_gt_filt.filter_rows(
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_QD") |
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_VQSR_filters") |
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate"), keep=False
             )
 
             # Filter out low MAF variants
