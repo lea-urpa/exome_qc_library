@@ -20,6 +20,11 @@ def count_case_control_carriers(mt, checkpoint_name, pheno_col='is_case_final', 
     :return:
     """
     logging.info("Annotating het and hom var carrier counts in controls to variants.")
+    annotations_to_transfer = [
+        'control_het_count', 'control_homvar_count', 'case_het_count', 'case_homvar_count',
+        'control_homvar_count_female', 'control_het_count_male', 'case_homvar_count_female',
+        'case_het_count_male'
+    ]
 
     ##################################################
     # Annotate control/case het count + homvar count #
@@ -62,7 +67,7 @@ def count_case_control_carriers(mt, checkpoint_name, pheno_col='is_case_final', 
 
     mt = mt.checkpoint(checkpoint_name, overwrite=True)
 
-    return mt
+    return mt, annotations_to_transfer
 
 
 def check_variants_annotated(mt, checkpoint_name, cadd_ht, mpc_ht, gnomad_ht, gnomad_mismatch_ht):

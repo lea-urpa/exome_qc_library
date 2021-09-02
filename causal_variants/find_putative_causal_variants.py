@@ -523,6 +523,26 @@ if __name__ == "__main__":
     start_count = non_mono_mt.count_rows()
     logging.info(f"Number of remaining variants after removing monomorphic variants: {start_count}")
 
+    #########################################################################
+    ## Filter failing samples and entries to calculate case/control counts ##
+    #########################################################################
+    # So not to count 'bad' genotypes/samples in calculating case/control counts for variants.
+    filter_checkpoint = args.output_name + "_bad_entries_variants_filtered.mt"
+
+    if (not utils.check_exists(filter_checkpoint)) or args.force:
+        mt_filtered = sq.filter_failing(
+            non_mono_mt, filter_checkpoint, prefix='final', entries=True, variants=False, samples=True,
+            unfilter_entries=False,
+            pheno_qc=True, min_dp=10, min_gq=20, max_het_ref_reads=0.8,
+            min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9,
+            max_hom_alt_ref_reads=0.1, force=args.force
+        )
+
+        mt_filtered = mt_filtered.checkpoint(filter_checkpoint, overwrite=True)
+    else:
+        logging.info(f"Detected file with bad variants and samples filtered out: {filter_checkpoint}. Loading this file.")
+        mt_filtered = hl.read_matrix_table(filter_checkpoint)
+
     ##################################################
     # Annotate matrix table with case/control counts #
     ##################################################
@@ -530,10 +550,17 @@ if __name__ == "__main__":
     case_annot_checkpoint = args.output_name + "_carriers_annotated.mt"
 
     if (not utils.check_exists(case_annot_checkpoint)) or args.force:
-        mt_case_counted, annotations_to_transfer = cv.count_case_control_carriers(
-            var_mt, case_annot_checkpoint, pheno_col=args.pheno_col, female_col=args.female_col)
+        # Do counts with dataset with bad variants and genotypes filtered out
+        mt_filt_annot, annotations_to_transfer = cv.count_case_control_carriers(
+            mt_filtered, case_annot_checkpoint, pheno_col=args.pheno_col, female_col=args.female_col)
 
+        # Transfer the counts to the unfiltered matrix table
+        for annotation in annotations_to_transfer:
+            mt_case_count = non_mono_mt.annotate_rows(
+                **{annotation: mt_filt_annot.rows()[non_mono_mt.row_key][annotation]}
+            )
 
+        mt_case_count = mt_case_count.checkpoint(case_annot_checkpoint, overwrite=True)
 
     else:
         logging.info(f"Detected file with carriers annotated exists: {case_annot_checkpoint}. Loading this file.")
