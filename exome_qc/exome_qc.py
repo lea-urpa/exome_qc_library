@@ -220,30 +220,29 @@ if __name__ == "__main__":
 
         ## Calculate relatedness with King ##
         # THIS triggers shuffles, think about removing secondaries... seemed to run ok though
-        if not utils.check_exists(relatedness_calculated):
+        if args.reference_genome is "GRCh38":
+            autosomes = ["chr" + str(i) for i in range(1, 23)]
+        else:
+            autosomes = [str(i) for i in range(1, 23)]
 
-            if args.reference_genome is "GRCh38":
-                autosomes = ["chr" + str(i) for i in range(1, 23)]
-            else:
-                autosomes = [str(i) for i in range(1, 23)]
+        mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
 
-            mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
+        related_to_remove = sq.king_relatedness(
+            mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
+            force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
+            region=args.region, reference_genome=args.reference_genome)
 
-            related_to_remove = sq.king_relatedness(
-                mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
-                force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
-                region=args.region, reference_genome=args.reference_genome)
+        mt = mt.annotate_cols(
+            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
 
-            mt = mt.annotate_cols(
-                related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
+        mt_ldpruned = mt_ldpruned.annotate_cols(
+            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned.s), True, False))
 
-            mt_ldpruned = mt_ldpruned.annotate_cols(
-                related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned.s), True, False))
+        logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
+        mt = mt.checkpoint(relatedness_calculated, overwrite=True)
+        mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
+        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
-            logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
-            mt = mt.checkpoint(relatedness_calculated, overwrite=True)
-            mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
-            utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
     else:
         logging.info("Detected mt with relatives annotated exists, skipping relatedness calculation.")
 
