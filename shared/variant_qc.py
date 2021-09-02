@@ -81,8 +81,8 @@ def maf_filter(mt, maf, filter_ac0_after_pruning=False):
     mt = mt.annotate_globals(maf_threshold=maf)
 
     if filter_ac0_after_pruning:
-        logging.info('Removing variants with alt allele count = 0 (monomorphic variants).')
-        mt = mt.filter_rows(mt.row.variant_qc.AC[0] == hl.int(0), keep=False)
+        logging.info('Removing variants no alt allele carriers remaining.')
+        mt = mt.filter_rows(mt.row.variant_qc.AC[1] == hl.int(0), keep=False)
         count = mt.count_rows()
         logging.info(f"MT count after removing monomorphic variants and MAF filtering: {count}")
     else:
