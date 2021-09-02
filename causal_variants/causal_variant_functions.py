@@ -234,12 +234,13 @@ def annotate_control_rarity(mt, checkpoint_name, gnomad_population, max_allowed_
     #####################################################
     # Annotate matrix table rows from 'rows' hail table #
     #####################################################
-    mt = mt.annotate_rows(dominant_rare_gnomad=rows[mt.locus, mt.alleles].dominant_rare_gnomad,
-                          recessive_rare_gnomad=rows[mt.locus, mt.alleles].recessive_rare_gnomad,
-                          hemizygous_rare_gnomad=rows[mt.locus, mt.alleles].hemizygous_rare_gnomad,
-                          dominant_rare_controls=rows[mt.locus, mt.alleles].dominant_rare_controls,
-                          recessive_rare_controls=rows[mt.locus, mt.alleles].recessive_rare_controls,
-                          hemizygous_rare_controls=rows[mt.locus, mt.alleles].hemizygous_rare_controls)
+    annotations_to_transfer = [
+        'dominant_rare_gnomad', 'recessive_rare_gnomad', 'hemizygous_rare_gnomad',
+        'dominant_rare_controls', 'recessive_rare_controls', 'hemizygous_rare_controls'
+    ]
+
+    for annotation in annotations_to_transfer:
+        mt = mt.annotate_rows(**{annotation: rows[mt.locus, mt.alleles][annotation]})
 
     mt = mt.checkpoint(checkpoint_name, overwrite=True)
 
