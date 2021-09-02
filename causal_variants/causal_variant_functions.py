@@ -173,7 +173,8 @@ def annotate_control_rarity(mt, checkpoint_name, gnomad_population, max_allowed_
     #####################################################
     rows = rows.annotate(recessive_rare_gnomad=hl.cond(
         (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[gnomad_idx]) &
-        (rows.gnomad_mismatch == False) & hl.is_defined(rows.gnomad_mismatch),
+        (rows.gnomad_mismatch == False) & hl.is_defined(rows.gnomad_mismatch) &
+        (rows.locus.contig != "chrX") & (rows.locus.contig != "chrY"),
         hl.cond(
             (rows.gnomad_popmax[gnomad_idx].homozygote_count <= max_allowed_homozygotes_recessive)
             & (rows.gnomad_popmax[gnomad_idx].AF <= gnomad_AF_cutoff_recessive),
@@ -214,7 +215,6 @@ def annotate_control_rarity(mt, checkpoint_name, gnomad_population, max_allowed_
             (rows.control_homvar_count == 0),
             True, False)
     )
-
 
     rows = rows.annotate(
         recessive_rare_controls=hl.cond(
