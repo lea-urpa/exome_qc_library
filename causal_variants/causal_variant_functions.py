@@ -9,7 +9,7 @@ import hail as hl
 import variant_annotation as va
 
 
-def count_case_control_carriers(mt, checkpoint_name, pheno_col='is_case_final', female_col='is_female_imputed'):
+def count_case_control_carriers(mt, pheno_col='is_case_final', female_col='is_female_imputed'):
     """
     Annotate het and hom var carriers for variants in matrix table.
 
@@ -64,8 +64,6 @@ def count_case_control_carriers(mt, checkpoint_name, pheno_col='is_case_final', 
                           hl.agg.filter((mt[pheno_col] == True) & hl.is_defined(mt[pheno_col]) &
                                         (mt[female_col] == False) & hl.is_defined(mt[female_col]),
                                         hl.agg.count_where(mt.GT.is_het())))
-
-    mt = mt.checkpoint(checkpoint_name, overwrite=True)
 
     return mt, annotations_to_transfer
 
@@ -124,7 +122,7 @@ def check_variants_annotated(mt, checkpoint_name, cadd_ht, mpc_ht, gnomad_ht, gn
     if gnomad_mismatch_not_annot:
         mt = va.annotate_variants_gnomad_mismatch(mt, gnomad_mismatch_ht)
 
-    if any(cadd_not_annot, mpc_not_annot, gnomad_not_annot, gnomad_mismatch_not_annot):
+    if any([cadd_not_annot, mpc_not_annot, gnomad_not_annot, gnomad_mismatch_not_annot]):
         mt = mt.checkpoint(checkpoint_name, overwrite=True)
 
     return mt

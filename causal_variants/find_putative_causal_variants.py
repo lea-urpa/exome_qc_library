@@ -392,7 +392,7 @@ if __name__ == "__main__":
 
     monomorphic_checkpoint = args.output_name + "_non_monomorphic_variants.mt"
     if (not utils.check_exists(monomorphic_checkpoint)) or args.force:
-        non_mono_mt = vq.remove_monomorphic(full_mt, monomorphic_checkpoint)
+        non_mono_mt = vq.remove_monomorphic(full_mt)
         non_mono_mt = non_mono_mt.checkpoint(monomorphic_checkpoint, overwrite=True)
 
     else:
@@ -478,6 +478,8 @@ if __name__ == "__main__":
             max_allowed_homozygotes_recessive=args.max_allowed_homozygotes_recessive,
             gnomad_AF_cutoff_recessive=args.gnomad_AF_cutoff_recessive
         )
+
+        mt_pop_annot = mt_pop_annot.checkpoint(rare_checkpoint, overwrite=True)
 
     else:
         logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {rare_checkpoint}. "
