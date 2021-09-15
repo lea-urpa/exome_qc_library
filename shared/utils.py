@@ -13,7 +13,7 @@ import logging
 import hail as hl
 
 
-def load_vcfs(vcf_files, data_dir, combined_mt_fn, force=False, test=False, chr_prefix=False,
+def load_vcfs(vcf_files, data_dir, force=False, test=False, chr_prefix=False,
               reference_genome="GRCh37", force_bgz=False, call_fields="PGT",):
     # Get combined mt output name
     if test:
@@ -21,69 +21,61 @@ def load_vcfs(vcf_files, data_dir, combined_mt_fn, force=False, test=False, chr_
     else:
         test_str = ""
 
-    if (not check_exists(combined_mt_fn)) or force:
-        logging.info('Importing genotype vcfs.')
-        matrix_tables = []
+    logging.info('Importing genotype vcfs.')
+    matrix_tables = []
 
-        # Deal with mismatching chromosome codes with reference genome
-        if (chr_prefix is True) and (reference_genome == "GRCh37"):
-            recode = {f"chr{i}": f"{i}" for i in (list(range(1, 23)) + ['X', 'Y'])}
+    # Deal with mismatching chromosome codes with reference genome
+    if (chr_prefix is True) and (reference_genome == "GRCh37"):
+        recode = {f"chr{i}": f"{i}" for i in (list(range(1, 23)) + ['X', 'Y'])}
 
-        elif (chr_prefix is False) and (reference_genome == "GRCh38"):
-            recode = {f"{i}": f"chr{i}" for i in (list(range(1, 23)) + ['X', 'Y'])}
-        else:
-            recode = None
-
-        first = True
-        for vcf in vcf_files:
-            # Write MT first, then read it from disk #
-            vcf_name = os.path.join(data_dir, vcf)
-
-            vcf_stem = os.path.basename(vcf).replace(".vcf", "").replace(".gz", "").replace(".bgz", "").replace("*", "")
-            mt_name = os.path.join(data_dir, vcf_stem + f"{test_str}.mt/")
-
-            # If MT does not already exist, load in VCF and then write it to disk
-            if (not check_exists(mt_name)) or force:
-                logging.info(f'Detected mt of input vcf {vcf} does not exist, importing vcf.')
-                if recode is None:
-                    mt_tmp = hl.import_vcf(
-                        vcf_name, force_bgz=force_bgz, call_fields=call_fields,
-                        reference_genome=reference_genome)
-                else:
-                    mt_tmp = hl.import_vcf(
-                        vcf_name, force_bgz=force_bgz, call_fields=call_fields,
-                        reference_genome=reference_genome, contig_recoding=recode)
-
-                if test:
-                    logging.info('Test flag given, filtering to chrom 22.')
-                    if reference_genome == "GRCh38":
-                        chrom_code = "chr22"
-                    else:
-                        chrom_code = "22"
-
-                    mt_tmp = mt_tmp.filter_rows(mt_tmp.locus.contig == chrom_code)
-
-                mt_tmp = mt_tmp.checkpoint(mt_name, overwrite=True)
-            else:
-                logging.info(f"Detected mt of input vcf {vcf} already exists, reading mt directly.")
-                mt_tmp = hl.read_matrix_table(mt_name)
-
-            mt_tmp = mt_tmp.annotate_cols(input_file=vcf)
-            logging.info('%s imported count: %s' % (vcf, mt_tmp.count()))
-
-            # Union to main matrix table
-            if first:
-                mt = mt_tmp
-                first = False
-            else:
-                mt = mt.union_cols(mt_tmp)
-
-        # Write combined matrix table
-        mt = mt.checkpoint(combined_mt_fn, overwrite=True)
+    elif (chr_prefix is False) and (reference_genome == "GRCh38"):
+        recode = {f"{i}": f"chr{i}" for i in (list(range(1, 23)) + ['X', 'Y'])}
     else:
-        mt = hl.read_matrix_table(combined_mt_fn)
+        recode = None
 
-    logging.info(f"Final matrix table count: {mt.count()}")
+    first = True
+    for vcf in vcf_files:
+        # Write MT first, then read it from disk #
+        vcf_name = os.path.join(data_dir, vcf)
+
+        vcf_stem = os.path.basename(vcf).replace(".vcf", "").replace(".gz", "").replace(".bgz", "").replace("*", "")
+        mt_name = os.path.join(data_dir, vcf_stem + f"{test_str}.mt/")
+
+        # If MT does not already exist, load in VCF and then write it to disk
+        if (not check_exists(mt_name)) or force:
+            logging.info(f'Detected mt of input vcf {vcf} does not exist, importing vcf.')
+            if recode is None:
+                mt_tmp = hl.import_vcf(
+                    vcf_name, force_bgz=force_bgz, call_fields=call_fields,
+                    reference_genome=reference_genome)
+            else:
+                mt_tmp = hl.import_vcf(
+                    vcf_name, force_bgz=force_bgz, call_fields=call_fields,
+                    reference_genome=reference_genome, contig_recoding=recode)
+
+            if test:
+                logging.info('Test flag given, filtering to chrom 22.')
+                if reference_genome == "GRCh38":
+                    chrom_code = "chr22"
+                else:
+                    chrom_code = "22"
+
+                mt_tmp = mt_tmp.filter_rows(mt_tmp.locus.contig == chrom_code)
+
+            mt_tmp = mt_tmp.checkpoint(mt_name, overwrite=True)
+        else:
+            logging.info(f"Detected mt of input vcf {vcf} already exists, reading mt directly.")
+            mt_tmp = hl.read_matrix_table(mt_name)
+
+        mt_tmp = mt_tmp.annotate_cols(input_file=vcf)
+        logging.info('%s imported count: %s' % (vcf, mt_tmp.count()))
+
+        # Union to main matrix table
+        if first:
+            mt = mt_tmp
+            first = False
+        else:
+            mt = mt.union_cols(mt_tmp)
 
     return mt
 
