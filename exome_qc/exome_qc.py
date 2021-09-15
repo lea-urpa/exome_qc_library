@@ -70,7 +70,6 @@ if __name__ == "__main__":
 
         utils.check_vep(mt)
 
-
         if args.test:
             utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
             mt = utils.create_test_dataset(mt, args.reference_genome, args.mt, args.out_dir)
@@ -140,7 +139,7 @@ if __name__ == "__main__":
             logging.info(f"Sample count after filtering by strings: {string_filtered}")
 
         logging.info(f"Writing checkpoint {stepcount}-1: sample removal")
-        mt = mt.checkpoint( samples_removed, overwrite=True)
+        mt = mt.checkpoint(samples_removed, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
         samples_cleaned = samples_removed
