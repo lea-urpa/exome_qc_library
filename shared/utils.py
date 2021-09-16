@@ -13,8 +13,8 @@ import logging
 import hail as hl
 
 
-def load_vcfs(vcf_files, data_dir, force=False, test=False, chr_prefix=False,
-              reference_genome="GRCh37", force_bgz=False, call_fields="PGT",):
+def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=False,
+              reference_genome="GRCh38", force_bgz=False, call_fields="PGT",):
     # Get combined mt output name
     if test:
         test_str = "_test"
@@ -38,8 +38,8 @@ def load_vcfs(vcf_files, data_dir, force=False, test=False, chr_prefix=False,
         # Write MT first, then read it from disk #
         vcf_name = os.path.join(data_dir, vcf)
 
-        vcf_stem = os.path.basename(vcf).replace(".vcf", "").replace(".gz", "").replace(".bgz", "").replace("*", "")
-        mt_name = os.path.join(data_dir, vcf_stem + f"{test_str}.mt/")
+        vcf_stem = vcf.replace("/","").replace(".vcf", "").replace(".gz", "").replace(".bgz", "").replace("*", "")
+        mt_name = os.path.join(out_dir, vcf_stem + f"{test_str}.mt/")
 
         # If MT does not already exist, load in VCF and then write it to disk
         if (not check_exists(mt_name)) or force:
