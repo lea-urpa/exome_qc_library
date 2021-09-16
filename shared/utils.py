@@ -14,7 +14,7 @@ import hail as hl
 
 
 def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=False,
-              reference_genome="GRCh38", force_bgz=False, call_fields="PGT",):
+              reference_genome="GRCh38", force_bgz=False, call_fields="PGT", save_row_annots=False):
     # Get combined mt output name
     if test:
         test_str = "_test"
@@ -33,7 +33,7 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
     else:
         recode = None
 
-    first = True
+    counter = 1
     for vcf in vcf_files:
         # Write MT first, then read it from disk #
         vcf_name = os.path.join(data_dir, vcf)
@@ -43,7 +43,7 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
 
         # If MT does not already exist, load in VCF and then write it to disk
         if (not check_exists(mt_name)) or force:
-            logging.info(f'Detected mt of input vcf {vcf} does not exist, importing vcf.')
+            logging.info(f'Detected {mt_name} does not exist, importing vcf.')
             if recode is None:
                 mt_tmp = hl.import_vcf(
                     vcf_name, force_bgz=force_bgz, call_fields=call_fields,
@@ -71,11 +71,24 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
         logging.info('%s imported count: %s' % (vcf, mt_tmp.count()))
 
         # Union to main matrix table
-        if first:
+        if counter == 1:
+            if save_row_annots:
+                row_info = mt_tmp.rows()
+
             mt = mt_tmp
-            first = False
+            counter += 1
         else:
+            if save_row_annots:
+                row_tmp = mt_tmp.rows()
+                row_info = row_info.join(row_tmp, how="left")
+
+            counter += 1
+
             mt = mt.union_cols(mt_tmp)
+
+        # Annotate matrix table with row info from all the separate VCFs
+        if save_row_annots and (len(vcf_files) > 1):
+            mt = mt.annotate_rows(**row_info.index(mt.row_key))
 
     return mt
 
