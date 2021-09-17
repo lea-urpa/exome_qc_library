@@ -37,7 +37,11 @@ if __name__ == "__main__":
     parser.add_argument("--force", action="store_true", help="Force re-run through checkpoints?")
     args = parser.parse_args()
 
-    # TODO check that --info_score_names is either length 1 or length of number of VCFs provided
+    vcf_files = args.vcf.strip().split(",")
+    info_score_names = args.info_score_names.strip().split(",")
+
+    if not ((len(info_score_names) == len(vcf_files)) | (hl.len(info_score_names) == 1)) :
+        logging.error("--info_score_names must be the same length as the number of VCFs, or length 1")
 
     ############################
     # Set up logger, init hail #
@@ -77,8 +81,6 @@ if __name__ == "__main__":
     #####################
     # Load data in Hail #
     #####################
-    vcf_files = args.vcf.strip().split(",")
-
     if (len(vcf_files) > 1) and (args.merged_file_name is None):
         logging.error("Error! Must give matrix table file name with --merged_file_name if importing more than one VCF.")
         exit(1)
@@ -135,7 +137,6 @@ if __name__ == "__main__":
     # Find variants not passing info score thresholds #
     ###################################################
     logging.info(f"Finding variants with INFO score > {args.info_score_cutoff} in all input chip VCFs.")
-    info_score_names = args.info_score_names.strip().split(",")
     # Given list of info scores, find which structure name they correspond to
     info_score_structs = []
     for name in info_score_names:
