@@ -22,8 +22,6 @@ if __name__ == "__main__":
                         help="File name of merged dataset if merging more than 1 imputation output.")
     parser.add_argument("--samples_annotation_files", default=None,
                         help="Text file(s) containing sample information. Comma sep if more than one.")
-    parser.add_argument("--sample_col")
-    parser.add_argument("--batch_col")
     parser.add_argument("--info_score_names", type=str, required=True)
     parser.add_argument("--info_score_cutoff", default="0.7", type=str,
                         help="Info score (IMPUTE2 info score) threshold, variants below will be removed. "
