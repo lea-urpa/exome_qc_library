@@ -24,7 +24,7 @@ if __name__ == "__main__":
                         help="Text file(s) containing sample information. Comma sep if more than one.")
     parser.add_argument("--sample_col")
     parser.add_argument("--batch_col")
-    parser.add_argument("--info_score_names", type=str)
+    parser.add_argument("--info_score_names", type=str, required=True)
     parser.add_argument("--info_score_cutoff", default="0.7", type=str,
                         help="Info score (IMPUTE2 info score) threshold, variants below will be removed. "
                              "Can give multiple thresholds, comma separated.")
@@ -36,6 +36,8 @@ if __name__ == "__main__":
     parser.add_argument("--test", action="store_true", help="Run test with chromosome 22?")
     parser.add_argument("--force", action="store_true", help="Force re-run through checkpoints?")
     args = parser.parse_args()
+
+    # TODO check that --info_score_names is either length 1 or length of number of VCFs provided
 
     ############################
     # Set up logger, init hail #
@@ -132,6 +134,7 @@ if __name__ == "__main__":
     ###################################################
     # Find variants not passing info score thresholds #
     ###################################################
+    logging.info(f"Finding variants with INFO score > {args.info_score_cutoff} in all input chip VCFs.")
     info_score_names = args.info_score_names.strip().split(",")
     # Given list of info scores, find which structure name they correspond to
     info_score_structs = []
@@ -184,3 +187,43 @@ if __name__ == "__main__":
     ############################
     # Batch-wise AF comparison #
     ############################
+    logging.info("Running pairwise AF comparison (Fisher or Chisq) for each variant, pairwise between input chips.")
+    # Annotate ref and alt allele count for all input chip sets
+    input_files_short = []
+    for input_file in vcf_files:
+        annot_name = input_file.replace("/", "").replace("*", "").replace(".vcf", "").replace(".gz", "")
+        input_files_short.append(annot_name)
+        mt = mt.annotate_rows(
+            **{f"{annot_name}_AC_ref": hl.agg.filter(
+                mt.input_file == input_file,
+                hl.int32((hl.agg.count_where(mt.GT.is_hom_ref()) * 2) + hl.agg.count_where(mt.GT.is_het())))}
+        )
+        mt = mt.annotate_rows(
+            **{f"{annot_name}_AC_alt": hl.agg.filter(
+                mt.input_file == input_file,
+                hl.int32((hl.agg.count_where(mt.GT.is_hom_var()) * 2) + hl.agg.count_where(mt.GT.is_het())))}
+        )
+
+    # Run pairwise AF test for each variant
+    for pair in utils.get_upper_triangle(input_files_short):
+        chip1 = pair[0]
+        chip2 = pair[1]
+        mt = mt.annotate_rows(
+            **{f"af_test_{chip1}_{chip2}":
+                   hl.contingency_table_test(mt[f"{chip1}_AC_ref"], mt[f"{chip2}_AC_ref"],
+                                             mt[f"{chip1}_AC_alt"], mt[f"{chip2}_AC_alt"],
+                                             min_cell_count=500)
+               }
+        )
+
+        output_file(f"{datestr}_AF_comparison_pvalue_hist_{chip1}_{chip2}")
+        info_hist = row_info.aggregate(hl.expr.aggregators.hist(mt[f"af_test_{chip1}_{chip2}"], 0, 1, 50))
+        p = hl.plot.histogram(info_hist, legend='p value',
+                              title=f'Distribution of p values for AF difference test \nbetween {chip1} and {chip2}')
+        save(p)
+
+    final_checkpoint = out_basename + f"_info_af_comparison_final{test_str}.mt/"
+
+    mt = mt.checkpoint(final_checkpoint)
+    utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+    logging.info("Pipeline completed successfully!")

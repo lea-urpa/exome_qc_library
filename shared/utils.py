@@ -273,3 +273,21 @@ def create_test_dataset(mt, reference_genome, mt_name, out_dir):
     mt = mt.checkpoint(os.path.join(out_dir, test_mt), overwrite=True)
 
     return mt
+
+
+def get_upper_triangle(list):
+    """
+    Given a list of items, returns a list where each element is the upper triangle of a pairwise comparison between
+    the items in the list.
+    :param file_list:
+    :return: Returns list of pairs, lenth n choose 2 (where n is length of file list)
+    """
+    # Get upper triangle of pairwise comparisons
+    uppertri = []
+    pairs = [[x, y] for i, x in enumerate(list) for j, y in enumerate(list) if i != j]  # upper and lower
+    for pair in pairs:  # remove duplicates/lower
+        pair.sort()
+        if pair not in uppertri:
+            uppertri.append(pair)
+
+    return uppertri
