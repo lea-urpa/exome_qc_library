@@ -23,13 +23,13 @@ if __name__ == "__main__":
     parser.add_argument("--samples_annotation_files", default=None,
                         help="Text file(s) containing sample information. Comma sep if more than one.")
     parser.add_argument("--info_score_names", type=str, required=True)
-    parser.add_argument("--info_score_cutoff", default="0.7", type=str,
+    parser.add_argument("--info_score_cutoff", default=0.7, type=float,
                         help="Info score (IMPUTE2 info score) threshold, variants below will be removed. "
                              "Can give multiple thresholds, comma separated.")
     parser.add_argument("--reference_genome", default="GRCh38", choices=["GRCh37",  "GRCh38"])
     parser.add_argument("--chr_prefix", action="store_true",
                         help="chromosome codes have 'chr' prefix? Only needed if GRCh37 and chr prefix.")
-    parser.add_argument("--force_bgz", default=True, help="Force bgz upload with Hail?")
+    parser.add_argument("--force_bgz", action="store_true", help="Force bgz upload with Hail?")
     parser.add_argument("--call_fields", default="PGT", help="Genotype call field name in VCF")
     parser.add_argument("--test", action="store_true", help="Run test with chromosome 22?")
     parser.add_argument("--force", action="store_true", help="Force re-run through checkpoints?")
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     vcf_files = args.vcf.strip().split(",")
     info_score_names = args.info_score_names.strip().split(",")
 
-    if not ((len(info_score_names) == len(vcf_files)) | (hl.len(info_score_names) == 1)) :
+    if not ((len(info_score_names) == len(vcf_files)) | (len(info_score_names) == 1)) :
         logging.error("--info_score_names must be the same length as the number of VCFs, or length 1")
 
     ############################
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     if (not utils.check_exists(combined_mt_fn)) or args.force:
         mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
                              chr_prefix=args.chr_prefix, reference_genome=args.reference_genome, force_bgz=args.force_bgz,
-                             call_fields=args.call_fields)
+                             call_fields=args.call_fields, save_row_annots=True)
 
         logging.info(f"Writing checkpoint after importing and merging VCFs")
         mt = mt.checkpoint(combined_mt_fn, overwrite=True)
