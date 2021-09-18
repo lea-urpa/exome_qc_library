@@ -216,7 +216,7 @@ if __name__ == "__main__":
         )
 
         output_file(f"{datestr}_AF_comparison_pvalue_hist_{chip1}_{chip2}")
-        info_hist = row_info.aggregate(hl.expr.aggregators.hist(mt[f"af_test_{chip1}_{chip2}"].p_value, 0, 1, 50))
+        info_hist = mt.aggregate_rows(hl.expr.aggregators.hist(mt[f"af_test_{chip1}_{chip2}"].p_value, 0, 1, 50))
         p = hl.plot.histogram(info_hist, legend='p value',
                               title=f'Distribution of p values for AF difference test \nbetween {chip1} and {chip2}')
         save(p)
