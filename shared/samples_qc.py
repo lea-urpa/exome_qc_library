@@ -595,11 +595,11 @@ def nx_algorithm(g, cases):
     degrees = dict(g.degree())
     high_degree_count = 0
     for degree in degrees.values():
-        if degree > 100:
+        if degree > 10:
             high_degree_count += 1
 
     if high_degree_count > 0:
-        print(f"Warning! {high_degree_count} samples are connected to > 100 other samples. This is likely from poorly "
+        print(f"Warning! {high_degree_count} samples are connected to > 10 other samples. This is likely from poorly "
               f"calculated kinships, increase number of variants used to calculate kinships and try again.")
 
     ##########################################
