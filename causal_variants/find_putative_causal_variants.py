@@ -6,415 +6,11 @@ import os
 import logging
 import argparse
 import sys
+import causal_variant_functions as cv
+import samples_qc as sq
+import variant_qc as vq
 import subprocess
 import hail as hl
-
-
-def remove_monomorphic(mt, args):
-    """
-    Takes matrix table and counts the number of non-reference genotypes per variant, removes variants with non-ref GT
-    count == 0.
-    :param mt: Matrix table to filter
-    :param args: arguments for checkpoint output location and name
-    :return: returns filtered matrix table
-    """
-    # TODO change output to depend on initial input name, but in output directory
-    filename = args.output_stem + "_non_monomorphic_tmp.mt"
-
-    if utils.check_exists(filename):
-        logging.info(f"Detected file with monomorphic variants filtered out: {filename}. Loading this file.")
-        mt = hl.read_matrix_table(filename)
-        args.start_count = mt.count_rows()
-        logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count}")
-        args.force = False
-    else:
-        start0_count = mt.count_rows()
-        logging.info(f"Starting number of variants: {start0_count}")
-        mt = mt.annotate_rows(non_ref_gt_count=hl.agg.count_where(mt.GT.is_non_ref()))
-        mt = mt.filter_rows(mt.non_ref_gt_count > 0, keep=True)
-
-        mt = mt.checkpoint(filename, overwrite=True)
-
-        args.start_count = mt.count_rows()
-        logging.info(f"Number of remaining variants after removing monomorphic variants: {args.start_count} "
-                     f"({round(args.start_count / start0_count * 100, 2)}% of all variants)")
-        args.force = True
-
-
-    # TODO add export of column info, if it doesn't already exists
-
-    return mt
-
-
-def count_case_control_carriers(mt, args):
-    """
-    Annotate het and hom var carriers for variants in matrix table.
-
-    :param mt: matrix table to annotate/filter
-    :param args: arguments for pheno column, etc
-    :return: returns annotated matrix table
-    """
-    # TODO change output to depend on initial input name, but in output directory
-    temp_filename = args.output_stem + "_carriers_annotated_tmp.mt"
-
-    if utils.check_exists(temp_filename) and (args.force is False):
-        logging.info(f"Detected file with carriers annotated exists: {temp_filename}. Loading this file.")
-        mt = hl.read_matrix_table(temp_filename)
-
-        case_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == True))
-        control_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == False))
-        missing = mt.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt[args.pheno_col])))
-
-        logging.info(f"Number of controls in dataset: {control_count}")
-        logging.info(f"Number of cases in dataset: {case_count}")
-        logging.info(f"Samples missing case/control information: {missing}")
-        if missing > 0:
-            logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
-    else:
-        args.force = True
-        h.add_preemptibles(args.cluster_name, args.num_preemptibles)
-        ############################################################
-        # Get count of samples that are cases and controls, report #
-        ############################################################
-        logging.info("Annotating het and hom var carrier counts in controls to variants.")
-
-        case_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == True))
-        control_count = mt.aggregate_cols(hl.agg.count_where(mt[args.pheno_col] == False))
-        missing = mt.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt[args.pheno_col])))
-
-        logging.info(f"Number of controls in dataset: {control_count}")
-        logging.info(f"Number of cases in dataset: {case_count}")
-        logging.info(f"Samples missing case/control information: {missing}")
-        if missing > 0:
-            logging.info(f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
-
-        ##################################################
-        # Annotate control/case het count + homvar count #
-        ##################################################
-        mt = mt.annotate_rows(control_het_count=
-                              hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]),
-                                            hl.agg.count_where(mt.GT.is_het())))
-        mt = mt.annotate_rows(control_homvar_count=
-                              hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]),
-                                            hl.agg.count_where(mt.GT.is_hom_var())))
-        mt = mt.annotate_rows(case_het_count=
-                              hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]),
-                                            hl.agg.count_where(mt.GT.is_het())))
-        mt = mt.annotate_rows(case_homvar_count=
-                              hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]),
-                                            hl.agg.count_where(mt.GT.is_hom_var())))
-
-        ################################################################################
-        # Count control homvar females and het males for hemizygous mutations on X chr #
-        ################################################################################
-        mt = mt.annotate_rows(control_homvar_count_female=
-                              hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]) &
-                                            (mt[args.female_col] == True) & hl.is_defined(mt[args.female_col]),
-                                            hl.agg.count_where(mt.GT.is_hom_var())))
-
-        mt = mt.annotate_rows(control_het_count_male=
-                              hl.agg.filter((mt[args.pheno_col] == False) & hl.is_defined(mt[args.pheno_col]) &
-                                            (mt[args.female_col] == False) & hl.is_defined(mt[args.female_col]),
-                                            hl.agg.count_where(mt.GT.is_het())))
-
-        mt = mt.annotate_rows(case_homvar_count_female=
-                              hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]) &
-                                            (mt[args.female_col] == True) & hl.is_defined(mt[args.female_col]),
-                                            hl.agg.count_where(mt.GT.is_hom_var())))
-
-        mt = mt.annotate_rows(case_het_count_male=
-                              hl.agg.filter((mt[args.pheno_col] == True) & hl.is_defined(mt[args.pheno_col]) &
-                                            (mt[args.female_col] == False) & hl.is_defined(mt[args.female_col]),
-                                            hl.agg.count_where(mt.GT.is_het())))
-
-        mt = mt.checkpoint(temp_filename, overwrite=True)
-
-    return mt
-
-
-def annotate_variants(mt, args):
-    """
-    Annotates matrix table variants with CADD, MPC and gnomad info.
-    :param mt: matrix table to annotate
-    :param args: arguments for cadd, mpc, and gnomad hail table locations
-    :return: returns annotated matrix table
-    """
-    # TODO change output to depend on initial input name, but in output directory
-    temp_filename = args.output_stem + "_cadd_mpc_gnomad_annotated_tmp.mt"
-
-    if utils.check_exists(temp_filename) and (args.force == False):
-        logging.info(f"Detected that matrix table annotated with CADD, MPC and Gnomad exist: {temp_filename}. "
-                     f"Loading this.")
-        mt = hl.read_matrix_table(temp_filename)
-    else:
-        args.force = True
-        logging.info("Annotating matrix table with CADD, MPC and Gnomad.")
-
-        h.add_preemptibles(args.cluster_name, args.num_preemptibles)
-
-        #####################################
-        # Annotate variants with CADD + MPC #
-        #####################################
-        mt = va.annotate_variants_cadd(mt, args.cadd_ht)
-        mt = va.annotate_variants_mpc(mt, args.mpc_ht)
-
-        #######################################################
-        # Annotate variants with Gnomad population + mismatch #
-        #######################################################
-        mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
-        args.gnomad_idx = mt.gnomad_popmax_index_dict.take(1)[0][args.gnomad_population]
-        mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
-
-        mt = mt.checkpoint(temp_filename, overwrite=True)
-
-        h.remove_preemptibles(args.cluster_name)
-
-    return mt
-
-
-def annotate_population_thresholds(mt, args):
-    """
-    Annotate with True/False categories based on population parameters for recessive and dominant inheritance models
-    in Gnomad population counts and allele frequencies and in control counts in dataset.
-
-    :param mt: matrix table to annotate
-    :param args: arguments giving max allowed carrier counts, max allele frequencies, and gnomad population index
-    :return: returns annotated matrix table
-    """
-    # TODO change output to depend on initial input name, but in output directory
-    temp_filename = args.output_stem + "_gnomad_control_thresholds_annotated_tmp.mt"
-
-    if utils.check_exists(temp_filename) and (args.force == False):
-        logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {temp_filename}. "
-                     f"Loading this file.")
-        mt = hl.read_matrix_table(temp_filename)
-    else:
-        args.force = True
-        logging.info("Annotating with boolean columns for whether variant fulfills population threshold criteria.")
-
-        ############################
-        # Pull rows and checkpoint #
-        ############################
-        rows = mt.rows()
-        rows = rows.checkpoint(args.output_stem + "_rows_tmp.ht", overwrite=True)
-
-        ####################################################
-        # Annotate whether variant dominant rare in gnomad #
-        ####################################################
-        rows = rows.annotate(dominant_rare_gnomad=hl.cond(
-            # If gnomad data is good,
-            (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
-            (rows.gnomad_mismatch == False),
-            # Ask whether the gnomad AC is small and there are no homozygotes
-            hl.cond(
-                (rows.gnomad_popmax[args.gnomad_idx].AC <= args.max_allowed_carrier_dominant) &
-                (rows.gnomad_popmax[args.gnomad_idx].homozygote_count == 0),
-                True, False),
-            # else return None
-            hl.null(hl.tbool)))
-
-        #####################################################
-        # Annotate whether variant recessive rare in gnomad #
-        #####################################################
-        rows = rows.annotate(recessive_rare_gnomad=hl.cond(
-            (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
-            (rows.gnomad_mismatch == False),
-            hl.cond(
-                (rows.gnomad_popmax[args.gnomad_idx].homozygote_count <= args.max_allowed_homozygotes_recessive)
-                & (rows.gnomad_popmax[args.gnomad_idx].AF <= args.gnomad_AF_cutoff_recessive),
-                True, False),
-            hl.null(hl.tbool)))
-
-        ###################################################################################################################
-        # Find which population is the max for each variant, find index of males and females for that population in freqs #
-        ###################################################################################################################
-        rows = rows.annotate(popmax_population=rows.gnomad_popmax[args.gnomad_idx].pop)
-        rows = rows.annotate(popmax_female_index=
-                              rows.gnomad_freq_index_dict[args.gnomad_population + "_" + rows.popmax_population + "_female"])
-        rows = rows.annotate(popmax_male_index=
-                              rows.gnomad_freq_index_dict[args.gnomad_population + "_" + rows.popmax_population + "_male"])
-
-        ######################################################
-        # Annotate whether variant hemizygous rare in gnomad #
-        ######################################################
-        rows = rows.annotate(hemizygous_rare_gnomad=hl.cond(
-            (hl.len(rows.gnomad_filters) == 0) & hl.is_defined(rows.gnomad_popmax[args.gnomad_idx]) &
-            (rows.gnomad_mismatch == False) & (rows.locus.contig == 'chrX'),
-            hl.cond(
-                (rows.gnomad_freq[rows.popmax_male_index].AC <= args.max_allowed_carrier_dominant) &
-                (rows.gnomad_freq[rows.popmax_female_index].homozygote_count <= args.max_allowed_homozygotes_recessive) &
-                (rows.gnomad_popmax[args.gnomad_idx].AF <= args.gnomad_AF_cutoff_recessive),
-                True, False),
-            hl.null(hl.tbool)
-        ))
-
-        ######################################################################################
-        # Annotate whether variant dominant/recessive/hemizygous rare in controls in dataset #
-        ######################################################################################
-        rows = rows.annotate(dominant_rare_controls=hl.cond(
-            (rows.control_het_count <= args.max_allowed_carrier_dominant) &
-            (rows.control_homvar_count == 0),
-            True, False))
-
-        rows = rows.annotate(recessive_rare_controls=hl.cond(
-            (rows.control_homvar_count <= args.max_allowed_homozygotes_recessive),
-            True, False))
-
-        rows = rows.annotate(hemizygous_rare_controls=hl.cond(
-            (rows.locus.contig == 'chrX') &
-            (rows.control_homvar_count_female <= args.max_allowed_homozygotes_recessive) &
-            (rows.control_het_count_male <= args.max_allowed_carrier_dominant),
-            True, False))
-
-        #####################################################
-        # Annotate matrix table rows from 'rows' hail table #
-        #####################################################
-        mt = mt.annotate_rows(dominant_rare_gnomad=rows[mt.locus, mt.alleles].dominant_rare_gnomad,
-                              recessive_rare_gnomad=rows[mt.locus, mt.alleles].recessive_rare_gnomad,
-                              hemizygous_rare_gnomad=rows[mt.locus, mt.alleles].hemizygous_rare_gnomad,
-                              dominant_rare_controls=rows[mt.locus, mt.alleles].dominant_rare_controls,
-                              recessive_rare_controls=rows[mt.locus, mt.alleles].recessive_rare_controls,
-                              hemizygous_rare_controls=rows[mt.locus, mt.alleles].hemizygous_rare_controls)
-
-        mt = mt.checkpoint(temp_filename, overwrite=True)
-
-    dominant_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.dominant_rare_gnomad))
-    recessive_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.recessive_rare_gnomad))
-    hemizygous_rare_gnomad = mt.aggregate_rows(hl.agg.counter(mt.hemizygous_rare_gnomad))
-    dominant_rare_controls = mt.aggregate_rows(hl.agg.counter(mt.dominant_rare_controls))
-    recessive_rare_controls = mt.aggregate_rows(hl.agg.counter(mt.recessive_rare_controls))
-    hemizygous_rare_controls = mt.aggregate_rows(hl.agg.counter(mt.hemizygous_rare_controls))
-
-    logging.info(f"Number of variants that are dominant rare in gnomad: {dominant_rare_gnomad}")
-    logging.info(f"Number of variants that are recessive rare in gnomad: {recessive_rare_gnomad}")
-    logging.info(f"Number of variants that are hemizygous rare in gnomad: {hemizygous_rare_gnomad}")
-
-    logging.info(f"Number of variants that are dominant rare in controls: {dominant_rare_controls}")
-    logging.info(f"Number of variants that are recessive rare in controls: {recessive_rare_controls}")
-    logging.info(f"Number of variants that are hemizygous rare in controls: {hemizygous_rare_controls}")
-
-    return mt
-
-
-def annotate_genes(mt, args):
-    """
-    Annotates gene set information, if disease geneset given.
-
-    :param mt: Matrix table to annotate gene set information to
-    :param args: arguments giving gene list, disease gene sep, gene col name, and output stem
-    :return: Returns matrix table with rows annotated with T/F column of whether variant in gene set of interest,
-    and column of allelic requirement strings.
-    """
-    # TODO change it to run high pLI genes only if a gene list is NOT given, not in addition
-    temp_filename = args.output_stem + "_genes_annotated.mt"
-
-    if utils.check_exists(temp_filename) and (args.force == False):
-        logging.info(f"Detected matrix table with gene information annotated exists: {temp_filename}. Loading this.")
-        mt = hl.read_matrix_table(temp_filename)
-
-    else:
-        args.force = True
-        ###########################################################################
-        # Pull MT rows, select only locus, alleles, and gene, checkpoint, explode #
-        ###########################################################################
-        rows = mt.rows()
-        rows = rows.key_by()
-        rows = rows.select("locus", "alleles", "gene")
-        genes = rows.explode(rows.gene)
-        genes = genes.key_by(genes.gene)
-        genes = genes.checkpoint(args.output_stem + "_rows_tmp2.ht", overwrite=True)
-
-        if args.disease_genes is not None:
-            logging.info("Annotating dataset with disease gene information.")
-            gene_table = hl.import_table(args.disease_genes, delimiter=args.disease_gene_sep)
-            gene_table = gene_table.transmute(gene=gene_table[args.gene_col_name])
-            gene_table = gene_table.key_by('gene')
-
-            ##################################################################################
-            # Add disease gene information as column, split allelic requirements and explode #
-            ##################################################################################
-            genes = genes.annotate(**gene_table[genes.gene])
-
-            genes = genes.annotate(allelic_requirement=genes[args.allelic_requirement_col].strip().split(","))
-            allelic_req = genes.explode(genes.allelic_requirement)
-
-            ######################################################
-            # Annotate inheritance based on allelic requirements #
-            ######################################################
-            recessive_terms = ['biallelic', 'uncertain', 'digenic']
-            dominant_terms = ['monoallelic', 'imprinted', 'x-linked dominant', 'x-linked over-dominance', 'uncertain',
-                               'digenic', 'mosaic']
-            allelic_req = allelic_req.annotate(inheritance=hl.case()
-                                   .when(hl.array(dominant_terms).contains(allelic_req.allelic_requirement), 'dominant')
-                                   .when(hl.array(recessive_terms).contains(allelic_req.allelic_requirement), 'recessive')
-                                   .when(allelic_req.allelic_requirement == 'hemizygous', 'hemizygous')
-                                   .or_missing())
-            ###################################
-            # Group table by gene, checkpoint #
-            ###################################
-            disease_genes = allelic_req.group_by('locus', 'alleles').aggregate(
-                gene=hl.array(hl.agg.collect_as_set(allelic_req.gene)),
-                allelic_requirement=hl.array(hl.agg.collect_as_set(allelic_req.allelic_requirement)),
-                inheritance=hl.array(hl.agg.collect_as_set(allelic_req.inheritance)))
-            disease_genes = disease_genes.key_by(disease_genes.locus, disease_genes.alleles)
-
-            #######################################
-            # Annotate rows with disease genes ht #
-            #######################################
-            mt = mt.annotate_rows(allelic_requirement=disease_genes[mt.locus, mt.alleles].allelic_requirement,
-                                  inheritance=disease_genes[mt.locus, mt.alleles].inheritance)
-            mt = mt.annotate_rows(**{args.gene_set_name: hl.cond(hl.is_defined(mt.allelic_requirement), True, False)})
-        else:
-            mt = mt.annotate_rows(allelic_requirement=hl.empty_array(hl.tstr))
-            mt = mt.annotate_rows(**{args.gene_set_name: hl.null(hl.tbool)})
-            mt = mt.annotate_rows(inheritance=hl.empty_array(hl.tstr))
-
-        if args.gnomad_gene_metrics is not None:
-            logging.info("Annotating genes with pLI metrics.")
-            gene_metrics = hl.import_table(args.gnomad_gene_metrics, types={'pLI': hl.tfloat64}, key='gene')
-
-            #################################
-            # Add pLI information as column #
-            #################################
-            genes = genes.annotate(pLI=gene_metrics[genes.gene].pLI)
-            vars_missing_pLI = genes.aggregate(hl.agg.counter(hl.is_defined(genes.pLI)))
-            logging.info(f"Count of variants where pLI values are missing (False) or not (True): {vars_missing_pLI}")
-
-            gene_count = genes.group_by("gene").aggregate(pLI=hl.agg.mean(genes.pLI))
-            missing_pLI = gene_count.aggregate(hl.agg.counter(hl.is_defined(gene_count.pLI)))
-            logging.info(f"Count of genes where pLI values are missing (False) or not (True): {missing_pLI}")
-
-            ###################################
-            # Group table by gene, checkpoint #
-            ###################################
-            pli_genes = genes.group_by('locus', 'alleles').aggregate(pLI=hl.array(hl.agg.collect_as_set(genes.pLI)))
-            pli_genes = pli_genes.key_by(pli_genes.locus, pli_genes.alleles)
-
-            #################################################################################
-            # Annotate matrix table with gene metrics, make boolean column of high pLI gene #
-            #################################################################################
-            mt = mt.annotate_rows(pLI=pli_genes[mt.locus, mt.alleles].pLI)
-            mt = mt.annotate_rows(high_pLI=hl.cond(hl.any(lambda x: x >= args.pLI_cutoff, mt.pLI), True, False))
-        else:
-            mt = mt.annotate_rows(pLI=hl.empty_array(hl.tstr), high_pLI=hl.null(hl.tbool))
-
-        mt = mt.checkpoint(temp_filename, overwrite=True)
-
-    if args.disease_genes is not None:
-        gene_count = mt.aggregate_rows(hl.agg.counter(mt[args.gene_set_name]))
-        logging.info(f"Number of variants in given disease gene set: {gene_count}")
-
-        dominant_count = mt.aggregate_rows(hl.agg.counter(hl.any(lambda x: x == 'dominant', mt.inheritance)))
-        recessive_count = mt.aggregate_rows(hl.agg.counter(hl.any(lambda x: x == 'recessive', mt.inheritance)))
-        hemizygous_count = mt.aggregate_rows(hl.agg.counter(hl.any(lambda x: x == 'hemizygous', mt.inheritance)))
-        logging.info(f"Count of variants in genes with dominant disease inheritance: {dominant_count}")
-        logging.info(f"Count of variants in genes with recessive disease inheritance: {recessive_count}")
-        logging.info(f"Count of variants in genes with hemizygous disease inheritance: {hemizygous_count}")
-
-    if args.gnomad_gene_metrics is not None:
-        pLI_count = mt.aggregate_rows(hl.agg.counter(mt.high_pLI))
-        logging.info(f"Number of variants in high pLI genes (>0.9): {pLI_count}")
-    return mt
 
 
 def find_putative_causal_variants(mt, args):
@@ -791,18 +387,128 @@ if __name__ == "__main__":
     ########################################################
     # Read in matrix table and remove monomorphic variants #
     ########################################################
-    h.add_preemptibles(args.cluster_name, args.num_preemptibles)
+    utils.add_secondary(args.cluster_name, args.num_secondary, region=args.region)
     full_mt = hl.read_matrix_table(args.mt)
-    var_mt = remove_monomorphic(full_mt, args)
+
+    monomorphic_checkpoint = args.output_name + "_non_monomorphic_variants.mt"
+    if (not utils.check_exists(monomorphic_checkpoint)) or args.force:
+        non_mono_mt = vq.remove_monomorphic(full_mt)
+        non_mono_mt = non_mono_mt.checkpoint(monomorphic_checkpoint, overwrite=True)
+
+    else:
+        logging.info(f"Detected file with monomorphic variants filtered out: {monomorphic_checkpoint}. Loading this file.")
+        non_mono_mt = hl.read_matrix_table(monomorphic_checkpoint)
+
+    start_count = non_mono_mt.count_rows()
+    logging.info(f"Number of remaining variants after removing monomorphic variants: {start_count}")
+
+    #########################################################################
+    ## Filter failing samples and entries to calculate case/control counts ##
+    #########################################################################
+    # So not to count 'bad' genotypes/samples in calculating case/control counts for variants.
+    filter_checkpoint = args.output_name + "_bad_entries_variants_filtered.mt"
+
+    if (not utils.check_exists(filter_checkpoint)) or args.force:
+        mt_filtered = sq.filter_failing(
+            non_mono_mt, filter_checkpoint, prefix='final', entries=True, variants=False, samples=True,
+            unfilter_entries=False,
+            pheno_qc=True, min_dp=10, min_gq=20, max_het_ref_reads=0.8,
+            min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9,
+            max_hom_alt_ref_reads=0.1, force=args.force
+        )
+
+        mt_filtered = mt_filtered.checkpoint(filter_checkpoint, overwrite=True)
+    else:
+        logging.info(f"Detected file with bad variants and samples filtered out: {filter_checkpoint}. Loading this file.")
+        mt_filtered = hl.read_matrix_table(filter_checkpoint)
 
     ##################################################
-    # Annotate matrix table with various annotations #
+    # Annotate matrix table with case/control counts #
     ##################################################
-    var_mt = count_case_control_carriers(var_mt, args)
-    var_mt = annotate_variants(var_mt, args)
-    var_mt = annotate_population_thresholds(var_mt, args)
-    h.remove_preemptibles(args.cluster_name)
-    var_mt = annotate_genes(var_mt, args)  # Triggers shuffles
+    # Annotate mt with het/homvar case/control counts
+    case_annot_checkpoint = args.output_name + "_carriers_annotated.mt"
+
+    if (not utils.check_exists(case_annot_checkpoint)) or args.force:
+        # Do counts with dataset with bad variants and genotypes filtered out
+        mt_filt_annot, annotations_to_transfer = cv.count_case_control_carriers(
+            mt_filtered, case_annot_checkpoint, pheno_col=args.pheno_col, female_col=args.female_col)
+
+        # Transfer the counts to the unfiltered matrix table
+        for annotation in annotations_to_transfer:
+            mt_case_count = non_mono_mt.annotate_rows(
+                **{annotation: mt_filt_annot.rows()[non_mono_mt.row_key][annotation]}
+            )
+
+        mt_case_count = mt_case_count.checkpoint(case_annot_checkpoint, overwrite=True)
+
+    else:
+        logging.info(f"Detected file with carriers annotated exists: {case_annot_checkpoint}. Loading this file.")
+        mt_case_count = hl.read_matrix_table(case_annot_checkpoint)
+
+    control_count = mt_case_count.aggregate_cols(hl.agg.count_where(mt_case_count[args.pheno_col] == False))
+    logging.info(f"Number of controls in dataset: {control_count}")
+    case_count = mt_case_count.aggregate_cols(hl.agg.count_where(mt_case_count[args.pheno_col] == True))
+    logging.info(f"Number of cases in dataset: {case_count}")
+    missing = mt_case_count.aggregate_cols(hl.agg.count_where(~hl.is_defined(mt_case_count[args.pheno_col])))
+    logging.info(f"Samples missing case/control information: {missing}")
+
+    if missing > 0:
+        logging.info(
+            f"Warning- samples missing case/control status will be generally ignored in this pipeline.")
+
+    ###############################################################
+    ## Annotate variants with gnomad, mpc, CADD, gnomad mismatch ##
+    ###############################################################
+    var_annot_checkpoint = args.output_name + "_cadd_mpc_gnomad_annot.mt/"
+
+    if (not utils.check_exists(var_annot_checkpoint)) or args.force:
+        mt_var_annot = cv.check_variants_annotated(mt_case_count)
+    else:
+        mt_var_annot = hl.read_matrix_table(var_annot_checkpoint)
+
+    ###########################################################################
+    ## Annotate whether variants are sufficiently rare in gnomad or controls ##
+    ###########################################################################
+    rare_checkpoint = args.output_name +  "_gnomad_control_rarity_annotated_tmp.mt/"
+
+    if (not utils.check_exists(rare_checkpoint)) or args.force:
+        mt_pop_annot = cv.annotate_control_rarity(
+            mt_var_annot, rare_checkpoint, args.gnomad_population,
+            max_allowed_carrier_dominant=args.max_allowed_carrier_dominant,
+            max_allowed_homozygotes_recessive=args.max_allowed_homozygotes_recessive,
+            gnomad_AF_cutoff_recessive=args.gnomad_AF_cutoff_recessive
+        )
+
+        mt_pop_annot = mt_pop_annot.checkpoint(rare_checkpoint, overwrite=True)
+
+    else:
+        logging.info(f"Detected file with boolean columns for variant fulfulling population criteria: {rare_checkpoint}. "
+                     f"Loading this file.")
+        mt_pop_annot = hl.read_matrix_table(rare_checkpoint)
+
+    ############################
+    ## Annotate mt with genes ##
+    ############################
+    genes_annot_checkpoint = args.output_name + "_genes_annotated.mt/"
+
+    if (not utils.check_exists(genes_annot_checkpoint)) or args.force:
+        utils.remove_secondary(args.cluster_name)
+        mt_genes_annot = cv.annotate_genes(
+            mt_pop_annot, genes_annot_checkpoint
+        )  # Triggers shuffles?
+
+        mt_genes_annot = mt_genes_annot.checkpoint(genes_annot_checkpoint, overwrite=True)
+    else:
+        logging.info(f"Detected file with genes annotated exists: {genes_annot_checkpoint}. Loading that.")
+        mt_genes_annot = hl.read_matrix_table(genes_annot_checkpoint)
+
+    if args.disease_genes is not None:
+        gene_count = mt_genes_annot.aggregate_rows(hl.agg.counter(mt_genes_annot[args.gene_set_name]))
+        logging.info(f"Number of variants in given disease gene set: {gene_count}")
+
+    if args.gnomad_gene_metrics is not None:
+        pLI_count = mt_genes_annot.aggregate_rows(hl.agg.counter(mt_genes_annot.high_pLI))
+        logging.info(f"Number of variants in high pLI genes (>0.9): {pLI_count}")
 
     ##########################################
     # Run analysis to find putative variants #
@@ -810,7 +516,7 @@ if __name__ == "__main__":
     h.add_preemptibles(args.cluster_name, args.num_preemptibles)
     variants, filt_mt = find_putative_causal_variants(var_mt, args)
     h.remove_preemptibles(args.cluster_name)
-    annotate_denovos_genotypes(variants, filt_mt, args)   # Triggers shuffles
+    annotate_denovos_genotypes(variants, filt_mt, args)   # Triggers shuffles?
 
     ###########################
     # Copy logs and shut down #
