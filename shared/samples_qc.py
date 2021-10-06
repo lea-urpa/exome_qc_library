@@ -743,8 +743,9 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     num_connections = pd.DataFrame(list(degrees.items()), columns=['s', 'related_num_connections'])
     num_connections_ht = hl.Table.from_pandas(num_connections, key='s')
 
-    degree_stats = num_connections_ht.aggregate(hl.agg.stats(num_connections_ht.num_connections))
-    degree_hist = num_connections_ht.aggregate(hl.expr.aggregators.hist(num_connections_ht.num_connections, 0, degree_stats.max, 50))
+    degree_stats = num_connections_ht.aggregate(hl.agg.stats(num_connections_ht.related_num_connections))
+    degree_hist = num_connections_ht.aggregate(
+        hl.expr.aggregators.hist(num_connections_ht.related_num_connections, 0, degree_stats.max, 50))
 
     output_file(f"{datestr}_number_connections_per_individual_hist.html")
     degree_plot = hl.plot.histogram(degree_hist, legend='# connections', title='Number of (>2nd degree) relations per individual')
