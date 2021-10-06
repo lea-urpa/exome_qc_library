@@ -299,7 +299,7 @@ if __name__ == "__main__":
     ###################
     # Parse arguments #
     ###################
-    parser = argparse.ArgumentParser(description="v9 exome sequencing dataset quality control pipeline.")
+    parser = argparse.ArgumentParser(description="Exome sequencing dataset quality control pipeline.")
     parser.add_argument("-mt", type=str, help="Input matrix table to run analysis on")
     parser.add_argument("--pheno_col", required=True, type=str, help="Col annotation giving case status, true/false.")
     parser.add_argument("--female_col", type=str, help="Col annotation giving female status, true/false.",
