@@ -697,7 +697,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     rel_tab = relatives.entries()
     rel_tab = rel_tab.filter(rel_tab.s != rel_tab.s_1)  # remove diagonal
     logging.info(f"Writing kinship pairs above threshold table to file: {relatives_fn}")
-    rel_tab = rel_tab.checkpoint(relatives_fn)
+    rel_tab = rel_tab.checkpoint(relatives_fn, overwrite=True)
     rel_tab.export(relatives_export)
 
     if export_duplicates:
