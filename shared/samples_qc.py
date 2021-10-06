@@ -9,6 +9,7 @@ import hail as hl
 import utils
 from bokeh.io import output_file, save
 import networkx as nx
+import pandas as pd
 
 
 def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True, variants=True, samples=True,
@@ -589,27 +590,25 @@ def nx_algorithm(g, cases):
     :param cases: list of cases
     :return: list of related nodes that are discarded
     """
-    #####################################################
-    # Report the number of highly connected individuals #
-    #####################################################
-    degrees = dict(g.degree())
-    high_degree_count = 0
-    for degree in degrees.values():
-        if degree > 10:
-            high_degree_count += 1
-
-    if high_degree_count > 0:
-        print(f"Warning! {high_degree_count} samples are connected to > 10 other samples. This is likely from poorly "
-              f"calculated kinships, increase number of variants used to calculate kinships and try again.")
-
     ##########################################
     # Loop through subgraphs in larger graph #
     ##########################################
-    # Instantiate list of unrelated notes
+    # Instantiate list of unrelated notes, list of subgraph sizes, dict of subgraph members
     unrelated_nodes = []
     num_graphs = 0
+    subgraph_dict = {}
+    subgraph_sizes = []
+
     for subgraph in connected_component_subgraphs(g):
         num_graphs += 1
+        # Get size of graph, assign graph a # and mark subject with it
+        nodes = subgraph.nodes()
+        subgraph_sizes.append(len(nodes))
+
+        for subject in subgraph.nodes():
+            subgraph_dict[subject] = num_graphs
+
+        # Find subgraph of unrelated subcases
         if cases is not None:
             subcases = filter_graph_cases(subgraph, cases)  # list of local cases
             if len(subcases) > 0:
@@ -624,7 +623,11 @@ def nx_algorithm(g, cases):
         else:
             unrelated_nodes += nx.maximal_independent_set(subgraph)
 
+    degree_counts = dict((x, subgraph_sizes.count(x)) for x in set(subgraph_sizes))
+
     logging.info(f"Number of groups of related individuals: {num_graphs}")
+    logging.info(f"Degree counts (group size: number of groups of that size)")
+    logging.info(degree_counts)
 
     ####################
     # result summaries #
@@ -638,11 +641,12 @@ def nx_algorithm(g, cases):
     else:
         unrelated_cases = 0
 
-    return related_nodes, len(unrelated_cases), len(unrelated_nodes)
+    return related_nodes, subgraph_dict, len(unrelated_cases), len(unrelated_nodes)
 
 
 def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=None, force=False,
-                     cluster_name=None, num_secondary_workers=None, region=None, reference_genome="GRCh38"):
+                     cluster_name=None, num_secondary_workers=None, region=None,
+                     export_duplicates=False):
     """
 
     :param mt: matrix table to calculate kinship values from
@@ -653,12 +657,15 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     :param cluster_name: name of cluster to update with secondary workers during kinship calculation
     :param num_secondary_workers: number of secondary workers to add
     :param region: region of cluster
-    :param reference_genome: reference genome to use (for filtering to autosomes only)
+    :param export_duplicates: export separate file with just duplicates?
     :return:
     """
+    datestr = time.strftime("%Y.%m.%d")
 
     kinship_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_kinship.mt/"
-    relatives_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.txt"
+    relatives_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.ht/"
+    relatives_export = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.txt"
+    duplicates_export = checkpoint_name.rstrip("/").replace(".mt", "") + "_duplicates.txt"
 
     var_count = mt.count_rows()
     if var_count < 10000:
@@ -666,7 +673,9 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
                         "kinship calculations will be incorrect (more relatedness than reality). Number of variants "
                         f"left after removing sex chromosomes: {var_count}.")
 
-    # Calculate kinship
+    #####################
+    # Calculate kinship #
+    #####################
     if (not utils.check_exists(kinship_fn)) or force:
         if (cluster_name is not None) and (num_secondary_workers is not None) and (region is not None):
             utils.add_secondary(cluster_name, num_secondary_workers, region)
@@ -679,21 +688,71 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
         logging.info(f"Detected kinship file exists {kinship_fn}, loading that.")
         kinship = hl.read_matrix_table(kinship_fn)
 
+    ##################################################
+    # Convert kinship matrix table to networkx graph #
+    ##################################################
     # Get just pairs above threshold, convert to pandas df
     relatives = kinship.filter_entries(kinship.phi > kinship_threshold)
 
     rel_tab = relatives.entries()
     rel_tab = rel_tab.filter(rel_tab.s != rel_tab.s_1)  # remove diagonal
     logging.info(f"Writing kinship pairs above threshold table to file: {relatives_fn}")
-    rel_tab.export(relatives_fn)
+    rel_tab = rel_tab.checkpoint(relatives_fn)
+    rel_tab.export(relatives_export)
+
+    if export_duplicates:
+        duplicates = rel_tab.filter(rel_tab.phi > 0.354)
+        duplicates.export(duplicates_export)
 
     # Select just edges and convert to pandas df
-    rel_tab = rel_tab.key_by().select("s", "s_1")
-    rel_df = rel_tab.to_pandas()
+    rel_tab_edges = rel_tab.key_by().select("s", "s_1")
+    rel_df = rel_tab_edges.to_pandas()
 
     # Create graph from pandas df
     related_ind_g = nx.from_pandas_edgelist(rel_df, "s", "s_1")
 
+    #######################
+    # Plot kinship values #
+    #######################
+    output_file(f"{datestr}_kinship_histogram.html")
+    kin_hist = rel_tab.aggregate(hl.expr.aggregators.hist(rel_tab.phi, 0, 0.5, 200))
+    kin_plot = hl.plot.histogram(kin_hist, legend='Kinship coefficient', title='Kinships in dataset (above degree 2)')
+    save(kin_plot)
+
+    duplicates = rel_tab.aggregate(hl.agg.count_where(rel_tab.phi > 0.354))
+    first_deg = rel_tab.aggregate(hl.agg.count_where((rel_tab.phi <= 0.354) & (rel_tab.phi > 0.177)))
+    second_deg = rel_tab.aggregate(hl.agg.count_where((rel_tab.phi <= 0.177) & (rel_tab.phi > 0.0884)))
+
+    logging.info(f"Number of duplicate or MZ twin pairs: {duplicates}.\nNumber of first degree pairs: {first_deg}."
+                 f"\nNumber of second degree pairs: {second_deg}")
+
+    ############################################################
+    # Report the number of highly connected individuals + plot #
+    ############################################################
+    degrees = dict(related_ind_g.degree())
+    high_degree_count = 0
+    for degree in degrees.values():
+        if degree > 10:
+            high_degree_count += 1
+
+    if high_degree_count > 0:
+        print(f"Warning! {high_degree_count} samples are connected to > 10 other samples. This is likely from poorly "
+              f"calculated kinships, increase number of variants used to calculate kinships and try again.")
+
+    # Plot histogram of connections
+    num_connections = pd.DataFrame(list(degrees.items()), columns=['s', 'related_num_connections'])
+    num_connections_ht = hl.Table.from_pandas(num_connections, key='s')
+
+    degree_stats = num_connections_ht.aggregate(hl.agg.stats(num_connections_ht.num_connections))
+    degree_hist = num_connections_ht.aggregate(hl.expr.aggregators.hist(num_connections_ht.num_connections, 0, degree_stats.max, 50))
+
+    output_file(f"{datestr}_number_connections_per_individual_hist.html")
+    degree_plot = hl.plot.histogram(degree_hist, legend='# connections', title='Number of (>2nd degree) relations per individual')
+    save(degree_plot)
+
+    #####################################
+    # Calculate maximal independent set #
+    #####################################
     if pheno_col is not None:
         sample_info = mt.cols()
         case_info = sample_info.filter(sample_info[pheno_col] == True)
@@ -702,7 +761,16 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
         case_ids = None
 
     logging.info('Calculating maximal independent set.')
-    related_to_remove, num_ind_cases, num_ind_nodes = nx_algorithm(related_ind_g, case_ids)
-    logging.info('# of unrelated cases: ' + str(num_ind_cases))
+    related_to_remove, subject_graph_dict, num_ind_cases, num_ind_nodes = nx_algorithm(related_ind_g, case_ids)
+    logging.info(f'# of unrelated cases: {num_ind_cases}')
+    logging.info(f"# of unrelated individuals: {num_ind_nodes}")
 
-    return related_to_remove
+    ###################################################################################
+    # Create table with graph ID:subject, join to table with # connections per sample #
+    ###################################################################################
+    subgraph_table = pd.DataFrame(list(subject_graph_dict.items()), columns=['s', 'related_graph_id'])
+    subgraph_ht = hl.Table.from_pandas(subgraph_table, key='s')
+
+    related_info_ht = subgraph_ht.annotate(**num_connections_ht[subgraph_ht.s])
+
+    return related_to_remove, related_info_ht
