@@ -641,7 +641,7 @@ def nx_algorithm(g, cases):
     else:
         unrelated_cases = 0
 
-    return related_nodes, subgraph_dict, len(unrelated_cases), len(unrelated_nodes)
+    return related_nodes, subgraph_dict, len(unrelated_cases)
 
 
 def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=None, force=False,
@@ -666,6 +666,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     relatives_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.ht/"
     relatives_export = checkpoint_name.rstrip("/").replace(".mt", "") + "_related_pairs.txt"
     duplicates_export = checkpoint_name.rstrip("/").replace(".mt", "") + "_duplicates.txt"
+    related_info_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_connection_info.ht/"
 
     var_count = mt.count_rows()
     if var_count < 10000:
@@ -762,9 +763,8 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
         case_ids = None
 
     logging.info('Calculating maximal independent set.')
-    related_to_remove, subject_graph_dict, num_ind_cases, num_ind_nodes = nx_algorithm(related_ind_g, case_ids)
+    related_to_remove, subject_graph_dict, num_ind_cases = nx_algorithm(related_ind_g, case_ids)
     logging.info(f'# of unrelated cases: {num_ind_cases}')
-    logging.info(f"# of unrelated individuals: {num_ind_nodes}")
 
     ###################################################################################
     # Create table with graph ID:subject, join to table with # connections per sample #
@@ -773,5 +773,6 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     subgraph_ht = hl.Table.from_pandas(subgraph_table, key='s')
 
     related_info_ht = subgraph_ht.annotate(**num_connections_ht[subgraph_ht.s])
+    related_info_ht = related_info_ht.checkpoint(related_info_fn, overwrite=True)
 
     return related_to_remove, related_info_ht
