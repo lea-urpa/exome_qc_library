@@ -736,7 +736,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
             high_degree_count += 1
 
     if high_degree_count > 0:
-        print(f"Warning! {high_degree_count} samples are connected to > 10 other samples. This is likely from poorly "
+        logging.info(f"Warning! {high_degree_count} samples are connected to > 10 other samples. This is likely from poorly "
               f"calculated kinships, increase number of variants used to calculate kinships and try again.")
 
     # Plot histogram of connections

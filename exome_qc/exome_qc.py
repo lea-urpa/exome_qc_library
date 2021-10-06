@@ -232,16 +232,25 @@ if __name__ == "__main__":
 
         mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
 
-        related_to_remove = sq.king_relatedness(
+        related_to_remove, related_info_ht = sq.king_relatedness(
             mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
             force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
             region=args.region, reference_genome=args.reference_genome)
 
         mt = mt.annotate_cols(
-            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False))
+            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False),
+            related_graph_id=related_info_ht[mt.s].related_graph_id,
+            related_num_connections=related_info_ht[mt.s].related_num_connections
+        )
+
+        mt = mt.annotate_cols(related_num_connections=hl.or_else(mt.related_num_connections, 0))
 
         mt_ldpruned = mt_ldpruned.annotate_cols(
-            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned.s), True, False))
+            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned.s), True, False),
+            related_graph_id=related_info_ht[mt_ldpruned.s].related_graph_id,
+            related_num_connections=related_info_ht[mt_ldpruned.s].related_num_connections)
+
+        mt_ldpruned = mt_ldpruned.annotate_cols(related_num_connections=hl.or_else(mt_ldpruned.related_num_connections, 0))
 
         logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
         mt = mt.checkpoint(relatedness_calculated, overwrite=True)
