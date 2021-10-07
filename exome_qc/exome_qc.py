@@ -183,6 +183,13 @@ if __name__ == "__main__":
     ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
     ld_pruned_maffilt = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_maf_filt{args.test_str}.mt/")
     ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
+    ## TEST CODE BLOCK
+    ld_pruned_maffilt_nocr = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_maf_filt_nocr{args.test_str}.mt/")
+    ld_pruned_nocr = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned_nocr{args.test_str}.mt/")
+    relatedness_calculated_nocr = os.path.join(
+        args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated_nocrfilt{args.test_str}.mt/")
+    ld_pruned_annot_nocr = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_ld_pruned_related_nocr{args.test_str}.mt/")
+    ## TEST CODE BLOCK END
 
     if (not utils.check_exists(relatedness_calculated)) or args.force:
         logging.info("Calculating relatedness")
@@ -206,22 +213,48 @@ if __name__ == "__main__":
                 mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate"), keep=False
             )
 
+            ## TEST CODE BLOCK, REMOVE LATER ##
+            mt_filtered_nocr = mt_gt_filt.filter_rows(
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_QD") |
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_VQSR_filters"), keep=False
+            )
+            ## TEST CODE BLOCK END ##
+
             # Filter out low MAF variants
             if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
                 mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf)
                 mt_maffilt = mt_maffilt.checkpoint(ld_pruned_maffilt, overwrite=True)
+                ## TEST CODE BLOCK ##
+                mt_maffilt_nocr = vq.maf_filter(mt_filtered_nocr, args.ind_maf)
+                mt_maffilt_nocr = mt_maffilt_nocr.checkpoint(ld_pruned_maffilt_nocr, overwrite=True)
+                ## TEST CODE BLOCK END ##
             else:
                 mt_maffilt = hl.read_matrix_table(ld_pruned_maffilt)
+                ## TEST CODE BLOCK
+                mt_maffilt_nocr = hl.read_matrix_table(ld_pruned_maffilt_nocr)
+                ## TEST CODE BLOCK END
 
             # LD prune if row count >80k
             mt_ldpruned = vq.downsample_variants(
                 mt_maffilt, 80000, ld_pruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
 
+            ## TEST CODE BLOCK
+            mt_ldpruned_nocr = vq.downsample_variants(
+                mt_maffilt_nocr, 80000, ld_pruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True
+            )
+            ## TEST CODE BLOCK END
+
             logging.info(f"Writing checkpoint {stepcount}-1: LD pruned dataset")
             mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
+            ## TEST CODE BLOCK
+            mt_ldpruned_nocr = mt_ldpruned_nocr(ld_pruned_nocr, overwrite=True)
+            ## TEST CODE BLOCK END
         else:
             logging.info("Detected LD pruned dataset written, loading that.")
             mt_ldpruned = hl.read_matrix_table(ld_pruned)
+            ## TEST CODE BLOCK
+            mt_ldpruned_nocr = hl.read_matrix_table(ld_pruned_nocr)
+            ## TEST CODE BLOCK END
 
         ## Calculate relatedness with King ##
         # THIS triggers shuffles, think about removing secondaries... seemed to run ok though
@@ -236,6 +269,15 @@ if __name__ == "__main__":
             mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
             force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
             region=args.region, reference_genome=args.reference_genome)
+
+        ## TEST CODE BLOCK- see if the relatedness calcs are the same with no call rate filter, but just w/ CR filt
+        mt_autosomes_nocr = mt_ldpruned_nocr.filter_rows(hl.literal(autosomes).contains(mt_ldpruned_nocr.locus.contig))
+
+        related_to_remove_nocr, related_info_ht_nocr = sq.king_relatedness(
+            mt_autosomes_nocr, relatedness_calculated_nocr, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
+            force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
+            region=args.region, reference_genome=args.reference_genome)
+        ## TEST CODE BLOCK END
 
         mt = mt.annotate_cols(
             related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False),
@@ -252,9 +294,20 @@ if __name__ == "__main__":
 
         mt_ldpruned = mt_ldpruned.annotate_cols(related_num_connections=hl.or_else(mt_ldpruned.related_num_connections, 0))
 
+        ## TEST CODE BLOCK
+        mt_ldpruned_nocr = mt_ldpruned_nocr.annotate_cols(
+            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned_nocr.s), True, False),
+            related_graph_id=related_info_ht[mt_ldpruned_nocr.s].related_graph_id,
+            related_num_connections=related_info_ht[mt_ldpruned_nocr.s].related_num_connections)
+
+        mt_ldpruned_nocr = mt_ldpruned_nocr.annotate_cols(
+            related_num_connections=hl.or_else(mt_ldpruned_nocr.related_num_connections, 0))
+        ## TEST CODE BLOCK END
+
         logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
         mt = mt.checkpoint(relatedness_calculated, overwrite=True)
         mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
+        mt_ldpruned_nocr = mt_ldpruned_nocr.checkpoint(ld_pruned_annot_nocr, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
     else:
@@ -278,6 +331,115 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(relatedness_calculated)
         mt_ldpruned = hl.read_matrix_table(ld_pruned_annot)
 
+        ## TEST CODE BLOCK ##
+        mt_ldpruned_nocr = hl.read_matrix_table(ld_pruned_annot_nocr)
+
+        if args.reference_genome is "GRCh38":
+            autosomes = ["chr" + str(i) for i in range(1, 23)]
+        else:
+            autosomes = [str(i) for i in range(1, 23)]
+
+        mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
+        var_count = mt_autosomes.count_rows()
+        logging.info(f"Variant count after filtering to autosomes: {var_count}")
+
+        # Remove related individuals
+        mt_unrelated = mt_autosomes.filter_cols(mt_autosomes.related_to_remove == False)
+        sample_count = mt_unrelated.count_cols()
+        logging.info(f'Sample count after removing related individuals: {sample_count}')
+
+        # Write checkpoint
+        mt_fn = pop_outliers_found.rstrip("/").replace(".mt", "") + "_autosomes_norelatives.mt/"
+        mt_unrelated = mt_unrelated.checkpoint(mt_fn, overwrite=True)
+
+        # Same for no call rate dataset
+        mt_autosomes_nocr = mt_ldpruned_nocr.filter_rows(hl.literal(autosomes).contains(mt_ldpruned_nocr.locus.contig))
+        var_count = mt_autosomes_nocr.count_rows()
+        logging.info(f"Variant count after filtering to autosomes (no call rate filt dataset): {var_count}")
+
+        # Remove related individuals
+        mt_unrelated_nocr = mt_autosomes_nocr.filter_cols(mt_autosomes_nocr.related_to_remove == False)
+        sample_count_nocr = mt_unrelated_nocr.count_cols()
+        logging.info(f'Sample count after removing related individuals (no call rate filt dataste): {sample_count_nocr}')
+
+        # Write checkpoint
+        mt_fn_nocr = pop_outliers_found.rstrip("/").replace(".mt", "") + "_autosomes_norelatives_nocallratefilt.mt/"
+        mt_unrelated_nocr = mt_unrelated_nocr.checkpoint(mt_fn_nocr, overwrite=True)
+
+        # Plot PCs for only VQSR and QD filtered dataset
+        eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_unrelated_nocr.GT, k=2)
+        output_file(f"{datestr}_PCs_testing_VQSR_QD_filt.html")
+        p1 = hl.plot.scatter(scores.scores[0], scores.scores[1],
+                            title=f"PCA plot, variants failing VQSR & QD removed",
+                            collect_all=False)
+        save(p1)
+
+        # plot PCs for VQSR, QD, and call rate filtered dataset
+        eigenvalues2, scores2, loadings2 = hl.hwe_normalized_pca(mt_unrelated.GT, k=2)
+        output_file(f"{datestr}_PCs_testing_VQSR_QD_CR_filt.html")
+        p2 = hl.plot.scatter(scores2.scores[0], scores2.scores[1],
+                             title=f"PCA plot, variants failing VQSR, QD, call rate removed",
+                             collect_all=False)
+        save(p2)
+
+        # Plot PCs for VQSR, QD, call rate, and het ab filtered dataset
+        mt_ab_filt = mt_unrelated.filter(
+            mt_unrelated.low_pass_failing_variant_qc.contains("failing_het_ab"), keep=False)
+
+        eigenvalues3, scores3, loadings3 = hl.hwe_normalized_pca(mt_ab_filt.GT, k=2)
+        output_file(f"{datestr}_PCs_testing_VQSR_QD_CR_AB_filt.html")
+        p3 = hl.plot.scatter(scores3.scores[0], scores3.scores[1],
+                             title=f"PCA plot, variants failing VQSR, QD, call rate, het AB removed",
+                             collect_all=False)
+        save(p3)
+
+        # Plot PCs for VQSR, QD, call rate, and hwe filtered dataset
+        mt_hwe_filt = mt_unrelated.filter(
+            mt_unrelated.low_pass_failing_variant_qc.contains("failing_hwe"), keep=False)
+
+        eigenvalues4, scores4, loadings4 = hl.hwe_normalized_pca(mt_hwe_filt.GT, k=2)
+        output_file(f"{datestr}_PCs_testing_VQSR_QD_CR_HWE_filt.html")
+        p4 = hl.plot.scatter(scores4.scores[0], scores4.scores[1],
+                             title=f"PCA plot, variants failing VQSR, QD, call rate, hwe removed",
+                             collect_all=False)
+        save(p4)
+
+        # Plot PCs for VQSR, QD, het ab filtered dataset
+        mt_ab_filt_nocr = mt_unrelated_nocr.filter(
+            mt_unrelated_nocr.low_pass_failing_variant_qc.contains("failing_het_ab"), keep=False)
+
+        eigenvalues5, scores5, loadings5 = hl.hwe_normalized_pca(mt_ab_filt_nocr.GT, k=2)
+        output_file(f"{datestr}_PCs_testing_VQSR_QD_AB_filt.html")
+        p5 = hl.plot.scatter(scores5.scores[0], scores5.scores[1],
+                             title=f"PCA plot, variants failing VQSR, QD, het AB removed (no CR filt)",
+                             collect_all=False)
+        save(p5)
+
+        # Plot PCs for VQSR, QD, hwe filtered dataset
+        mt_hwe_filt_nocr = mt_unrelated_nocr.filter(
+            mt_unrelated_nocr.low_pass_failing_variant_qc.contains("failing_hwe"), keep=False)
+
+        eigenvalues6, scores6, loadings6 = hl.hwe_normalized_pca(mt_hwe_filt_nocr.GT, k=2)
+        output_file(f"{datestr}_PCs_testing_VQSR_QD_HWE_filt.html")
+        p6 = hl.plot.scatter(scores6.scores[0], scores6.scores[1],
+                             title=f"PCA plot, variants failing VQSR, QD, hwe removed (no CR filt)",
+                             collect_all=False)
+        save(p6)
+
+        # Plot PCs for VQSR, QD, call rate, het ab, and hwe filtered dataset
+        mt_all_filt = mt_unrelated.filter(hl.len(mt_unrelated.low_pass_failing_variant_qc) == 0)
+
+        eigenvalues7, scores7, loadings7 = hl.hwe_normalized_pca(mt_all_filt.GT, k=2)
+        output_file(f"{datestr}_PCs_testing_VQSR_QD_CR_HWE_AB_all_filt.html")
+        p7 = hl.plot.scatter(scores7.scores[0], scores7.scores[1],
+                             title=f"PCA plot, variants failing all (VQSR, QD, call rate, hwe, het AB) removed",
+                             collect_all=False)
+        save(p7)
+
+        logging.info("PCs testing completed. Exiting")
+        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+        exit()
+        ## TEST CODE BLOCK END
         maf_stats = mt_ldpruned.aggregate_rows(hl.agg.stats(mt_ldpruned.variant_qc.AF[1]))
 
         if maf_stats.min < 0.05:
