@@ -197,7 +197,7 @@ if __name__ == "__main__":
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         ## LD prune and checkpoint ##
-        if (not utils.check_exists(ld_pruned)) or args.force:
+        if (not utils.check_exists(ld_pruned)) or (not utils.check_exists(ld_pruned_nocr)) or args.force:
 
             # Filter failing samples, variants, and genotypes
             mt_gt_filt = sq.filter_failing(
@@ -247,7 +247,7 @@ if __name__ == "__main__":
             logging.info(f"Writing checkpoint {stepcount}-1: LD pruned dataset")
             mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
             ## TEST CODE BLOCK
-            mt_ldpruned_nocr = mt_ldpruned_nocr(ld_pruned_nocr, overwrite=True)
+            mt_ldpruned_nocr = mt_ldpruned_nocr.checkpoint(ld_pruned_nocr, overwrite=True)
             ## TEST CODE BLOCK END
         else:
             logging.info("Detected LD pruned dataset written, loading that.")
