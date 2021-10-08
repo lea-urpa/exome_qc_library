@@ -383,7 +383,7 @@ if __name__ == "__main__":
         save(p2)
 
         # Plot PCs for VQSR, QD, call rate, and het ab filtered dataset
-        mt_ab_filt = mt_unrelated.filter(
+        mt_ab_filt = mt_unrelated.filter_rows(
             mt_unrelated.low_pass_failing_variant_qc.contains("failing_het_ab"), keep=False)
 
         eigenvalues3, scores3, loadings3 = hl.hwe_normalized_pca(mt_ab_filt.GT, k=2)
@@ -394,7 +394,7 @@ if __name__ == "__main__":
         save(p3)
 
         # Plot PCs for VQSR, QD, call rate, and hwe filtered dataset
-        mt_hwe_filt = mt_unrelated.filter(
+        mt_hwe_filt = mt_unrelated.filter_rows(
             mt_unrelated.low_pass_failing_variant_qc.contains("failing_hwe"), keep=False)
 
         eigenvalues4, scores4, loadings4 = hl.hwe_normalized_pca(mt_hwe_filt.GT, k=2)
@@ -405,7 +405,7 @@ if __name__ == "__main__":
         save(p4)
 
         # Plot PCs for VQSR, QD, het ab filtered dataset
-        mt_ab_filt_nocr = mt_unrelated_nocr.filter(
+        mt_ab_filt_nocr = mt_unrelated_nocr.filter_rows(
             mt_unrelated_nocr.low_pass_failing_variant_qc.contains("failing_het_ab"), keep=False)
 
         eigenvalues5, scores5, loadings5 = hl.hwe_normalized_pca(mt_ab_filt_nocr.GT, k=2)
@@ -416,7 +416,7 @@ if __name__ == "__main__":
         save(p5)
 
         # Plot PCs for VQSR, QD, hwe filtered dataset
-        mt_hwe_filt_nocr = mt_unrelated_nocr.filter(
+        mt_hwe_filt_nocr = mt_unrelated_nocr.filter_rows(
             mt_unrelated_nocr.low_pass_failing_variant_qc.contains("failing_hwe"), keep=False)
 
         eigenvalues6, scores6, loadings6 = hl.hwe_normalized_pca(mt_hwe_filt_nocr.GT, k=2)
@@ -427,7 +427,7 @@ if __name__ == "__main__":
         save(p6)
 
         # Plot PCs for VQSR, QD, call rate, het ab, and hwe filtered dataset
-        mt_all_filt = mt_unrelated.filter(hl.len(mt_unrelated.low_pass_failing_variant_qc) == 0)
+        mt_all_filt = mt_unrelated.filter_rows(hl.len(mt_unrelated.low_pass_failing_variant_qc) == 0)
 
         eigenvalues7, scores7, loadings7 = hl.hwe_normalized_pca(mt_all_filt.GT, k=2)
         output_file(f"{datestr}_PCs_testing_VQSR_QD_CR_HWE_AB_all_filt.html")
