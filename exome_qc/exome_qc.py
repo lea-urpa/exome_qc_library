@@ -268,7 +268,7 @@ if __name__ == "__main__":
         related_to_remove, related_info_ht = sq.king_relatedness(
             mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
             force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
-            region=args.region, reference_genome=args.reference_genome)
+            region=args.region)
 
         ## TEST CODE BLOCK- see if the relatedness calcs are the same with no call rate filter, but just w/ CR filt
         mt_autosomes_nocr = mt_ldpruned_nocr.filter_rows(hl.literal(autosomes).contains(mt_ldpruned_nocr.locus.contig))
@@ -276,7 +276,7 @@ if __name__ == "__main__":
         related_to_remove_nocr, related_info_ht_nocr = sq.king_relatedness(
             mt_autosomes_nocr, relatedness_calculated_nocr, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
             force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
-            region=args.region, reference_genome=args.reference_genome)
+            region=args.region)
         ## TEST CODE BLOCK END
 
         mt = mt.annotate_cols(
