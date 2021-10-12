@@ -5,6 +5,7 @@ Author: Lea Urpa, August 2020
 """
 import logging
 import time
+import os
 import hail as hl
 import utils
 from bokeh.io import output_file, save
@@ -668,8 +669,10 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     duplicates_export = checkpoint_name.rstrip("/").replace(".mt", "") + "_duplicates.txt"
     related_info_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_connection_info.ht/"
 
-    kinship_plot_fn = checkpoint_name.rstrip("/").replace(".mt", "") + f"_{datestr}_kinship_histogram.html"
-    connection_plot_fn = checkpoint_name.rstrip("/").replace(".mt", "") + f"_{datestr}_num_connections_per_individual_hist.html"
+    basename = os.path.basename(checkpoint_name)
+
+    kinship_plot_fn = basename.rstrip("/").replace(".mt", "") + f"_{datestr}_kinship_histogram.html"
+    connection_plot_fn = basename.rstrip("/").replace(".mt", "") + f"_{datestr}_num_connections_per_individual_hist.html"
 
     var_count = mt.count_rows()
     if var_count < 10000:
