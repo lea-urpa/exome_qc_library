@@ -203,7 +203,8 @@ if __name__ == "__main__":
             mt_filtered = mt_gt_filt.filter_rows(
                 mt_gt_filt.low_pass_failing_variant_qc.contains("failing_QD") |
                 mt_gt_filt.low_pass_failing_variant_qc.contains("failing_VQSR_filters") |
-                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate"), keep=False
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate") |
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_hwe"), keep=False
             )
 
             # Filter out low MAF variants
@@ -224,7 +225,6 @@ if __name__ == "__main__":
             mt_ldpruned = hl.read_matrix_table(ld_pruned)
 
         ## Calculate relatedness with King ##
-        # THIS triggers shuffles, think about removing secondaries... seemed to run ok though
         if args.reference_genome is "GRCh38":
             autosomes = ["chr" + str(i) for i in range(1, 23)]
         else:
