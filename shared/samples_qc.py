@@ -668,6 +668,9 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     duplicates_export = checkpoint_name.rstrip("/").replace(".mt", "") + "_duplicates.txt"
     related_info_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_connection_info.ht/"
 
+    kinship_plot_fn = checkpoint_name.rstrip("/").replace(".mt", "") + f"_{datestr}_kinship_histogram.html"
+    connection_plot_fn = checkpoint_name.rstrip("/").replace(".mt", "") + f"_{datestr}_num_connections_per_individual_hist.html"
+
     var_count = mt.count_rows()
     if var_count < 10000:
         logging.warning("Warning! Number of variants to calculate kinship is less than 10 000, it is likely that "
@@ -715,7 +718,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     #######################
     # Plot kinship values #
     #######################
-    output_file(f"{datestr}_kinship_histogram.html")
+    output_file(kinship_plot_fn)
     kin_hist = rel_tab.aggregate(hl.expr.aggregators.hist(rel_tab.phi, 0, 0.5, 200))
     kin_plot = hl.plot.histogram(kin_hist, legend='Kinship coefficient', title='Kinships in dataset (above degree 2)')
     save(kin_plot)
@@ -748,7 +751,7 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     degree_hist = num_connections_ht.aggregate(
         hl.expr.aggregators.hist(num_connections_ht.related_num_connections, 0, degree_stats.max, 50))
 
-    output_file(f"{datestr}_number_connections_per_individual_hist.html")
+    output_file(connection_plot_fn)
     degree_plot = hl.plot.histogram(degree_hist, legend='# connections', title='Number of (>2nd degree) relations per individual')
     save(degree_plot)
 
