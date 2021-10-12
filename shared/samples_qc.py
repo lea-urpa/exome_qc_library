@@ -198,12 +198,12 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
                     logging.error(e)
                     output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
                     p = hl.plot.scatter(scores.scores[0], scores.scores[1], title=f"PCA plot round {round_num}",
-                                        collect_all=True)
+                                        collect_all=collect_all)
                     save(p)
             else:
                 output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
                 p = hl.plot.scatter(scores.scores[0], scores.scores[1], title=f"PCA plot round {round_num}",
-                                    collect_all=True)
+                                    collect_all=collect_all)
                 save(p)
 
         # Calculate upper and lower limits for each principal component
