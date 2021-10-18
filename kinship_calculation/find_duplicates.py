@@ -31,16 +31,61 @@ if __name__ == "__main__":
     parser.add_argument("--log_dir", type=str, required=True, help="Location where logs should be written to.")
     parser.add_argument("--data_dir", type=str, required=True, help="Location where VCFs to import exist.")
     parser.add_argument("--out_dir", type=str, required=True, help="Location to write combined + vep annotated mt")
-    parser.add_argument("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
+    parser.add_argument("--reference_genome", default='GRCh38', choices=['GRCh37', 'GRCh38'],
                         help="Reference genome build.")
     parser.add_argument("--chr_prefix", action='store_true', help="Chromosomes are of form 'chr1', NOT '1' etc.")
     parser.add_argument("--force_bgz", action='store_true', help="Force blog gzip import? Default true.")
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
     parser.add_argument("--test", action='store_true', help="Filters data to just chr 22 for testing purposes.")
     parser.add_argument("--force", action='store_true', help="Force re-run of all steps?")
+    parser.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
+    parser.add_argument('--num_secondary_workers', type=int, default=20,
+                        help='Number of secondary workers for scaling in applicable steps.')
+    parser.add_argument("--region", default='europe-west1', help='Region name for scaling in pipeline.')
+
+    # Variant QC thresholds #
+    var_thresh = parser.add_argument_group("Variant QC thresholds. If not indicated 'final' or 'low pass' in name, "
+                                           "thresholds are used for both low pass variant filtering and final variant"
+                                           "filtering.")
+    var_thresh.add_argument("--low_pass_p_hwe", default=1e-9, type=float, help="Low pass variant QC HWE cutoff")
+    var_thresh.add_argument("--low_pass_min_call_rate", default=0.8, type=float,
+                            help="Low pass variant QC min call rate")
+    var_thresh.add_argument("--snp_qd", default=2, type=float, help="Variant QC min quality by depth for snps")
+    var_thresh.add_argument("--indel_qd", default=3, type=float, help="Variant QC min quality by depth for indels")
+    var_thresh.add_argument("--ab_allowed_dev_het", default=0.8, type=float,
+                            help="% of het GT calls for a variant that must be in allelic balance (% ref or alt "
+                                 "reads out of range for het GT call)")
+
+    # Genotype QC thresholds #
+    geno_thresh = parser.add_argument_group("Genotype QC thresholds. If not indicated 'final' or 'low pass' in name,"
+                                            "thresholds are used for both low pass and final genotype filtering.")
+    geno_thresh.add_argument("--min_dp", default=10, type=float, help="min read depth for a genotype")
+    geno_thresh.add_argument("--min_gq", default=20, type=float, help="min genotype quality for all GT calls.")
+    geno_thresh.add_argument("--min_het_ref_reads", default=0.2, type=float,
+                             help="min % reference reads for a het GT call")
+    geno_thresh.add_argument("--max_het_ref_reads", default=0.8, type=float,
+                             help="max % reference reads for a het GT call")
+    geno_thresh.add_argument("--min_hom_ref_ref_reads", default=0.9, type=float,
+                             help="min % reference reads for a ref GT call")
+    geno_thresh.add_argument("--max_hom_alt_ref_reads", default=0.1, type=float,
+                             help="max % reference reads for an alt GT call")
+    geno_thresh.add_argument("--count_failing", default=True, type=bool,
+                             help="Count number of genotypes failing each filter? Slow, but handy for troubleshooting.")
 
     args = parser.parse_args()
 
+    # LD pruning thresholds #
+    ld_thresh = parser.add_argument_group("Thresholds for LD pruning.")
+    ld_thresh.add_argument("--r2", default=0.2, type=float, help="r2 correlation cutoff for LD pruning.")
+    ld_thresh.add_argument("--bp_window_size", default=500000, type=int,
+                           help="Sliding window size for LD pruning in bp.")
+
+    # Kinship thresholds #
+    kin_thresh = parser.add_argument_group("Kinship thresholds.")
+    kin_thresh.add_argument("--ind_maf", default=0.05, type=float,
+                            help="Minor allele frequency cutoff for calculating kinship.")
+    kin_thresh.add_argument("--kinship_threshold", default=0.0883,
+                            help="Threshold for kinship coefficient, above which individuals are defined as related.")
 
     ###############################################
     # Import scripts, configure logger and inputs #
