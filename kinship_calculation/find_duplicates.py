@@ -133,11 +133,11 @@ if __name__ == "__main__":
         test_str = ""
 
     if args.out_file is None:
-        basename = os.path.basename(vcf_files[0]).replace(".vcf", "").replace(".gz", "").replace(".bgz", "")
+        args.out_name = os.path.basename(vcf_files[0]).replace(".vcf", "").replace(".gz", "").replace(".bgz", "").replace("*","")
     else:
-        basename = args.out_file.rstrip("/").replace(".mt", "")
+        args.out_name = args.out_file.rstrip("/").replace(".mt", "")
 
-    out_basename = os.path.join(args.out_dir, basename)
+    out_basename = os.path.join(args.out_dir, args.out_name)
     combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
 
     if (not utils.check_exists(combined_mt_fn)) or args.force:
