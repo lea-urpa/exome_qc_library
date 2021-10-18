@@ -253,7 +253,7 @@ if __name__ == "__main__":
         related_to_remove, related_info_ht = sq.king_relatedness(
             mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold,
             force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
-            region=args.region, reference_genome=args.reference_genome, export_duplicates=True)
+            region=args.region, export_duplicates=True)
 
         mt = mt.annotate_cols(
             related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False),
