@@ -17,9 +17,6 @@ import samples_qc as sq
 
 
 if __name__ == "__main__":
-
-    hl.init()
-
     ###################
     # Parse arguments #
     ###################
@@ -144,7 +141,7 @@ if __name__ == "__main__":
     combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
 
     if (not utils.check_exists(combined_mt_fn)) or args.force:
-        mt = utils.load_vcfs(vcf_files, args.data_dir, force=args.force, test=args.test,
+        mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
                              chr_prefix=args.chr_prefix, reference_genome=args.reference_genome,
                              force_bgz=args.force_bgz,
                              call_fields=args.call_fields)
