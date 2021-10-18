@@ -69,8 +69,6 @@ if __name__ == "__main__":
     geno_thresh.add_argument("--count_failing", default=True, type=bool,
                              help="Count number of genotypes failing each filter? Slow, but handy for troubleshooting.")
 
-    args = parser.parse_args()
-
     # LD pruning thresholds #
     ld_thresh = parser.add_argument_group("Thresholds for LD pruning.")
     ld_thresh.add_argument("--r2", default=0.2, type=float, help="r2 correlation cutoff for LD pruning.")
@@ -83,6 +81,8 @@ if __name__ == "__main__":
                             help="Minor allele frequency cutoff for calculating kinship.")
     kin_thresh.add_argument("--kinship_threshold", default=0.0883,
                             help="Threshold for kinship coefficient, above which individuals are defined as related.")
+
+    args = parser.parse_args()
 
     ###############################################
     # Import scripts, configure logger and inputs #
@@ -184,7 +184,7 @@ if __name__ == "__main__":
             call_rate=args.low_pass_min_call_rate, p_hwe=args.low_pass_p_hwe, snp_qd=args.snp_qd,
             indel_qd=args.indel_qd,
             ab_allowed_dev_het=args.ab_allowed_dev_het, count_failing=args.count_failing, sex_aware_call_rate=False,
-            pheno_col=args.pheno_col, samples_qc=False, force=args.force
+            samples_qc=False, force=args.force
         )
 
         logging.info(f"Writing checkpoint after low pass variant QC")
