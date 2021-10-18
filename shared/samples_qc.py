@@ -639,10 +639,11 @@ def nx_algorithm(g, cases):
     if cases is not None:
         unrelated_cases = filter_node_cases(unrelated_nodes, cases)
         sanity_check(g, unrelated_cases)
+        unrelated_cases_count = len(unrelated_cases)
     else:
-        unrelated_cases = 0
+        unrelated_cases_count = 0
 
-    return related_nodes, subgraph_dict, len(unrelated_cases)
+    return related_nodes, subgraph_dict, unrelated_cases_count
 
 
 def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=None, force=False,
