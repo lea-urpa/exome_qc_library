@@ -251,7 +251,7 @@ if __name__ == "__main__":
         mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
 
         related_to_remove, related_info_ht = sq.king_relatedness(
-            mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
+            mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold,
             force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
             region=args.region, reference_genome=args.reference_genome, export_duplicates=True)
 
