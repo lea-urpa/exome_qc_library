@@ -20,7 +20,6 @@ if __name__ == "__main__":
     ###################
     # Parse arguments #
     ###################
-    # TODO add missing args from pipe below
     parser = argparse.ArgumentParser(description="Pipeline to find duplicates from an exome sequencing dataset.")
     parser.add_argument("--vcf", type=str, required=True,
                         help="Name of VCF file (or files) to import, comma separated if > 1 file.")
@@ -150,7 +149,8 @@ if __name__ == "__main__":
                              force_bgz=args.force_bgz,
                              call_fields=args.call_fields)
 
-        mt = mt.checkpoint(combined_mt_fn, overwrite=True)
+        if len(vcf_files) > 1:
+            mt = mt.checkpoint(combined_mt_fn, overwrite=True)
     else:
         mt = hl.read_matrix_table(combined_mt_fn)
 
@@ -221,11 +221,12 @@ if __name__ == "__main__":
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
                 max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
             )
-
+            logging.info("Filtering variants failing on QD, VQSR, call rate, and hwe.")
             mt_filtered = mt_gt_filt.filter_rows(
                 mt_gt_filt.low_pass_failing_variant_qc.contains("failing_QD") |
                 mt_gt_filt.low_pass_failing_variant_qc.contains("failing_VQSR_filters") |
-                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate"), keep=False
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate") |
+                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_hwe"), keep=False
             )
 
             # Filter out low MAF variants
