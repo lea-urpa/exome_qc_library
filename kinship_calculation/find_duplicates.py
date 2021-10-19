@@ -138,7 +138,11 @@ if __name__ == "__main__":
         args.out_name = args.out_file.rstrip("/").replace(".mt", "")
 
     out_basename = os.path.join(args.out_dir, args.out_name)
-    combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
+
+    if len(vcf_files) > 1:
+        combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
+    else:
+        combined_mt_fn = out_basename + f"{test_str}.mt/"
 
     if (not utils.check_exists(combined_mt_fn)) or args.force:
         mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
