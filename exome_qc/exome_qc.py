@@ -177,6 +177,9 @@ if __name__ == "__main__":
     relatedness_calculated = os.path.join(
         args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
 
+    logging.info("Testing new variant QC, ending here. Check the logs.")
+    exit()
+
     #########################
     # Calculate relatedness #
     #########################
