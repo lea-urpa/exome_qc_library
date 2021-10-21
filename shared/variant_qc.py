@@ -596,7 +596,7 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
     ############################################
     # Find variants not passing mean DP filter #
     ############################################
-    dp_cond = hl.is_defined(mt[varqc_name].DP.mean) & (mt[varqc_name].DP.mean < min_dp)
+    dp_cond = hl.is_defined(mt[varqc_name].dp_stats.mean) & (mt[varqc_name].dp_stats.mean < min_dp)
 
     dp_filter = hl.cond(dp_cond, mt[failing_name].append("failing_mean_DP"), mt[failing_name])
     mt = mt.annotate_rows(**{failing_name: dp_filter})
@@ -604,7 +604,7 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
     ############################################
     # Find variants not passing mean GQ filter #
     ############################################
-    gq_cond = hl.is_defined(mt[varqc_name].GQ.mean) & (mt[varqc_name].GQ.mean < min_gq)
+    gq_cond = hl.is_defined(mt[varqc_name].gq_stats.mean) & (mt[varqc_name].gq_stats.mean < min_gq)
 
     gq_filter = hl.cond(gq_cond, mt[failing_name].append("failing_mean_GQ"), mt[failing_name])
     mt = mt.annotate_rows(**{failing_name: gq_filter})
