@@ -850,8 +850,11 @@ def variant_quality_control(
         #mt = mt.annotate_globals(**{dp_qc_name: mt_varannot.index_globals()[dp_qc_name]})
         #ab_name = annotation_prefix + "genotype_qc_failing_ab"
         #mt = mt.annotate_globals(**{ab_name: mt_varannot.index_globals()[ab_name]})
-        var_name = annotation_prefix + "failing_variant_qc_counts"
-        mt = mt.annotate_globals(**{var_name: mt_varannot.index_globals()[var_name]})
+        try:
+            var_name = annotation_prefix + "failing_variant_qc_counts"
+            mt = mt.annotate_globals(**{var_name: mt_varannot.index_globals()[var_name]})
+        except:
+            logging.info("Missing failing variant QC counts dictionary, can't annotate to main matrix table.")
 
     if pheno_col is not None:
         mt = mt.annotate_rows(hwe_ctrls_only=mt_varannot.index_rows(mt.row_key).hwe_ctrls_only)
