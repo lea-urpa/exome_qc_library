@@ -846,10 +846,10 @@ def variant_quality_control(
         mt = mt.annotate_rows(**{het_ab: mt_varannot.index_rows(mt.row_key)[het_ab]})
 
     if count_failing:
-        dp_qc_name = annotation_prefix + "genotype_qc_failing_quality_depth"
-        mt = mt.annotate_globals(**{dp_qc_name: mt_varannot.index_globals()[dp_qc_name]})
-        ab_name = annotation_prefix + "genotype_qc_failing_ab"
-        mt = mt.annotate_globals(**{ab_name: mt_varannot.index_globals()[ab_name]})
+        #dp_qc_name = annotation_prefix + "genotype_qc_failing_quality_depth"
+        #mt = mt.annotate_globals(**{dp_qc_name: mt_varannot.index_globals()[dp_qc_name]})
+        #ab_name = annotation_prefix + "genotype_qc_failing_ab"
+        #mt = mt.annotate_globals(**{ab_name: mt_varannot.index_globals()[ab_name]})
         var_name = annotation_prefix + "failing_variant_qc_counts"
         mt = mt.annotate_globals(**{var_name: mt_varannot.index_globals()[var_name]})
 
