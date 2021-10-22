@@ -170,12 +170,24 @@ if __name__ == "__main__":
         logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")
         mt = mt.checkpoint(low_pass_qcd, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+
+        logging.info("variants failing different QC methods:")
+        logging.info(mt.aggregate_rows(hl.agg.counter(hl.str(",").join(mt.low_pass_failing_variant_qc))))
+
+        logging.info("Variants with in-sample MAF > 0.05 and passing all filters:")
+        logging.info(mt.aggregate_rows(hl.agg.counter(
+            (hl.len(mt.low_pass_failing_variant_qc) == 0) & (mt.low_pass_variant_qc.AF[1] > 0.05)
+        )))
+
     else:
         logging.info("Detected low-pass variant QC mt exists, skipping low-pass variant QC.")
 
     stepcount += 1
     relatedness_calculated = os.path.join(
         args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
+
+    logging.info("Re-ran low pass variant QC, check the logs and see the # of variants passing all filters.")
+    exit()
 
     #########################
     # Calculate relatedness #
