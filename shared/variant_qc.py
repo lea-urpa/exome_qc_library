@@ -221,18 +221,15 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
     return mt
 
 
-def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2,
-                     max_het_ref_reads=0.8, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
+def count_variant_het_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2, max_het_ref_reads=0.8,
+                         min_dp=10, min_gq=20):
     """
     :param mt: matrix table to annotate
-    :param checkpoint_name: Name of checkpoint to write to, including bucket name or file dir to write to
     :param prefix: prefix to add to variant annotations
     :param samples_qc: has samples QC been run, failing samples and population outliers found?
     :param pheno_col: is there a column annotation giving True/False for case status?
     :param min_het_ref_reads: minimum percent reference reads for het genotype
     :param max_het_ref_reads: maximum percent reference reads for het genotype
-    :param min_hom_ref_ref_reads: minimum percent reference reads for hom ref genotype
-    :param max_hom_alt_ref_reads: maximum percent reference reads for hom alt genotype
     :return:
     """
     if (not prefix.endswith("_")) and (prefix != ""):
@@ -248,7 +245,11 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
     ##########################################################################
     # Get total # of het GTs per variant in passing samples (or all samples) #
     ##########################################################################
-    het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT)
+    #het_gt_filters = mt.GT.is_het() & hl.is_defined(mt.GT)
+    het_gt_filters = (mt.GT.is_het() & hl.is_defined(mt.GT) & (mt.DP > min_dp) & (mt.GQ > min_gq) &
+                      hl.is_defined(mt.DP) & hl.is_defined(mt.GQ))
+
+
     if samples_qc:
         sample_filter = (
                 (mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) &
@@ -269,16 +270,17 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
     ###########################################
     # Define filter conditions for variant ab #
     ###########################################
-    het_ab_cond = (
-            (((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads))
+    passing_het_gts = (
+            (
+                    ((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads)
+            )
             & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
+            & (mt.DP > min_dp) & hl.is_defined(mt.DP) & (mt.GQ > min_gq) & hl.is_defined(mt.GQ)
     )
 
     #####################################################
     # Get percent of het gts in AB if het gt count != 0 #
     #####################################################
-    passing_het_gts = mt.GT.is_het() & hl.is_defined(mt.GT) & het_ab_cond
-
     if samples_qc:
         sample_filter = ((mt.pop_outlier_sample == False) & (hl.len(mt.failing_samples_qc) == 0) &
                          hl.is_defined(mt.pop_outlier_sample) & hl.is_defined(mt.failing_samples_qc))
@@ -347,7 +349,7 @@ def count_variant_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col
 
 
 def annotate_variant_het_ab(mt, checkpoint_name, prefix="", samples_qc=False, pheno_col=None, min_het_ref_reads=0.2,
-                            max_het_ref_reads=0.8, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1):
+                            max_het_ref_reads=0.8, min_dp=10, min_gq=20):
     """
     Annotate percentage of het genotypes per variant that are in  allelic balance. That means that the genotype has ref
     reads within the 20-80% range of all reads.
@@ -369,9 +371,9 @@ def annotate_variant_het_ab(mt, checkpoint_name, prefix="", samples_qc=False, ph
                  "population outliers and samples failing samples QC (if run already) and genotypes failing on "
                  "depth and quality by depth measures.")
 
-    mt = count_variant_ab(mt, checkpoint_name, prefix=prefix, samples_qc=samples_qc, pheno_col=None,
-                          min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
-                          min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
+    mt = count_variant_het_ab(mt, prefix=prefix, samples_qc=samples_qc, pheno_col=None,
+                              min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads, min_dp=min_dp,
+                              min_gq=min_gq)
 
     mt = mt.checkpoint(checkpoint_name + "_variant_het_ab_annotated.mt/", overwrite=True)
 
@@ -379,9 +381,9 @@ def annotate_variant_het_ab(mt, checkpoint_name, prefix="", samples_qc=False, ph
     # Annotate het GT and het GT allelic balance for cases and controls separately #
     ################################################################################
     if (pheno_col is not None) and (samples_qc is True):
-        mt = count_variant_ab(mt, checkpoint_name, prefix=prefix, samples_qc=samples_qc, pheno_col=pheno_col,
-                              min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
-                              min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads)
+        mt = count_variant_het_ab(mt, prefix=prefix, samples_qc=samples_qc, pheno_col=pheno_col,
+                                  min_het_ref_reads=min_het_ref_reads, max_het_ref_reads=max_het_ref_reads,
+                                  min_dp=min_dp, min_gq=min_gq)
 
         mt = mt.checkpoint(checkpoint_name + "_variant_het_ab_case_annotated.mt/", overwrite=True)
 
@@ -799,7 +801,7 @@ def variant_quality_control(
         mt_abannot = annotate_variant_het_ab(
             mt, checkpoint_name, prefix=annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
             max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads,
-            min_hom_ref_ref_reads=min_hom_ref_ref_reads, max_hom_alt_ref_reads=max_hom_alt_ref_reads
+            min_dp=min_dp,min_gq=min_gq
         )
     else:
         logging.info("Detected het AB annotated mt exists, loading that.")
