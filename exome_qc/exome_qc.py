@@ -8,6 +8,7 @@ import sys
 import os
 import logging
 import time
+from pprint import pprint
 import hail as hl
 from bokeh.io import output_file, save
 from parse_arguments import parse_arguments, check_inputs
@@ -171,16 +172,36 @@ if __name__ == "__main__":
         mt = mt.checkpoint(low_pass_qcd, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
+    else:
+        #logging.info("Detected low-pass variant QC mt exists, skipping low-pass variant QC.")
+        het_ab_annotated = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_low_pass_qcd_het_ab_stats{args.test_str}.mt/")
+
+        mt = hl.read_matrix_table(low_pass_qcd)
+
         logging.info("variants failing different QC methods:")
-        logging.info(mt.aggregate_rows(hl.agg.counter(hl.str(",").join(mt.low_pass_failing_variant_qc))))
+        logging.info(pprint(mt.aggregate_rows(hl.agg.counter(hl.str(",").join(mt.low_pass_failing_variant_qc)))))
 
         logging.info("Variants with in-sample MAF > 0.05 and passing all filters:")
         logging.info(mt.aggregate_rows(hl.agg.counter(
             (hl.len(mt.low_pass_failing_variant_qc) == 0) & (mt.low_pass_variant_qc.AF[1] > 0.05)
         )))
 
-    else:
-        logging.info("Detected low-pass variant QC mt exists, skipping low-pass variant QC.")
+        logging.info("Annotating het ab stats and making plot.")
+        het_gt_filters = (mt.GT.is_het() & hl.is_defined(mt.GT) & (mt.DP > args.min_dp) & (mt.GQ > args.min_gq) &
+                          hl.is_defined(mt.DP) & hl.is_defined(mt.GQ))
+        mt = mt.annotate_rows(het_ab_stats=hl.agg.filter(
+            het_gt_filters,
+            hl.agg.stats((mt.AD[0] / hl.sum(mt.AD))
+                         )))
+
+        mt = mt.checkpoint(het_ab_annotated, overwrite=True)
+
+        output_file(f"{datestr}_mean_het_ab_hist.html")
+        ab_hist = mt.aggregate_entries(hl.agg.hist(mt.het_ab_stats.mean, 0, 1, 50))
+        p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
+        save(p)
+
+        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
     stepcount += 1
     relatedness_calculated = os.path.join(
