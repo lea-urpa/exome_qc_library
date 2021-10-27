@@ -54,7 +54,7 @@ def annotate_variants(mt):
                          hl.struct(gene_symbol=x.gene_symbol, gene_id=x.gene_id, consequence=x.consequence_terms)),
             most_severe.map(lambda x:
                             hl.struct(gene_symbol=x.gene_symbol, gene_id=x.gene_id, consequence=x.consequence_terms))),
-    )
+    missing_false=True)
 
     # Same thing but for variants predicted to be noncoding in that transcript
     canon_pc = mt.row.vep.transcript_consequences.filter(
@@ -85,7 +85,7 @@ def annotate_variants(mt):
                          hl.struct(gene_symbol=x.gene_symbol, gene_id=x.gene_id, consequence=x.consequence_terms)),
             most_severe.map(lambda x:
                             hl.struct(gene_symbol=x.gene_symbol, gene_id=x.gene_id, consequence=x.consequence_terms))),
-    )
+    missing_false=True)
 
     # either if there is a canonical and protein coding transcript consequence for that variant,
     # and the lof annotation is not missing and equal to HC, and the lof flag is missing or is blank,
