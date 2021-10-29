@@ -167,6 +167,11 @@ if __name__ == "__main__":
             pheno_col=args.pheno_col, samples_qc=False, force=args.force
         )
 
+        output_file(f"{low_pass_qcd}_mean_het_ab_hist.html")
+        ab_hist = mt.aggregate_rows(hl.agg.hist(mt.het_ab_stats.mean, 0, 1, 50))
+        p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
+        save(p)
+
         logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")
         mt = mt.checkpoint(low_pass_qcd, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
