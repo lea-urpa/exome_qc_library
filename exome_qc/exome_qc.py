@@ -172,11 +172,28 @@ if __name__ == "__main__":
         p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
         save(p)
 
+        output_file(f"{low_pass_qcd}_initial_call_rate.html")
+        cr_hist_1 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_initial_call_rate, 0, 1, 50))
+        p1 = hl.plot.histogram(cr_hist_1, legend='call rate', title="variant call rate, before GT filters")
+        save(p1)
+
+        output_file(f"{low_pass_qcd}_call_rate_after_DP_GQ_filt.html")
+        cr_hist_2 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_call_rate_after_DP_GQ_filt, 0, 1, 50))
+        p2 = hl.plot.histogram(cr_hist_2, legend='call rate', title="variant call rate, before GT filters")
+        save(p2)
+
+        output_file(f"{low_pass_qcd}_call_rate_after_AB_filt.html")
+        cr_hist_3 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_call_rate_after_AB_filt, 0, 1, 50))
+        p3 = hl.plot.histogram(cr_hist_3, legend='call rate', title="variant call rate, before GT filters")
+        save(p3)
+
         logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")
         mt = mt.checkpoint(low_pass_qcd, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
     else:
         logging.info("Detected low-pass variant QC mt exists, skipping low-pass variant QC.")
+
+
 
     stepcount += 1
     relatedness_calculated = os.path.join(
