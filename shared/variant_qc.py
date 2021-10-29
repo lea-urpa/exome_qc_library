@@ -71,7 +71,7 @@ def maf_filter(mt, maf, filter_ac0_after_pruning=False):
     :param filter_ac0_after_pruning: filter variants no longer in the data, e.g. sum(AC) = 0?
     :return: returns maf filtered matrix table.
     """
-
+    # TODO change this to give variant QC annotation name, if not present then calculate variant QC.
     # Run hl.variant_qc() to get AFs
     mt = hl.variant_qc(mt)
 
