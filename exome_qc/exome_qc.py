@@ -195,8 +195,6 @@ if __name__ == "__main__":
     else:
         logging.info("Detected low-pass variant QC mt exists, skipping low-pass variant QC.")
 
-
-
     stepcount += 1
     relatedness_calculated = os.path.join(
         args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
