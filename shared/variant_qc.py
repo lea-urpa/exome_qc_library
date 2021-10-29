@@ -309,7 +309,7 @@ def count_variant_het_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_he
     # Annotate het AB stats #
     #########################
     mt = mt.annotate_rows(het_ab_stats=hl.agg.filter(
-        het_gt_filters,
+        mt.GT.is_het() & hl.is_defined(mt.GT),
         hl.agg.stats((mt.AD[0] / hl.sum(mt.AD))
                      )))
 
