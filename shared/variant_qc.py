@@ -207,7 +207,7 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
 
     mt = mt.filter_entries(filter_condition, keep=False)
     mt = mt.annotate_rows(**{
-        prefix + 'call_rate_after_DP_GQ_filt': hl.agg.count(hl.is_defined(mt.GT)) / mt.count_cols()
+        prefix + 'call_rate_after_DP_GQ_filt': hl.agg.count_where(hl.is_defined(mt.GT)) / mt.count_cols()
     })
 
     mt = mt.checkpoint(checkpoint_name + "_DP_GQ_filtered.mt/", overwrite=True)
@@ -498,7 +498,7 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
     ############################
     mt = mt.filter_entries(het_ab_cond | hom_ab_cond | homalt_ab_cond, keep=False)
     mt = mt.annotate_rows(**{
-        prefix + 'call_rate_after_AB_filt': hl.agg.count(hl.is_defined(mt.GT)) / mt.count_cols()
+        prefix + 'call_rate_after_AB_filt': hl.agg.count_where(hl.is_defined(mt.GT)) / mt.count_cols()
     })
 
     mt = mt.checkpoint(checkpoint_name + "_GT_ab_filtered.mt/", overwrite=True)
@@ -765,7 +765,7 @@ def variant_quality_control(
     # Calculate initial call rate #
     ###############################
     mt = mt.annotate_rows(
-        **{annotation_prefix + 'initial_call_rate': hl.agg.count(hl.is_defined(mt.GT)) / mt.count_cols()}
+        **{annotation_prefix + 'initial_call_rate': hl.agg.count_where(hl.is_defined(mt.GT)) / mt.count_cols()}
     )
 
     ############################################################
