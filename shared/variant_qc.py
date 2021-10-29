@@ -206,6 +206,10 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
         filter_condition = failing_dp_cond | pl_cond | gq_cond
 
     mt = mt.filter_entries(filter_condition, keep=False)
+    mt = mt.annotate_rows(**{
+        prefix + 'call_rate_after_DP_GQ_filt': hl.agg.count(hl.is_defined(mt.GT)) / mt.count_cols()
+    })
+
     mt = mt.checkpoint(checkpoint_name + "_DP_GQ_filtered.mt/", overwrite=True)
 
     if count_failing:
@@ -262,9 +266,8 @@ def count_variant_het_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_he
     # Define filter conditions for variant ab #
     ###########################################
     passing_het_gts = (
-            (
-                    ((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) | ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads)
-            )
+            ( ((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) |
+              ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads) )
             & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
     )
 
@@ -300,23 +303,19 @@ def count_variant_het_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_he
     else:
         mt = mt.annotate_rows(**{het_ab: hl.cond((mt[het_gt_cnt] > 0) & hl.is_defined(mt[het_gt_cnt]),
                                                  hl.agg.count_where(passing_het_gts) / mt[het_gt_cnt],
-                                                 hl.null(hl.tfloat))})
 
-    # TODO add this in somewhere
-    logging.info("Annotating het ab stats and making plot.")
-    het_gt_filters = (mt.GT.is_het() & hl.is_defined(mt.GT) & (mt.DP > args.min_dp) & (mt.GQ > args.min_gq) &
-                      hl.is_defined(mt.DP) & hl.is_defined(mt.GQ))
+                                                 hl.null(hl.tfloat))})
+    #########################
+    # Annotate het AB stats #
+    #########################
     mt = mt.annotate_rows(het_ab_stats=hl.agg.filter(
         het_gt_filters,
         hl.agg.stats((mt.AD[0] / hl.sum(mt.AD))
                      )))
 
-    output_file(f"{datestr}_mean_het_ab_hist.html")
-    ab_hist = mt.aggregate_entries(hl.agg.hist(mt.het_ab_stats.mean, 0, 1, 50))
-    p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
-    save(p)
-
-    # Check if het ab is missing for some samples, report if there are
+    ####################################################################
+    # Check if het ab is missing for some samples, report if there are #
+    ####################################################################
     ab_undefined = mt.aggregate_rows(hl.agg.count_where(~(hl.is_defined(mt[het_ab]))))
     ab_0 = mt.aggregate_rows(hl.agg.count_where(mt[het_gt_cnt] == 0))
     if ab_0 > 0:
@@ -498,6 +497,10 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
     # Filter failing genotypes #
     ############################
     mt = mt.filter_entries(het_ab_cond | hom_ab_cond | homalt_ab_cond, keep=False)
+    mt = mt.annotate_rows(**{
+        prefix + 'call_rate_after_AB_filt': hl.agg.count(hl.is_defined(mt.GT)) / mt.count_cols()
+    })
+
     mt = mt.checkpoint(checkpoint_name + "_GT_ab_filtered.mt/", overwrite=True)
 
     passing_gts = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
@@ -757,6 +760,13 @@ def variant_quality_control(
         mt = sq.filter_failing(
             mt, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col, entries=False, variants=False,
             samples=True, pheno_qc=False, force=force)
+
+    ###############################
+    # Calculate initial call rate #
+    ###############################
+    mt = mt.annotate_rows(
+        **{annotation_prefix + 'initial_call_rate': hl.agg.count(hl.is_defined(mt.GT)) / mt.count_cols()}
+    )
 
     ############################################################
     # Find failing genotypes and do allelic balance annotation #
