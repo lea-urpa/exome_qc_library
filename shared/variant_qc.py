@@ -266,8 +266,8 @@ def count_variant_het_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_he
     # Define filter conditions for variant ab #
     ###########################################
     passing_het_gts = (
-            ( ((mt.AD[0] / hl.sum(mt.AD)) < min_het_ref_reads) |
-              ((mt.AD[0] / hl.sum(mt.AD)) > max_het_ref_reads) )
+            ( ((mt.AD[0] / hl.sum(mt.AD)) > min_het_ref_reads) |
+              ((mt.AD[0] / hl.sum(mt.AD)) < max_het_ref_reads) )
             & hl.is_defined(mt.AD) & mt.GT.is_het() & hl.is_defined(mt.GT)
     )
 
