@@ -231,7 +231,7 @@ if __name__ == "__main__":
 
             # Filter out low MAF variants
             if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
-                mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf)
+                mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, "low_pass_variant_qc")
                 mt_maffilt = mt_maffilt.checkpoint(ld_pruned_maffilt, overwrite=True)
             else:
                 mt_maffilt = hl.read_matrix_table(ld_pruned_maffilt)

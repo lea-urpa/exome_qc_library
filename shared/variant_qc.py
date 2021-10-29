@@ -62,7 +62,7 @@ def downsample_variants(mt, target_count, checkpoint_name, r2=0.2, bp_window_siz
         return mt
 
 
-def maf_filter(mt, maf, filter_ac0_after_pruning=False):
+def maf_filter(mt, maf, varqc_annot_name, filter_ac0_after_pruning=False):
     """
     Takes matrix table, filters out failing genotypes, variants, and samples, and MAF prunes the
     table, and returns the matrix table
@@ -71,13 +71,9 @@ def maf_filter(mt, maf, filter_ac0_after_pruning=False):
     :param filter_ac0_after_pruning: filter variants no longer in the data, e.g. sum(AC) = 0?
     :return: returns maf filtered matrix table.
     """
-    # TODO change this to give variant QC annotation name, if not present then calculate variant QC.
-    # Run hl.variant_qc() to get AFs
-    mt = hl.variant_qc(mt)
-
     # Filter MAF
     logging.info(f'Filtering out variants with minor allele frequency < {maf}')
-    mt = mt.filter_rows(mt.row.variant_qc.AF[1] > maf, keep=True)
+    mt = mt.filter_rows(mt[varqc_annot_name].AF[1] > maf, keep=True)
     mt = mt.annotate_globals(maf_threshold=maf)
 
     if filter_ac0_after_pruning:
