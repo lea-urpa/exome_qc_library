@@ -223,10 +223,7 @@ if __name__ == "__main__":
             )
             logging.info("Filtering variants failing on QD, VQSR, call rate, and hwe.")
             mt_filtered = mt_gt_filt.filter_rows(
-                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_QD") |
-                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_VQSR_filters") |
-                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate") |
-                mt_gt_filt.low_pass_failing_variant_qc.contains("failing_hwe"), keep=False
+                hl.len(mt_gt_filt.low_pass_failing_variant_qc) == 0, keep=True
             )
 
             # Filter out low MAF variants
