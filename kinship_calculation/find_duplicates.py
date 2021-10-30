@@ -253,7 +253,7 @@ if __name__ == "__main__":
 
         mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
 
-        hl.export_plink(mt_autosomes, plink_stem, ind_id=mt.s)
+        hl.export_plink(mt_autosomes, plink_stem, ind_id=mt_autosomes.s)
 
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
     else:
