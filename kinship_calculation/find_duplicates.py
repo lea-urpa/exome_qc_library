@@ -197,54 +197,55 @@ if __name__ == "__main__":
     else:
         logging.info("Detected low-pass variant QC mt exists, skipping low-pass variant QC.")
 
-    #########################
-    # Calculate relatedness #
-    #########################
-    relatedness_calculated = os.path.join(args.out_dir, f"{args.out_name}_relatedness_calculated{args.test_str}.mt/")
-
+    ###########################
+    # LD prune and checkpoint #
+    ###########################
     ld_pruned = os.path.join(args.out_dir, f"{args.out_name}_ld_pruned{args.test_str}.mt/")
     ld_pruned_maffilt = os.path.join(args.out_dir, f"{args.out_name}_maf_filt{args.test_str}.mt/")
     ld_pruned_annot = os.path.join(args.out_dir, f"{args.out_name}_ld_pruned_related{args.test_str}.mt/")
 
-    if (not utils.check_exists(relatedness_calculated)) or args.force:
-        logging.info("Calculating relatedness")
+    if (not utils.check_exists(ld_pruned)) or args.force:
         mt = hl.read_matrix_table(low_pass_qcd)
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
-        ## LD prune and checkpoint ##
-        if (not utils.check_exists(ld_pruned)) or args.force:
+        # Filter failing samples, variants, and genotypes
+        mt_gt_filt = sq.filter_failing(
+            mt, ld_pruned, prefix='low_pass', entries=True, variants=False, samples=False, unfilter_entries=True,
+            pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+            min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+        )
+        logging.info("Filtering variants failing on QD, VQSR, call rate, and hwe.")
+        mt_filtered = mt_gt_filt.filter_rows(
+            hl.len(mt_gt_filt.low_pass_failing_variant_qc) == 0, keep=True
+        )
 
-            # Filter failing samples, variants, and genotypes
-            mt_gt_filt = sq.filter_failing(
-                mt, ld_pruned, prefix='low_pass', entries=True, variants=False, samples=False, unfilter_entries=True,
-                pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
-                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
-            )
-            logging.info("Filtering variants failing on QD, VQSR, call rate, and hwe.")
-            mt_filtered = mt_gt_filt.filter_rows(
-                hl.len(mt_gt_filt.low_pass_failing_variant_qc) == 0, keep=True
-            )
-
-            # Filter out low MAF variants
-            if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
-                mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, "low_pass_variant_qc")
-                mt_maffilt = mt_maffilt.checkpoint(ld_pruned_maffilt, overwrite=True)
-            else:
-                mt_maffilt = hl.read_matrix_table(ld_pruned_maffilt)
-
-            # LD prune if row count >80k
-            mt_ldpruned = vq.downsample_variants(
-                mt_maffilt, 80000, ld_pruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
-
-            logging.info(f"Writing checkpoint after LD pruned dataset")
-            mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
+        # Filter out low MAF variants
+        if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
+            mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, "low_pass_variant_qc")
+            mt_maffilt = mt_maffilt.checkpoint(ld_pruned_maffilt, overwrite=True)
         else:
-            logging.info("Detected LD pruned dataset written, loading that.")
-            mt_ldpruned = hl.read_matrix_table(ld_pruned)
+            mt_maffilt = hl.read_matrix_table(ld_pruned_maffilt)
 
-        ## Calculate relatedness with King ##
-        # THIS triggers shuffles, think about removing secondaries... seemed to run ok though
+        # LD prune if row count >80k
+        mt_ldpruned = vq.downsample_variants(
+            mt_maffilt, 80000, ld_pruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
+
+        logging.info(f"Writing checkpoint after LD pruned dataset")
+        mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
+    else:
+        logging.info("Detected LD pruned dataset written, loading that.")
+        mt_ldpruned = hl.read_matrix_table(ld_pruned)
+
+    ##############################################
+    # Export to calculate relatedness externally #
+    ##############################################
+    # For finding duplicates, I think the Hail implementation of King doesn't work well, since it implements only
+    # the between-family estimator... let's export the file in plink format and run command-line king
+    plink_stem = os.path.join(args.out_dir, f"{args.out_name}_ld_pruned{args.test_str}")
+
+    if not utils.check_exists(plink_stem + ".bfile"):
+        logging.info("Filtering to autosomes and exporting to Plink format")
         if args.reference_genome is "GRCh38":
             autosomes = ["chr" + str(i) for i in range(1, 23)]
         else:
@@ -252,32 +253,9 @@ if __name__ == "__main__":
 
         mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
 
-        related_to_remove, related_info_ht = sq.king_relatedness(
-            mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold,
-            force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
-            region=args.region, export_duplicates=True)
+        hl.export_plink(mt_autosomes, plink_stem, ind_id=mt.s)
 
-        mt = mt.annotate_cols(
-            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False),
-            related_graph_id=related_info_ht[mt.s].related_graph_id,
-            related_num_connections=related_info_ht[mt.s].related_num_connections
-        )
-
-        mt = mt.annotate_cols(related_num_connections=hl.or_else(mt.related_num_connections, 0))
-
-        mt_ldpruned = mt_ldpruned.annotate_cols(
-            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned.s), True, False),
-            related_graph_id=related_info_ht[mt_ldpruned.s].related_graph_id,
-            related_num_connections=related_info_ht[mt_ldpruned.s].related_num_connections)
-
-        mt_ldpruned = mt_ldpruned.annotate_cols(
-            related_num_connections=hl.or_else(mt_ldpruned.related_num_connections, 0))
-
-        logging.info(f"Writing checkpoint after relatedness annotated")
-        mt = mt.checkpoint(relatedness_calculated, overwrite=True)
-        mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-
     else:
-        logging.info("Detected mt with relatives annotated exists, skipping relatedness calculation.")
+        logging.info("Detected plink file already exported.")
 
