@@ -752,6 +752,9 @@ def variant_quality_control(
 
     mt = mt.annotate_globals(**{annotation_prefix + "genotype_qc_thresholds": hl.literal(gt_thresholds)})
 
+    # TODO change all the code below such that you just do filters *within* the annotations (het ab, etc)
+    # instead of writing all these intermediate matrix tables- then you can skip moving annotations over.
+
     ###############################################
     # Filter matrix table to only passing samples #
     ###############################################
