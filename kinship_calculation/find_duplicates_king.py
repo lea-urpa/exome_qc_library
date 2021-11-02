@@ -71,7 +71,7 @@ if __name__ == "__main__":
     parser.add_argument("--remake_bed", action='store_true', help="Remake bed files, if Hail output is badly formatted?")
     parser.add_argument("--plink_path", required=True, help="Path of plink executable, if necessary to remake bed files.")
     parser.add_argument("--king_path", required=True, help="Path of King executable.")
-    parser.add_argument("--pull_duplicates", help="Pull duplicate samples to separate file?")
+    parser.add_argument("--pull_duplicates", action='store_true', help="Pull duplicate samples to separate file?")
 
     args = parser.parse_args()
 
