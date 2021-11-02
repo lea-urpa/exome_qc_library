@@ -106,7 +106,8 @@ if __name__ == "__main__":
             in_f.close()
 
             n, bins, patches = plt.hist(kinships, bins=50)
-            plt.title(f'Histogram of {kin_file} kinships')
+            fn, extension = os.path.splitext(kin_file)
+            plt.title(f'Histogram of {extension} kinships')
             plt.ylabel('Frequency')
             plt.xlabel('Kinship coefficient')
             plt.savefig(f'{kin_file.replace(".", "_")}_hist.png')
