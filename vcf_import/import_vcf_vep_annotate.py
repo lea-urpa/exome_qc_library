@@ -6,7 +6,6 @@ Author: Lea Urpa, August 2020
 
 
 if __name__ == "__main__":
-    print('Beginning import pipeline')
     import os
     import argparse
     import sys
