@@ -84,34 +84,37 @@ if __name__ == "__main__":
     ############################################################
     # Pull duplicates from kin and kin0 files to separate file #
     ############################################################
-    duplicates = open(f"{args.plink_data}_duplicates.txt", "w")
-    duplicates.write("\t".join(["FID1", "ID1", "FID2", "ID2", "N_SNP", "HetHet", "IBS0", "Kinship"]))
+    if args.pull_duplicates:
+        duplicates = open(f"{args.plink_data}_duplicates.txt", "w")
+        duplicates.write("\t".join(["FID1", "ID1", "FID2", "ID2", "N_SNP", "HetHet", "IBS0", "Kinship"]))
 
-    for kin_file in [args.plink_data + ".kin0", args.plink_data + ".kin"]:
-        if os.path.exists(kin_file):
-            with open(kin_file) as in_f:
-                first_line = True
-                for line in in_f:
-                    words = line.strip().split("\t")
-                    if first_line:
-                        kin_index = words.index('Kinship')
-                        if "FID" in words:
-                            filetype = "kin0"
+        for kin_file in [args.plink_data + ".kin0", args.plink_data + ".kin"]:
+            if os.path.exists(kin_file):
+                with open(kin_file) as in_f:
+                    first_line = True
+                    for line in in_f:
+                        words = line.strip().split("\t")
+                        if first_line:
+                            kin_index = words.index('Kinship')
+                            if "FID" in words:
+                                filetype = "kin0"
+                            else:
+                                filetype = "kin"
+                            first_line = False
+                            continue
                         else:
-                            filetype = "kin"
-                        first_line = False
-                        continue
-                    else:
-                        if float(words[kin_index]) > 0.354:
-                            if filetype == "kin":
-                                new_line = [words[0], words[1], words[0], words[2], words[3], words[6], words[7], words[8]]
-                            if filetype == "kin0":
-                                new_line = words
+                            if float(words[kin_index]) > 0.354:
+                                if filetype == "kin":
+                                    new_line = [words[0], words[1], words[0], words[2], words[3], words[6], words[7], words[8]]
+                                if filetype == "kin0":
+                                    new_line = words
 
-                            duplicates.write("\t".join(new_line))
-            in_f.close()
-        else:
-            print(f"{kin_file} does not exist.")
+                                duplicates.write("\t".join(new_line))
+                in_f.close()
+            else:
+                print(f"{kin_file} does not exist.")
+
+        duplicates.close()
 
 
 
