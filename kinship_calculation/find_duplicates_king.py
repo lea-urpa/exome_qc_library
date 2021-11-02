@@ -7,6 +7,28 @@ import argparse
 import matplotlib.pyplot as plt
 
 
+def recode_bim(filestem):
+    """
+    Recode bim file, if needed
+    :param filestem:
+    :return:
+    """
+    print(f'Recoding bim file: {filestem}.bim')
+    old_bim = filestem + "_old_chrom_names.bim"
+    new_bim = filestem + ".bim"
+    if not os.path.isfile(old_bim):
+        os.rename(new_bim, old_bim)
+
+    new_bim = open(new_bim, "w")
+    with open(old_bim) as old:
+        for line in old:
+            words = line.strip().split('\t')
+            new_chrom = words[0].replace("chr", "")
+            words[0] = new_chrom
+
+            new_bim.write("\t".join(words) + "\n")
+
+
 def run_king(plink_data, plink_path, king_path, remake_bed=False):
     """
     Wrapper function to run King relatedness calculations.
@@ -45,12 +67,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Runs King relatedness calculation and finds maximal independent "
                                                  "set of relatives.")
     parser.add_argument("--plink_data", required=True, help="Plink 1.9 fileset (bed/bim/fam) file stem name.")
+    parser.add_argument("--recode_bim", action='store_true', help="Recode bim file to make chrX > X?")
     parser.add_argument("--remake_bed", action='store_true', help="Remake bed files, if Hail output is badly formatted?")
-    parser.add_argument("--plink_path", help="Path of plink executable, if necessary to remake bed files.")
-    parser.add_argument("--king_path", help="Path of King executable.")
+    parser.add_argument("--plink_path", required=True, help="Path of plink executable, if necessary to remake bed files.")
+    parser.add_argument("--king_path", required=True, help="Path of King executable.")
     parser.add_argument("--pull_duplicates", help="Pull duplicate samples to separate file?")
 
     args = parser.parse_args()
+
+    #############################
+    # Recode bim file if needed #
+    #############################
+    if args.recode_bim:
+        recode_bim(args.plink_data)
 
     ################################
     # Run king on input plink file #
