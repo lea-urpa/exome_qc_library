@@ -141,7 +141,7 @@ if __name__ == "__main__":
                                 if filetype == "kin0":
                                     new_line = words
 
-                                duplicates.write("\t".join(new_line))
+                                duplicates.write("\t".join(new_line) + "\n")
                 in_f.close()
             else:
                 print(f"{kin_file} does not exist.")
