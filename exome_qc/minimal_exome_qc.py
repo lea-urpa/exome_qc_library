@@ -10,7 +10,6 @@ if __name__ == "__main__":
     import sys
     import logging
     import time
-    from bokeh.io import output_file, save
     import hail as hl
     import utils
     import variant_qc as vq
