@@ -8,9 +8,6 @@ import subprocess
 import argparse
 
 
-def recode_bim(filestem):
-    """
-    Takes a Plink filestem and recodes 'chr1' style chromosome IDs to '1' style chromsome IDs.
 
     :param filestem:
     :return:
