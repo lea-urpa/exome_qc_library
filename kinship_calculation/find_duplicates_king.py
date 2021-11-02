@@ -27,15 +27,18 @@ def run_king(plink_data, plink_path, king_path, remake_bed=False):
     #####################
     # Calculate kinship #
     #####################
-    print('Calculating kinship coefficients with King.')
-    if remake_bed | os.path.exists(plink_data + '_remade.bed'):
-        input_name = plink_data + '_remade.bed'
-    else:
-        input_name = plink_data + '.bed'
+    if not (os.path.exists(f"{plink_data}.kin") | os.path.exists(f"{plink_data}.kin0")):
+        print('Calculating kinship coefficients with King.')
+        if remake_bed | os.path.exists(plink_data + '_remade.bed'):
+            input_name = plink_data + '_remade.bed'
+        else:
+            input_name = plink_data + '.bed'
 
-    cmd = f"{king_path} -b {input_name} --kinship --prefix {plink_data} --degree 3 --ibs"
-    print(f"King command to run: {cmd}")
-    subprocess.call(cmd.split())
+        cmd = f"{king_path} -b {input_name} --kinship --prefix {plink_data} --degree 3 --ibs"
+        print(f"King command to run: {cmd}")
+        subprocess.call(cmd.split())
+    else:
+        print("Kinships already calculated, detected files.")
 
 
 if __name__ == "__main__":
