@@ -191,7 +191,7 @@ if __name__ == "__main__":
         mt_filt = hl.read_matrix_table(mt_filt_fn)
         mt = hl.read_matrix_table(qcd_fn)
 
-    vcf_name = out_basename + "_failing_variants_genotypes_filtered.vcf.gz"
+    vcf_name = out_basename + "_failing_variants_genotypes_filtered.vcf.bgz"
     if (not utils.check_exists(vcf_name)) or args.force:
         hl.export_vcf(mt_filt, vcf_name, tabix=True)
     else:
