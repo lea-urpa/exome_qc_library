@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
     vcf_name = out_basename + "_failing_variants_genotypes_filtered.vcf.gz"
     if (not utils.check_exists(vcf_name)) or args.force:
-        hl.export_vcf(mt_filt, vcf_name)
+        hl.export_vcf(mt_filt, vcf_name, tabix=True)
     else:
         logging.info("Detected VCF already exported, skipping export.")
 
