@@ -22,6 +22,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--vcf", type=str, required=True,
                         help="Name of VCF file (or files) to import, comma separated if > 1 file.")
+    parser.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
+    parser.add_argument('--num_secondary_workers', type=int, default=20,
+                        help='Number of secondary workers for scaling in applicable steps.')
     parser.add_argument("--out_file", type=str, help="Name of matrix table to output.")
     parser.add_argument("--log_dir", type=str, required=True, help="Location where logs should be written to.")
     parser.add_argument("--data_dir", type=str, required=True, help="Location where VCFs to import exist.")
