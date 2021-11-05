@@ -224,6 +224,29 @@ if __name__ == "__main__":
     ##################
     # Run samples QC #
     ##################
+    samples_qcd_fn = out_basename + f"_samples_qcd{test_str}.mt/"
+
+    if (not utils.check_exists(samples_qcd_fn)) or args.force:
+        args.force = True
+
+        mt = hl.read_matrix_table(sex_imputed)
+
+        # Annotate with bam metadata
+        if args.bam_metadata is not None:
+            mt = sa.annotate_cols_from_file(mt, args.bam_metadata, args.bam_delim, args.bam_sample_col, args.bam_miss)
+
+        # Check columns exist
+        for colname in ['chimeras_col', 'contamination_col']:
+            col = getattr(args, colname)
+            try:
+                test = hl.is_defined(mt[col])
+            except Exception as e:
+                logging.error(f"Error! Given column annotation {col} does not actually exist after inputting sample "
+                              f"annotations.")
+                logging.error(e)
+                exit(1)
+
+        #TODO add samples QC function call, additional check if imputed sex does not match reported sex
 
 
     #####################################
