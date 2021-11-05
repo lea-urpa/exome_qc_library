@@ -115,25 +115,27 @@ if __name__ == "__main__":
 
     out_basename = os.path.join(args.out_dir, basename)
     combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
-
-    if (not utils.check_exists(combined_mt_fn)) or args.force:
-        mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
-                             chr_prefix=args.chr_prefix, reference_genome=args.reference_genome,
-                             force_bgz=args.force_bgz,
-                             call_fields=args.call_fields)
-
-        mt = mt.checkpoint(combined_mt_fn, overwrite=True)
-        logging.info(f"Final matrix table count: {mt.count()}")
-        utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=args.data_dir)
-    else:
-        logging.info("Detected VCF file already converted to matrix table, skipping VCF import.")
-
-    ###############################
-    # Split multiallelic variants #
-    ###############################
     split_fn = out_basename + f"_split{test_str}.mt/"
 
+    #############################################
+    # Combine VCF files and split multiallelics #
+    #############################################
     if (not utils.check_exists(split_fn)) or args.force:
+
+        # Import VCF files and combine
+        if (not utils.check_exists(combined_mt_fn)) or args.force:
+            mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
+                                 chr_prefix=args.chr_prefix, reference_genome=args.reference_genome,
+                                 force_bgz=args.force_bgz,
+                                 call_fields=args.call_fields)
+
+            mt = mt.checkpoint(combined_mt_fn, overwrite=True)
+            logging.info(f"Final matrix table count: {mt.count()}")
+            utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=args.data_dir)
+        else:
+            logging.info("Detected VCF file already converted to matrix table, skipping VCF import.")
+
+        # Split multiallelics
         logging.info('Splitting multiallelic variants')
         mt = hl.read_matrix_table(combined_mt_fn)
 
