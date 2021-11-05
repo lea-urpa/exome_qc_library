@@ -172,19 +172,24 @@ if __name__ == "__main__":
     else:
         logging.info("Detected variant QC already performed, skipping that.")
 
-    #############################
-    # Export to VCF, text files #
-    #############################
-    # Filter out failing genotypes and variants, export to vcf
-    mt_filt_fn = out_basename + f"_low_pass_filtered{test_str}.mt/"
-    logging.info("Filtering out failing variants and genotypes and writing to VCF.")
+    ##################
+    # Run samples QC #
+    ##################
+
+
+    #####################################
+    # Filter failing gts, vars, samples #
+    #####################################
+    # Filter out failing genotypes, samples, and variants, export to vcf
+    mt_filt_fn = out_basename + f"_low_pass_variants_samples_filtered{test_str}.mt/"
+    logging.info("Filtering out failing variants, genotypes, and samples and writing to VCF.")
 
     if (not utils.check_exists(mt_filt_fn)) or args.force:
         args.force = True
         mt = hl.read_matrix_table(qcd_fn)
 
         mt_filt = sq.filter_failing(
-            mt, mt_filt_fn, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=True,
+            mt, mt_filt_fn, prefix='low_pass', entries=True, variants=True, samples=True, unfilter_entries=True,
             pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
@@ -237,7 +242,7 @@ if __name__ == "__main__":
         logging.info("Detected variant info table already exported, skipping export.")
 
     # Export samples information to a separate tsv file
-    sample_info_fn = out_basename + "_sample_info.tsv.bgz"
+    sample_info_fn = out_basename + "_unfiltered_sample_info.tsv.bgz"
 
     if (not utils.check_exists(sample_info_fn)) or args.force:
         args.force = True
