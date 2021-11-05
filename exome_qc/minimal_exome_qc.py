@@ -32,6 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("--out_dir", type=str, required=True, help="Location to write combined + vep annotated mt")
     parser.add_argument("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
                         help="Reference genome build.")
+    parser.add_argument("--split_by_chrom", action="store_true", help="Split vcf output by chromosome?")
     parser.add_argument("--chr_prefix", action='store_true', help="Chromosomes are of form 'chr1', NOT '1' etc.")
     parser.add_argument("--force_bgz", action='store_true', help="Force blog gzip import? Default true.")
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
@@ -198,18 +199,26 @@ if __name__ == "__main__":
     #############################################
     # Export filtered mt as VCF, per chromosome #
     #############################################
-    chroms = [str(x) for x in range(1, 23)]
-    chroms.extend(["X", "Y"])
-    if args.reference_genome == "GRCh38":
-        chroms = [f"chr{x}" for x in chroms]
+    if args.split_by_chrom:
+        chroms = [str(x) for x in range(1, 23)]
+        chroms.extend(["X", "Y"])
+        if args.reference_genome == "GRCh38":
+            chroms = [f"chr{x}" for x in chroms]
 
-    for chrom in chroms:
-        vcf_name = out_basename + f"_failing_variants_genotypes_filtered_chrom_{chrom}.vcf.bgz"
+        for chrom in chroms:
+            vcf_name = out_basename + f"_failing_variants_genotypes_filtered_chrom_{chrom}.vcf.bgz"
+            if (not utils.check_exists(vcf_name)) or args.force:
+                args.force = True
+
+                mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
+                hl.export_vcf(mt_tmp, vcf_name, tabix=True)
+            else:
+                logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
+    else:
+        vcf_name = out_basename + f"_failing_variants_genotypes_filtered.vcf.bgz"
         if (not utils.check_exists(vcf_name)) or args.force:
             args.force = True
-
-            mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
-            hl.export_vcf(mt_tmp, vcf_name, tabix=True)
+            hl.export_vcf(mt_filt, vcf_name, tabix=True)
         else:
             logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
 
