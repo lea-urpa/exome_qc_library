@@ -14,7 +14,7 @@ if __name__ == "__main__":
     import utils
     import variant_qc as vq
     import samples_qc as sq
-
+    import samples_annotation as sa
 
     ##################################
     # Parse arguments for imput data #
@@ -150,16 +150,16 @@ if __name__ == "__main__":
     #######################
     # Low pass variant QC #
     #######################
-    qcd_fn = out_basename + f"_low_pass_qcd{test_str}.mt/"
+    variant_qcd_fn = out_basename + f"_low_pass_qcd{test_str}.mt/"
 
-    if (not utils.check_exists(qcd_fn)) or args.force:
+    if (not utils.check_exists(variant_qcd_fn)) or args.force:
         args.force = True
         logging.info("Running variant QC")
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
         mt = hl.read_matrix_table(split_fn)
 
         mt = vq.variant_quality_control(
-            mt, qcd_fn, annotation_prefix="low_pass", min_dp=args.min_dp, min_gq=args.min_gq,
+            mt, variant_qcd_fn, annotation_prefix="low_pass", min_dp=args.min_dp, min_gq=args.min_gq,
             max_het_ref_reads=args.max_het_ref_reads, min_het_ref_reads=args.min_het_ref_reads,
             min_hom_ref_ref_reads=args.min_hom_ref_ref_reads, max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
             call_rate=args.low_pass_min_call_rate, p_hwe=args.low_pass_p_hwe, snp_qd=args.snp_qd,
@@ -168,9 +168,58 @@ if __name__ == "__main__":
             samples_qc=False, force=args.force
         )
 
-        mt = mt.checkpoint(qcd_fn, overwrite=True)
+        mt = mt.checkpoint(variant_qcd_fn, overwrite=True)
     else:
         logging.info("Detected variant QC already performed, skipping that.")
+
+    ##############
+    # Impute sex #
+    ##############
+    sex_imputed = out_basename + f"_sex_imputed{test_str}.mt"
+    filtered_nohwe = out_basename + f"_variant_filtered_nohwe{test_str}.mt"
+
+    if (not utils.check_exists(sex_imputed)) or args.force:
+        logging.info("Imputing sex")
+        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
+
+        mt = hl.read_matrix_table(variant_qcd_fn)
+
+        if (not utils.check_exists(filtered_nohwe)) or args.force:
+            # Filter out failing variants, genotypes, rare variants
+            mt_gt_filt= sq.filter_failing(
+                mt, sex_imputed, prefix='low_pass', variants=False, entries=True, samples=False,
+                unfilter_entries=False, pheno_qc=False, min_dp=args.min_dp,
+                min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+            )
+
+            mt_filtered = mt_gt_filt.filter_rows(
+                (mt_gt_filt.low_pass_failing_variant_qc == ["failing_hwe"]) |
+                (hl.len(mt_gt_filt.low_pass_failing_variant_qc) == 0), keep=True
+            )
+
+            mt_count = mt_filtered.count_rows()
+            if not mt_count > 20000:
+                logging.info(f"Error! Not enough variants after filtering to passing all QC measures. "
+                             f"var count: {mt_count}")
+                exit()
+            mt_filtered = mt_filtered.checkpoint(filtered_nohwe, overwrite=True)
+        else:
+            mt_filtered = hl.read_matrix_table(filtered_nohwe)
+
+        # Impute sex
+        imputed_sex = sq.impute_sex_plot(mt_filtered, female_threshold=args.female_threshold,
+                                         male_threshold=args.male_threshold, aaf_threshold=0.05)
+
+        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female, f_stat=imputed_sex[mt.s].f_stat)
+        mt = mt.annotate_globals(
+            sex_imputation_thresholds={'female_threshold': args.female_threshold,
+                                       'male_threshold': args.male_threshold})
+
+        mt = mt.checkpoint(sex_imputed, overwrite=True)
+    else:
+        logging.info("Detected sex imputed, skipping sex imputation.")
 
     ##################
     # Run samples QC #
@@ -186,7 +235,7 @@ if __name__ == "__main__":
 
     if (not utils.check_exists(mt_filt_fn)) or args.force:
         args.force = True
-        mt = hl.read_matrix_table(qcd_fn)
+        mt = hl.read_matrix_table(samples_qcd_fn)
 
         mt_filt = sq.filter_failing(
             mt, mt_filt_fn, prefix='low_pass', entries=True, variants=True, samples=True, unfilter_entries=True,
@@ -199,7 +248,7 @@ if __name__ == "__main__":
 
     else:
         mt_filt = hl.read_matrix_table(mt_filt_fn)
-        mt = hl.read_matrix_table(qcd_fn)
+        mt = hl.read_matrix_table(samples_qcd_fn)
 
     #############################################
     # Export filtered mt as VCF, per chromosome #
