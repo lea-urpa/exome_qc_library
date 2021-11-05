@@ -121,7 +121,7 @@ if __name__ == "__main__":
     # Combine VCF files and split multiallelics #
     #############################################
     if (not utils.check_exists(split_fn)) or args.force:
-
+        args.force = True
         # Import VCF files and combine
         if (not utils.check_exists(combined_mt_fn)) or args.force:
             mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
@@ -152,6 +152,7 @@ if __name__ == "__main__":
     qcd_fn = out_basename + f"_low_pass_qcd{test_str}.mt/"
 
     if (not utils.check_exists(qcd_fn)) or args.force:
+        args.force = True
         logging.info("Running variant QC")
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
         mt = hl.read_matrix_table(split_fn)
@@ -178,6 +179,7 @@ if __name__ == "__main__":
     logging.info("Filtering out failing variants and genotypes and writing to VCF.")
 
     if (not utils.check_exists(mt_filt_fn)) or args.force:
+        args.force = True
         mt = hl.read_matrix_table(qcd_fn)
 
         mt_filt = sq.filter_failing(
@@ -195,6 +197,7 @@ if __name__ == "__main__":
 
     vcf_name = out_basename + "_failing_variants_genotypes_filtered.vcf.bgz"
     if (not utils.check_exists(vcf_name)) or args.force:
+        args.force = True
         hl.export_vcf(mt_filt, vcf_name, tabix=True)
     else:
         logging.info("Detected VCF already exported, skipping export.")
@@ -203,6 +206,7 @@ if __name__ == "__main__":
     variant_info_fn = out_basename + "_variant_info.tsv.bgz"
 
     if (not utils.check_exists(variant_info_fn)) or args.force:
+        args.force = True
         var_info = mt.rows()
         var_info = var_info.flatten()
 
@@ -214,6 +218,7 @@ if __name__ == "__main__":
     sample_info_fn = out_basename + "_sample_info.tsv.bgz"
 
     if (not utils.check_exists(sample_info_fn)) or args.force:
+        args.force = True
         sample_info = mt.cols()
         sample_info = sample_info.flatten()
 
