@@ -195,15 +195,28 @@ if __name__ == "__main__":
         mt_filt = hl.read_matrix_table(mt_filt_fn)
         mt = hl.read_matrix_table(qcd_fn)
 
-    vcf_name = out_basename + "_failing_variants_genotypes_filtered.vcf.bgz"
-    if (not utils.check_exists(vcf_name)) or args.force:
-        args.force = True
-        hl.export_vcf(mt_filt, vcf_name, tabix=True)
-    else:
-        logging.info("Detected VCF already exported, skipping export.")
+    #############################################
+    # Export filtered mt as VCF, per chromosome #
+    #############################################
+    chroms = [str(x) for x in range(1, 23)]
+    chroms.extend(["X", "Y"])
+    if args.reference_genome == "GRCh38":
+        chroms = [f"chr{x}" for x in chroms]
 
-    # Export variant information to a separate tsv file
-    variant_info_fn = out_basename + "_variant_info.tsv.bgz"
+    for chrom in chroms:
+        vcf_name = out_basename + f"_failing_variants_genotypes_filtered_chrom_{chrom}.vcf.bgz"
+        if (not utils.check_exists(vcf_name)) or args.force:
+            args.force = True
+
+            mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
+            hl.export_vcf(mt_tmp, vcf_name, tabix=True)
+        else:
+            logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
+
+    ################################################################
+    # Export unfiltered variant information to a separate tsv file #
+    ################################################################
+    variant_info_fn = out_basename + "_unfiltered_variant_info.tsv.bgz"
 
     if (not utils.check_exists(variant_info_fn)) or args.force:
         args.force = True
