@@ -210,3 +210,14 @@ if __name__ == "__main__":
     else:
         logging.info("Detected variant info table already exported, skipping export.")
 
+    # Export samples information to a separate tsv file
+    sample_info_fn = out_basename + "_sample_info.tsv.bgz"
+
+    if (not utils.check_exists(sample_info_fn)) or args.force:
+        sample_info = mt.cols()
+        sample_info = sample_info.flatten()
+
+        sample_info.export(sample_info_fn)
+    else:
+        logging.info("Detected sample info table already exported, skipping export.")
+
