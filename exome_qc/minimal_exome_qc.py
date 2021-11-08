@@ -356,11 +356,16 @@ if __name__ == "__main__":
             chroms = [f"chr{x}" for x in chroms]
 
         for chrom in chroms:
+            if args.test:
+                if not "22" in chrom:
+                    pass
+
             vcf_name = out_basename + f"_failing_variants_genotypes_filtered_chrom_{chrom}.vcf.bgz"
             if (not utils.check_exists(vcf_name)) or args.force:
                 args.force = True
 
                 mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
+
                 hl.export_vcf(mt_tmp, vcf_name, tabix=True)
             else:
                 logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
