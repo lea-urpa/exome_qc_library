@@ -22,6 +22,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--vcf", type=str, required=True,
                         help="Name of VCF file (or files) to import, comma separated if > 1 file.")
+    parser.add_argument("--samples_annotation_files", type=str,
+                        help="Files to annotate the samples with, comma separated.")
+    parser.add_argument("--samples_col", type=str,
+                        help="Name of samples column in sample annotation files. Must be the same in all files.")
+    parser.add_argument("--samples_delim", type=str, default="\t",
+                        help="Delimiter in sample annotation files. Must be the same in all files. Default tab.")
+    parser.add_argument("--samples_miss", type=str, default="n/a",
+                        help="String for missing values in annotation files, e.g. NA. Must be the same in all files.")
+    parser.add_argument("--chimeras_col", required=True, type=str,
+                                help="Column in matrix table or annotation files giving sample chimera percentage")
+    parser.add_argument("--contamination_col", required=True, type=str,
+                                help="Column in matrix table or annotation files giving sample contamination percent.")
+    parser.add_argument("--batch_col_name", type=str,
+                                help="Samples annotation in matrix table or annotation giving batch/cohort for "
+                                     "stratified samples QC (TiTv, het/homvar, indel ratios, n singletons).")
+    parser.add_argument("--sex_col", type=str, help="Column in annotation files givien sex column.")
+    parser.add_argument("--male_str", type=str, help="string in sex column indicating a male sample.")
+    parser.add_argument("--female_str", type=str, help="string in sex column indicating a female sample.")
     parser.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')
     parser.add_argument("--region", type=str, default="europe-west1", help="Region of cluster for scaling.")
     parser.add_argument('--num_secondary_workers', type=int, default=20,
@@ -65,6 +83,17 @@ if __name__ == "__main__":
     var_thresh.add_argument("--ab_allowed_dev_het", default=0.8, type=float,
                             help="% of het GT calls for a variant that must be in allelic balance (% ref or alt "
                                  "reads out of range for het GT call)")
+
+    # Samples QC thresholds #
+    samples_thresh = parser.add_argument_group("Samples QC thresholds.")
+    samples_thresh.add_argument("--sample_call_rate", type=float, default=0.8,
+                                help="Minimum genotype call rate per sample. Default none- samples not filtered on "
+                                     "call rate.")
+    samples_thresh.add_argument("--chimeras_max", default=0.05, type=float, help="Max % of chimeras allowed for sample")
+    samples_thresh.add_argument("--contamination_max", default=0.05, type=float,
+                                help="Max % contamination allowed for sample")
+    samples_thresh.add_argument("--sampleqc_sd_threshold", default=4, type=int,
+                                help="Number of standard deviations from mean sample can deviate on heterozygosity.")
 
     args = parser.parse_args()
 
@@ -242,7 +271,7 @@ if __name__ == "__main__":
             mt = sa.annotate_cols_from_file(mt, args.bam_metadata, args.bam_delim, args.bam_sample_col, args.bam_miss)
 
         # Check columns exist
-        for colname in ['chimeras_col', 'contamination_col']:
+        for colname in ['chimeras_col', 'contamination_col', 'sex_col']:
             col = getattr(args, colname)
             try:
                 test = hl.is_defined(mt[col])
@@ -252,8 +281,46 @@ if __name__ == "__main__":
                 logging.error(e)
                 exit(1)
 
-        #TODO add samples QC function call, additional check if imputed sex does not match reported sex
+        # Filter failing variants and genotypes
+        logging.info("Filtering out failing genotypes and variants.")
+        mt_filtered = sq.filter_failing(
+            mt, samples_qcd_fn, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
+            pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+            min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+        )
 
+        # Run samples QC
+        mt = sq.samples_qc(
+            mt_filtered, mt, samples_qcd_fn, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
+            chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
+            contamination_max=args.contamination_max, batch_col_name=args.batch_col_name,
+            sampleqc_sd_threshold=args.sampleqc_sd_threshold
+        )
+
+        # Convert sex_col to is_female column
+        mt = mt.annotate_cols(is_female_reported=hl.cond(
+            hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col] == args.male_str),
+            False,
+            hl.cond(
+                hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col == args.female_str]),
+                True, hl.null(hl.tbool)
+            )
+        ))
+
+        # Check that imputed sex matches given sex
+        mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+            hl.is_defined(mt.is_female_imputed) & hl.is_defined(mt[args.sex_col]) &
+            (mt.is_female_imputed != mt.is_female_reported),
+            mt.failing_samples_qc.append("missing_sexaware_sample_call_rate"),
+            mt.failing_samples_qc
+        ))
+
+        logging.info(f"Writing checkpoint: sample QC")
+        mt = mt.checkpoint(samples_qcd_fn, overwrite=True)
+        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+    else:
+        logging.info("Detected samples QC completed, skipping this step.")
 
     #####################################
     # Filter failing gts, vars, samples #
