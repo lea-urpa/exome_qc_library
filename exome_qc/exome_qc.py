@@ -56,6 +56,12 @@ if __name__ == "__main__":
     else:
         args.test_str = ""
 
+    #########################################
+    # Check dataproc cluster vs file inputs #
+    #########################################
+    for file_url in [args.log_dir, args.out_dir, args.data_dir]:
+        utils.check_regions(args.region, file_url)
+
     ##################################
     # Load data and annotate samples #
     ##################################
