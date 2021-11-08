@@ -443,6 +443,7 @@ if __name__ == "__main__":
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
         )
         utils.remove_secondary(args.cluster_name, args.region)
+
         # Run samples QC
         mt = sq.samples_qc(
             mt_filtered, mt, samples_qcd, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
