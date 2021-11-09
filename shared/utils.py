@@ -48,7 +48,8 @@ def check_regions(cluster_region, file_url):
     :return:
     """
     # Get bucket region
-    bucket_describe = f"gsutil ls -L -b {file_url}"
+    bucket = "gs://" + file_url.split("/")[2]
+    bucket_describe = f"gsutil ls -L -b {bucket}"
 
     try:
         bucket_output = subprocess.check_output(shlex.split(bucket_describe))
