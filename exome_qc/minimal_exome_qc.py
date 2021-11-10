@@ -296,8 +296,8 @@ if __name__ == "__main__":
         )
 
         mt = mt.annotate_cols(**{
-            args.chimeras_col: float(mt[args.chimeras_col]),
-            args.contamination_col: float(mt[args.contamination_col])
+            args.chimeras_col: hl.float(mt[args.chimeras_col]),
+            args.contamination_col: hl.float(mt[args.contamination_col])
         })
 
         # Run samples QC
