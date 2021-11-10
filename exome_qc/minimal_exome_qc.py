@@ -96,6 +96,11 @@ if __name__ == "__main__":
     samples_thresh.add_argument("--sampleqc_sd_threshold", default=4, type=int,
                                 help="Number of standard deviations from mean sample can deviate on heterozygosity.")
 
+    # Impute sex thresholds #
+    sex_thresh = parser.add_argument_group("Impute sex thresholds.")
+    sex_thresh.add_argument("--female_threshold", default=0.2, type=float, help="F-stat cutoff for defining female")
+    sex_thresh.add_argument("--male_threshold", default=0.8, type=float, help="F-stat cutoff for defining male")
+
     args = parser.parse_args()
 
     hl.init()
