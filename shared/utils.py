@@ -68,7 +68,8 @@ def check_regions(cluster_region, file_url):
 
 
 def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=False,
-              reference_genome="GRCh38", force_bgz=False, call_fields="PGT", save_row_annots=False):
+              reference_genome="GRCh38", force_bgz=False, call_fields="PGT", save_row_annots=False,
+              chrom_split=False):
     # Get combined mt output name
     if test:
         test_str = "_test"
@@ -137,15 +138,14 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
                 row_info = row_info.join(row_tmp, how="left")
 
             counter += 1
-
-            mt = mt.union_cols(mt_tmp)
+            if chrom_split:
+                mt = mt.union_rows(mt_tmp)
+            else:
+                mt = mt.union_cols(mt_tmp)
 
         # Annotate matrix table with row info from all the separate VCFs
         if save_row_annots and (len(vcf_files) > 1):
             mt = mt.annotate_rows(**row_info.index(mt.row_key))
-
-    print("combined mt count:")
-    print(mt.count())
 
     return mt
 

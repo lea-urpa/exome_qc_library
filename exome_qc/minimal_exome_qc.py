@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--vcf", type=str, required=True,
                         help="Name of VCF file (or files) to import, comma separated if > 1 file.")
+    parser.add_argument("--vcfs_chrom_split", action="store_true", help="Are vcfs given chrom split, e.g. same samples?")
     parser.add_argument("--samples_annotation_files", type=str,
                         help="Files to annotate the samples with, comma separated.")
     parser.add_argument("--samples_col", type=str,
@@ -162,7 +163,7 @@ if __name__ == "__main__":
             mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
                                  chr_prefix=args.chr_prefix, reference_genome=args.reference_genome,
                                  force_bgz=args.force_bgz,
-                                 call_fields=args.call_fields)
+                                 call_fields=args.call_fields, chrom_split=args.vcfs_chrom_split)
 
             mt = mt.checkpoint(combined_mt_fn, overwrite=True)
             logging.info(f"Final matrix table count: {mt.count()}")
