@@ -157,7 +157,6 @@ if __name__ == "__main__":
     # Combine VCF files and split multiallelics #
     #############################################
     if (not utils.check_exists(split_fn)) or args.force:
-        args.force = True
         # Import VCF files and combine
         if (not utils.check_exists(combined_mt_fn)) or args.force:
             mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
