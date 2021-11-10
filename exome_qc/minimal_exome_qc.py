@@ -271,10 +271,6 @@ if __name__ == "__main__":
 
         mt = hl.read_matrix_table(sex_imputed)
 
-        # Annotate with bam metadata
-        if args.bam_metadata is not None:
-            mt = sa.annotate_cols_from_file(mt, args.bam_metadata, args.bam_delim, args.bam_sample_col, args.bam_miss)
-
         # Check columns exist
         for colname in ['chimeras_col', 'contamination_col', 'sex_col']:
             col = getattr(args, colname)
