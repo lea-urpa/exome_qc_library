@@ -144,6 +144,9 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
         if save_row_annots and (len(vcf_files) > 1):
             mt = mt.annotate_rows(**row_info.index(mt.row_key))
 
+    print("combined mt count:")
+    print(mt.count())
+
     return mt
 
 
