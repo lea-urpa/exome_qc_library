@@ -295,6 +295,11 @@ if __name__ == "__main__":
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
         )
 
+        mt = mt.annotate_cols(**{
+            args.chimeras_col: float(mt[args.chimeras_col]),
+            args.contamination_col: float(mt[args.contamination_col])
+        })
+
         # Run samples QC
         mt = sq.samples_qc(
             mt_filtered, mt, samples_qcd_fn, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
