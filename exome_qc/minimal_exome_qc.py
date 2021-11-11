@@ -251,9 +251,15 @@ if __name__ == "__main__":
         else:
             mt_filtered = hl.read_matrix_table(filtered_nohwe)
 
-        # Impute sex
+        # Impute sex, annotate to main matrix table and filtered matrix table
         imputed_sex = sq.impute_sex_plot(mt_filtered, female_threshold=args.female_threshold,
                                          male_threshold=args.male_threshold, aaf_threshold=0.05)
+
+        mt_filtered = mt_filtered.annotate_cols(is_female_imputed=imputed_sex[mt_filtered.s].is_female)
+        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female, f_stat=imputed_sex[mt.s].f_stat)
+        mt = mt.annotate_globals(
+            sex_imputation_thresholds={'female_threshold': args.female_threshold,
+                                       'male_threshold': args.male_threshold})
 
         # Annotate sex-aware variant annotations (gt filt only to have for all variants)
         gt_filt_fn = sex_imputed.rstrip("/").replace(".mt", "") + "_GT_filtered.mt/"
@@ -271,11 +277,6 @@ if __name__ == "__main__":
         for annotation in annotations_to_transfer:
             mt = mt.annotate_rows(**{annotation: mt_filtered.rows()[mt.row_key][annotation]})
         mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
-
-        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female, f_stat=imputed_sex[mt.s].f_stat)
-        mt = mt.annotate_globals(
-            sex_imputation_thresholds={'female_threshold': args.female_threshold,
-                                       'male_threshold': args.male_threshold})
 
         mt = mt.checkpoint(sex_imputed, overwrite=True)
     else:
