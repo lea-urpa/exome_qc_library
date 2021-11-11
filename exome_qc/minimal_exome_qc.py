@@ -286,6 +286,11 @@ if __name__ == "__main__":
                 logging.error(e)
                 exit(1)
 
+        mt = mt.annotate_cols(**{
+            args.chimeras_col: hl.float(mt[args.chimeras_col]),
+            args.contamination_col: hl.float(mt[args.contamination_col])
+        })
+
         # Filter failing variants and genotypes
         logging.info("Filtering out failing genotypes and variants.")
         mt_filtered = sq.filter_failing(
@@ -294,11 +299,6 @@ if __name__ == "__main__":
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
         )
-
-        mt = mt.annotate_cols(**{
-            args.chimeras_col: hl.float(mt[args.chimeras_col]),
-            args.contamination_col: hl.float(mt[args.contamination_col])
-        })
 
         # Run samples QC
         mt = sq.samples_qc(
