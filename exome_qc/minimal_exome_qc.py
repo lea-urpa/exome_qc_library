@@ -286,11 +286,6 @@ if __name__ == "__main__":
                 logging.error(e)
                 exit(1)
 
-        mt = mt.annotate_cols(**{
-            args.chimeras_col: hl.float(mt[args.chimeras_col]),
-            args.contamination_col: hl.float(mt[args.contamination_col])
-        })
-
         # Filter failing variants and genotypes
         logging.info("Filtering out failing genotypes and variants.")
         mt_filtered = sq.filter_failing(
