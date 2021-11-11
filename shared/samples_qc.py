@@ -348,7 +348,7 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
         if batch_none > 0:
             logging.info(f"Warning- {batch_none} samples have batch undefined. These samples will be grouped in one"
                          f"batch for sample QC (named no_batch_info).")
-            cols.filter_cols(cols[batch_col_name] == "no_batch_info").s.show(batch_none + 1)
+            cols.filter(cols[batch_col_name] == "no_batch_info").s.show(batch_none + 1)
 
         batch_set = cols.aggregate(hl.agg.collect_as_set(cols[batch_col_name]))
     else:
