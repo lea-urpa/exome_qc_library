@@ -259,7 +259,7 @@ if __name__ == "__main__":
         gt_filt_fn = sex_imputed.rstrip("/").replace(".mt", "") + "_GT_filtered.mt/"
         mt_gt_filt = hl.read_matrix_table(gt_filt_fn)
         mt_gt_filt = mt_gt_filt.annotate_cols(is_female_imputed=imputed_sex[mt_gt_filt.s].is_female)
-        mt_gt_filt, annotations_to_transfer = va.sex_aware_variant_annotations(mt_gt_filt, pheno_col=args.pheno_col)
+        mt_gt_filt, annotations_to_transfer = va.sex_aware_variant_annotations(mt_gt_filt)
 
         # Annotate sex-aware sample annotations, checkpoint
         mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
