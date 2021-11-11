@@ -15,6 +15,7 @@ if __name__ == "__main__":
     import variant_qc as vq
     import samples_qc as sq
     import samples_annotation as sa
+    import variant_annotation as va
 
     ##################################
     # Parse arguments for imput data #
@@ -217,6 +218,7 @@ if __name__ == "__main__":
     ##############
     sex_imputed = out_basename + f"_sex_imputed{test_str}.mt"
     filtered_nohwe = out_basename + f"_variant_filtered_nohwe{test_str}.mt"
+    filtered_annot = out_basename + f"_variant_filtere_sex_annotated{test_str}.mt"
 
     if (not utils.check_exists(sex_imputed)) or args.force:
         logging.info("Imputing sex")
@@ -251,6 +253,23 @@ if __name__ == "__main__":
         # Impute sex
         imputed_sex = sq.impute_sex_plot(mt_filtered, female_threshold=args.female_threshold,
                                          male_threshold=args.male_threshold, aaf_threshold=0.05)
+
+        # Annotate sex-aware variant annotations (gt filt only to have for all variants)
+        gt_filt_fn = sex_imputed.rstrip("/").replace(".mt", "") + "_GT_filtered.mt/"
+        mt_gt_filt = hl.read_matrix_table(gt_filt_fn)
+        mt_gt_filt = mt_gt_filt.annotate_cols(is_female_imputed=imputed_sex[mt_gt_filt.s].is_female)
+        mt_gt_filt, annotations_to_transfer = va.sex_aware_variant_annotations(mt_gt_filt, pheno_col=args.pheno_col)
+
+        # Annotate sex-aware sample annotations, checkpoint
+        mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
+        for annotation in annotations_to_transfer:
+            mt_filtered = mt_filtered.annotate_rows(**{annotation: mt_gt_filt.rows()[mt_filtered.row_key][annotation]})
+        mt_filtered = mt_filtered.checkpoint(filtered_annot, overwrite=True)
+
+        # Annotate main MT with variant and sample sex-aware annotations
+        for annotation in annotations_to_transfer:
+            mt = mt.annotate_rows(**{annotation: mt_filtered.rows()[mt.row_key][annotation]})
+        mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
 
         mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female, f_stat=imputed_sex[mt.s].f_stat)
         mt = mt.annotate_globals(
