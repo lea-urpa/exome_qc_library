@@ -222,6 +222,7 @@ if __name__ == "__main__":
 
     if (not utils.check_exists(sex_imputed)) or args.force:
         logging.info("Imputing sex")
+        args.force = True
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         mt = hl.read_matrix_table(variant_qcd_fn)
