@@ -251,7 +251,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
 
 def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_call_rate=None,
                chimeras_col="", chimeras_max=0.05, contamination_col="", contamination_max=0.05,
-               batch_col_name=None, sampleqc_sd_threshold=4, pheno_col=None):
+               batch_col_name=None, sampleqc_sd_threshold=4, pheno_col=None, force=False):
     """
     Performs samples QC on a matrix table, removing samples on chimera and contamination %, as well as being +/- 4
     standard deviations from mean on TiTv, het/homvar, insertion/deletion ratios and n_singletons for a specific
@@ -268,9 +268,13 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
     mt = hl.sample_qc(mt)
 
     # Pull data to cols and checkpoint
-    cols_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_coldata.ht/"
-    cols = mt.cols()
-    cols = cols.checkpoint(cols_fn, overwrite=True)
+    cols_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_coldata_tmp.ht/"
+    if (not utils.check_exists(cols_fn)) or force:
+        force = True
+        cols = mt.cols()
+        cols = cols.checkpoint(cols_fn, overwrite=True)
+    else:
+        cols = hl.read_table(cols_fn)
 
     # Instantiate empty array for failing samples QC tags
     cols = cols.annotate(failing_samples_qc=hl.empty_array(hl.tstr))
@@ -278,15 +282,22 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
     ############################################################
     # Find samples failing on chimeras or contamination values #
     ############################################################
-    cols = cols.annotate(failing_samples_qc=hl.cond(
-        (cols[chimeras_col] > chimeras_max) & hl.is_defined(cols[chimeras_col]),
-        cols.failing_samples_qc.append("failing_chimeras"),
-        cols.failing_samples_qc))
+    chim_cont_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_coldata_chim_cont_tmp.ht/"
+    if (not utils.check_exists(chim_cont_fn)) or force:
+        force = True
+        cols = cols.annotate(failing_samples_qc=hl.cond(
+            (cols[chimeras_col] > chimeras_max) & hl.is_defined(cols[chimeras_col]),
+            cols.failing_samples_qc.append("failing_chimeras"),
+            cols.failing_samples_qc))
 
-    cols = cols.annotate(failing_samples_qc=hl.cond(
-        (cols[contamination_col] > contamination_max) & hl.is_defined(cols[contamination_col]),
-        cols.failing_samples_qc.append("failing_contamination"),
-        cols.failing_samples_qc))
+        cols = cols.annotate(failing_samples_qc=hl.cond(
+            (cols[contamination_col] > contamination_max) & hl.is_defined(cols[contamination_col]),
+            cols.failing_samples_qc.append("failing_contamination"),
+            cols.failing_samples_qc))
+
+        cols = cols.checkpoint(chim_cont_fn, overwrite=True)
+    else:
+        cols = hl.read_table(chim_cont_fn)
 
     if count_failing:
         failing_chim = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_chimeras")))
@@ -316,15 +327,19 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
     # Find samples failing on sex-aware call rate #
     ###############################################
     if sample_call_rate is not None:
-        cols = cols.annotate(failing_samples_qc=hl.cond(
-            (cols.sexaware_sample_call_rate < sample_call_rate) & hl.is_defined(cols.sexaware_sample_call_rate),
-            cols.failing_samples_qc.append("failing_sexaware_sample_call_rate"),
-            cols.failing_samples_qc))
+        callrate_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_coldata_callrate_tmp.ht/"
+        if (not utils.check_exists(callrate_fn)) or force:
+            force = True
 
-        cols = cols.annotate(failing_samples_qc=hl.cond(
-            ~(hl.is_defined(cols.sexaware_sample_call_rate)),
-            cols.failing_samples_qc.append("missing_sexaware_sample_call_rate"),
-            cols.failing_samples_qc))
+            cols = cols.annotate(failing_samples_qc=hl.cond(
+                (cols.sexaware_sample_call_rate < sample_call_rate) & hl.is_defined(cols.sexaware_sample_call_rate),
+                cols.failing_samples_qc.append("failing_sexaware_sample_call_rate"),
+                cols.failing_samples_qc))
+
+            cols = cols.annotate(failing_samples_qc=hl.cond(
+                ~(hl.is_defined(cols.sexaware_sample_call_rate)),
+                cols.failing_samples_qc.append("missing_sexaware_sample_call_rate"),
+                cols.failing_samples_qc))
 
             cols = cols.annotate(failing_samples_qc=hl.cond(
                 ~(hl.is_defined(cols.sexaware_sample_call_rate)) & hl.is_defined(cols.sample_qc.call_rate) &
@@ -333,10 +348,14 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
                 cols.failing_samples_qc
             ))
 
-            if count_failing:
-                failing_cr = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_sexaware_sample_call_rate")))
-                missing_cr = cols.aggregate(
-                    hl.agg.count_where(cols.failing_samples_qc.contains("missing_sexaware_sample_call_rate")))
+            cols = cols.checkpoint(callrate_fn, overwrite=True)
+        else:
+            cols = hl.read_table(callrate_fn)
+
+        if count_failing:
+            failing_cr = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_sexaware_sample_call_rate")))
+            missing_cr = cols.aggregate(
+                hl.agg.count_where(cols.failing_samples_qc.contains("missing_sexaware_sample_call_rate")))
 
             logging.info(f"Number of samples failing on sex-aware call rate > {sample_call_rate}: {failing_cr}")
             logging.info(f"Number of samples missing sex-aware call rate : {missing_cr}")
@@ -376,52 +395,59 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
     batch_statistics = {}
     for measure in ['r_ti_tv', 'r_het_hom_var', 'r_insertion_deletion', 'n_singleton']:
         logging.info(f"Performing sample QC for measure {measure}")
+        checkpoint_fn = checkpoint_name.rstrip("/").replace(".mt", "") + f"_coldata_{measure}_tmp.ht/"
 
-        # Instantiate/reset box plot label
-        cols = cols.annotate(boxplot_label=cols[batch_col_name])
+        if (not utils.check_exists(checkpoint_fn)) or force:
+            force = True
+            # Instantiate/reset box plot label
+            cols = cols.annotate(boxplot_label=cols[batch_col_name])
 
-        batch_thresholds[measure] = {}
-        batch_statistics[measure] = {}
+            batch_thresholds[measure] = {}
+            batch_statistics[measure] = {}
 
-        cols = cols.annotate(failing_samples_qc=hl.cond(
-            ~(hl.is_defined(cols.sample_qc[measure])),
-            cols.failing_samples_qc.append(f"missing_{measure}"),
-            cols.failing_samples_qc))
+            cols = cols.annotate(failing_samples_qc=hl.cond(
+                ~(hl.is_defined(cols.sample_qc[measure])),
+                cols.failing_samples_qc.append(f"missing_{measure}"),
+                cols.failing_samples_qc))
 
-        for batch in batch_set:
-            # See if values exist at all for all values
-            defined_values = cols.aggregate(hl.agg.count_where(hl.is_defined(cols.sample_qc[measure])))
+            for batch in batch_set:
+                # See if values exist at all for all values
+                defined_values = cols.aggregate(hl.agg.count_where(hl.is_defined(cols.sample_qc[measure])))
 
-            if defined_values > 0:
-                # Get mean and standard deviation for each measure, for each batch's samples
-                stats = cols.aggregate(hl.agg.filter(cols[batch_col_name] == batch,
-                                                        hl.agg.stats(cols.sample_qc[measure])))
+                if defined_values > 0:
+                    # Get mean and standard deviation for each measure, for each batch's samples
+                    stats = cols.aggregate(hl.agg.filter(cols[batch_col_name] == batch,
+                                                            hl.agg.stats(cols.sample_qc[measure])))
 
-                # Get cutoffs for each measure
-                cutoff_upper = stats.mean + (sampleqc_sd_threshold * stats.stdev)
-                cutoff_lower = stats.mean - (sampleqc_sd_threshold * stats.stdev)
+                    # Get cutoffs for each measure
+                    cutoff_upper = stats.mean + (sampleqc_sd_threshold * stats.stdev)
+                    cutoff_lower = stats.mean - (sampleqc_sd_threshold * stats.stdev)
 
-                if measure == "n_singleton":
-                    logging.info(f"Max number of singletons for batch {batch}: {stats.max}")
+                    if measure == "n_singleton":
+                        logging.info(f"Max number of singletons for batch {batch}: {stats.max}")
 
-                cols = cols.annotate(failing_samples_qc=hl.cond(
-                    ((cols.sample_qc[measure] > cutoff_upper) | (cols.sample_qc[measure] < cutoff_lower))
-                    & hl.is_defined(cols.sample_qc[measure]) & (cols[batch_col_name] == batch),
-                    cols.failing_samples_qc.append(f"failing_{measure}"),
-                    cols.failing_samples_qc))
+                    cols = cols.annotate(failing_samples_qc=hl.cond(
+                        ((cols.sample_qc[measure] > cutoff_upper) | (cols.sample_qc[measure] < cutoff_lower))
+                        & hl.is_defined(cols.sample_qc[measure]) & (cols[batch_col_name] == batch),
+                        cols.failing_samples_qc.append(f"failing_{measure}"),
+                        cols.failing_samples_qc))
 
-                cols = cols.annotate(boxplot_label=hl.cond(
-                    ((cols.sample_qc[measure] > cutoff_upper) | (cols.sample_qc[measure] < cutoff_lower)) &
-                    hl.is_defined(cols.sample_qc[measure]) & (cols[batch_col_name] == batch),
-                    "outlier", cols.boxplot_label))
+                    cols = cols.annotate(boxplot_label=hl.cond(
+                        ((cols.sample_qc[measure] > cutoff_upper) | (cols.sample_qc[measure] < cutoff_lower)) &
+                        hl.is_defined(cols.sample_qc[measure]) & (cols[batch_col_name] == batch),
+                        "outlier", cols.boxplot_label))
 
-                # Collect thresholds and statistics for each batch
-                batch_thresholds[measure][batch] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
-                batch_statistics[measure][batch] = stats
+                    # Collect thresholds and statistics for each batch
+                    batch_thresholds[measure][batch] = {'min_thresh': cutoff_lower, 'max_thresh': cutoff_upper}
+                    batch_statistics[measure][batch] = stats
 
-            else:
-                logging.error(f"Error- no defined values for measure {measure}. NAs can be introduced by division by "
-                              f"zero. Samples not filtered on {measure}!")
+                else:
+                    logging.error(f"Error- no defined values for measure {measure}. NAs can be introduced by division by "
+                                  f"zero. Samples not filtered on {measure}!")
+
+            cols = cols.checkpoint(checkpoint_fn, overwrite=True)
+        else:
+            cols = hl.read_matrix_table(checkpoint_fn)
 
         # Create plot for measure for each batch
         output_file(f"{datestr}_samples_qc_plots_{measure}.html")
