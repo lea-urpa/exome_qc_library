@@ -360,7 +360,7 @@ if __name__ == "__main__":
 
         logging.info(f"Writing checkpoint: sample QC")
         mt = mt.checkpoint(samples_qcd_fn, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
     else:
         logging.info("Detected samples QC completed, skipping this step.")
 
@@ -383,7 +383,7 @@ if __name__ == "__main__":
         )
 
         mt_filt = mt_filt.checkpoint(mt_filt_fn, overwrite=True)
-
+        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
     else:
         mt_filt = hl.read_matrix_table(mt_filt_fn)
         mt = hl.read_matrix_table(samples_qcd_fn)
@@ -413,6 +413,7 @@ if __name__ == "__main__":
                     logging.warning(f"Warning! No variants for chromosome {chrom} in dataset!")
             else:
                 logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
+        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
     else:
         vcf_name = out_basename + f"_failing_variants_genotypes_filtered.vcf.bgz"
         if (not utils.check_exists(vcf_name)) or args.force:
@@ -421,6 +422,7 @@ if __name__ == "__main__":
         else:
             logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
 
+        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
     ################################################################
     # Export unfiltered variant information to a separate tsv file #
     ################################################################
@@ -446,4 +448,6 @@ if __name__ == "__main__":
         sample_info.export(sample_info_fn)
     else:
         logging.info("Detected sample info table already exported, skipping export.")
+
+    utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
 
