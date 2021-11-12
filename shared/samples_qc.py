@@ -326,10 +326,17 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
             cols.failing_samples_qc.append("missing_sexaware_sample_call_rate"),
             cols.failing_samples_qc))
 
-        if count_failing:
-            failing_cr = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_sexaware_sample_call_rate")))
-            missing_cr = cols.aggregate(
-                hl.agg.count_where(cols.failing_samples_qc.contains("missing_sexaware_sample_call_rate")))
+            cols = cols.annotate(failing_samples_qc=hl.cond(
+                ~(hl.is_defined(cols.sexaware_sample_call_rate)) & hl.is_defined(cols.sample_qc.call_rate) &
+                (cols.sample_qc.call_rate < sample_call_rate),
+                cols.failing_samples_qc.append("failing_sample_call_rate"),
+                cols.failing_samples_qc
+            ))
+
+            if count_failing:
+                failing_cr = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_sexaware_sample_call_rate")))
+                missing_cr = cols.aggregate(
+                    hl.agg.count_where(cols.failing_samples_qc.contains("missing_sexaware_sample_call_rate")))
 
             logging.info(f"Number of samples failing on sex-aware call rate > {sample_call_rate}: {failing_cr}")
             logging.info(f"Number of samples missing sex-aware call rate : {missing_cr}")
