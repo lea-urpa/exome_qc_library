@@ -353,12 +353,15 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
             cols = hl.read_table(callrate_fn)
 
         if count_failing:
-            failing_cr = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_sexaware_sample_call_rate")))
+            failing_sex_cr = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_sexaware_sample_call_rate")))
             missing_cr = cols.aggregate(
                 hl.agg.count_where(cols.failing_samples_qc.contains("missing_sexaware_sample_call_rate")))
+            failing_cr = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_sample_call_rate")))
 
-            logging.info(f"Number of samples failing on sex-aware call rate > {sample_call_rate}: {failing_cr}")
+            logging.info(f"Number of samples failing on sex-aware call rate > {sample_call_rate}: {failing_sex_cr}")
             logging.info(f"Number of samples missing sex-aware call rate : {missing_cr}")
+            logging.info(f"Number of samples missing sex-aware call rate but normal call rate > {sample_call_rate}:"
+                         f" {failing_cr}")
 
             cr_stats = cols.aggregate(hl.agg.stats(cols.sexaware_sample_call_rate))
 
