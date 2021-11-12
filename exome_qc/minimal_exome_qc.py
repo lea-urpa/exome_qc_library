@@ -407,8 +407,10 @@ if __name__ == "__main__":
                 args.force = True
 
                 mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
-
-                hl.export_vcf(mt_tmp, vcf_name, tabix=True)
+                if mt_tmp.count_rows() > 0:
+                    hl.export_vcf(mt_tmp, vcf_name, tabix=True)
+                else:
+                    logging.warning(f"Warning! No variants for chromosome {chrom} in dataset!")
             else:
                 logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
     else:
