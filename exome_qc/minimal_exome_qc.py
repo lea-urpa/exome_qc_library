@@ -112,6 +112,7 @@ if __name__ == "__main__":
     datestr = time.strftime("%Y.%m.%d")  # Used for output folder
     timestr = time.strftime("%Y.%m.%d-%H.%M.%S")  # Used for output files, for more than one run per day
     log_file = 'import_minimal_qc-' + timestr + '.txt'
+    plot_dir = args.log_dir.rstrip("/") + "/plots"
 
     root = logging.getLogger()  # creates logger
     root.setLevel(logging.INFO)
@@ -173,7 +174,7 @@ if __name__ == "__main__":
 
             mt = mt.checkpoint(combined_mt_fn, overwrite=True)
             logging.info(f"Final matrix table count: {mt.count()}")
-            utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=args.data_dir)
+            utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=plot_dir)
         else:
             logging.info("Detected VCF file already converted to matrix table, skipping VCF import.")
 
@@ -184,7 +185,7 @@ if __name__ == "__main__":
         mt = hl.split_multi_hts(mt)
         mt = mt.checkpoint(split_fn, overwrite=True)
         logging.info('Split count: ' + str(mt.count()))
-        utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=args.data_dir)
+        utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=plot_dir)
     else:
         logging.info("Detected split mt exists, skipping splitting MT.")
 
@@ -360,7 +361,7 @@ if __name__ == "__main__":
 
         logging.info(f"Writing checkpoint: sample QC")
         mt = mt.checkpoint(samples_qcd_fn, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
+        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
     else:
         logging.info("Detected samples QC completed, skipping this step.")
 
@@ -382,7 +383,7 @@ if __name__ == "__main__":
         )
 
         mt_filt = mt_filt.checkpoint(mt_filt_fn, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
+        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
         args.force = True
     else:
         mt_filt = hl.read_matrix_table(mt_filt_fn)
@@ -413,7 +414,7 @@ if __name__ == "__main__":
                     logging.warning(f"Warning! No variants for chromosome {chrom} in dataset!")
             else:
                 logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
-        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
+        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
     else:
         vcf_name = out_basename + f"_failing_variants_genotypes_filtered.vcf.bgz"
         if (not utils.check_exists(vcf_name)) or args.force:
@@ -422,7 +423,7 @@ if __name__ == "__main__":
         else:
             logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
 
-        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
+        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
     ################################################################
     # Export unfiltered variant information to a separate tsv file #
     ################################################################
@@ -449,5 +450,5 @@ if __name__ == "__main__":
     else:
         logging.info("Detected sample info table already exported, skipping export.")
 
-    utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
+    utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
 
