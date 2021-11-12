@@ -15,7 +15,8 @@ import pandas as pd
 
 def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True, variants=True, samples=True,
                    unfilter_entries=False, pheno_qc=False, min_dp=10, min_gq=20, max_het_ref_reads=0.8,
-                   min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1, force=False):
+                   min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1, force=False,
+                   pop_outliers=True):
     """
     Filters failing samples, variants, and entries from a given matrix table
     :param mt: matrix table to filter
@@ -92,8 +93,12 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     ##################
     if samples:
         if (not utils.check_exists(checkpoint_name + "_samples_filtered.mt/")) or force:
-            mt = mt.filter_cols((hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc) &
-                                (mt.pop_outlier_sample == False) & hl.is_defined(mt.pop_outlier_sample), keep=True)
+            sample_filter = (hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc)
+
+            if pop_outliers:
+                sample_filter = sample_filter & (mt.pop_outlier_sample == False) & hl.is_defined(mt.pop_outlier_sample)
+
+            mt = mt.filter_cols(sample_filter, keep=True)
 
             mt = mt.checkpoint(checkpoint_name + "_samples_filtered.mt/", overwrite=True)
         else:
