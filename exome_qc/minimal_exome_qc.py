@@ -345,7 +345,7 @@ if __name__ == "__main__":
             hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col] == args.male_str),
             False,
             hl.cond(
-                hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col == args.female_str]),
+                hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col] == args.female_str),
                 True, hl.null(hl.tbool)
             )
         ))
