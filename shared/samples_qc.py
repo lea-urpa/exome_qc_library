@@ -41,6 +41,7 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     ##################
     if entries:
         if (not utils.check_exists(checkpoint_name + "_GT_filtered.mt/")) or force:
+            force = True
             dp_cond = hl.is_defined(mt.DP) & (mt.DP > min_dp)
             gq_cond = hl.is_defined(mt.GQ) & (mt.GQ > min_gq)
 
@@ -71,6 +72,7 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     ###################
     if variants:
         if (not utils.check_exists(checkpoint_name + "_variants_filtered.mt/")) or force:
+            force = True
             mt = mt.filter_rows((hl.len(mt[prefix + 'failing_variant_qc']) == 0) &
                                 hl.is_defined(mt[prefix + "failing_variant_qc"]), keep=True)
 
@@ -93,6 +95,7 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     ##################
     if samples:
         if (not utils.check_exists(checkpoint_name + "_samples_filtered.mt/")) or force:
+            force = True
             sample_filter = (hl.len(mt.failing_samples_qc) == 0) & hl.is_defined(mt.failing_samples_qc)
 
             if pop_outliers:

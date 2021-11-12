@@ -194,7 +194,6 @@ if __name__ == "__main__":
     variant_qcd_fn = out_basename + f"_low_pass_qcd{test_str}.mt/"
 
     if (not utils.check_exists(variant_qcd_fn)) or args.force:
-        args.force = True
         logging.info("Running variant QC")
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
         mt = hl.read_matrix_table(split_fn)
@@ -210,6 +209,7 @@ if __name__ == "__main__":
         )
 
         mt = mt.checkpoint(variant_qcd_fn, overwrite=True)
+        args.force = True
     else:
         logging.info("Detected variant QC already performed, skipping that.")
 
@@ -222,7 +222,6 @@ if __name__ == "__main__":
 
     if (not utils.check_exists(sex_imputed)) or args.force:
         logging.info("Imputing sex")
-        args.force = True
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         mt = hl.read_matrix_table(variant_qcd_fn)
@@ -248,6 +247,7 @@ if __name__ == "__main__":
                              f"var count: {mt_count}")
                 exit()
             mt_filtered = mt_filtered.checkpoint(filtered_nohwe, overwrite=True)
+            args.force = True
         else:
             mt_filtered = hl.read_matrix_table(filtered_nohwe)
 
@@ -295,10 +295,10 @@ if __name__ == "__main__":
 
         # Annotate with bam metadata
         if (not utils.check_exists(annotated_fn)) or args.force:
-            args.force = True
             mt = sa.annotate_cols_from_file(mt, args.samples_annotation_files, args.samples_delim, args.samples_col,
                                             args.samples_miss)
             mt = mt.checkpoint(annotated_fn, overwrite=True)
+            args.force = True
         else:
             mt = hl.read_matrix_table(annotated_fn)
 
@@ -315,7 +315,6 @@ if __name__ == "__main__":
 
         # Filter failing variants and genotypes
         if (not utils.check_exists(filtered_mt_fn)) or args.force:
-            args.force = True
             logging.info("Filtering out failing genotypes and variants.")
             mt_filtered = sq.filter_failing(
                 mt, samples_qcd_fn, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
@@ -324,12 +323,12 @@ if __name__ == "__main__":
                 max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
             )
             mt_filtered = mt_filtered.checkpoint(filtered_mt_fn, overwrite=True)
+            args.force = True
         else:
             mt_filtered = hl.read_matrix_table(filtered_mt_fn)
 
         # Run samples QC
         if (not utils.check_exists(first_samples_qc_fn)) or args.force:
-            args.force = True
             mt = sq.samples_qc(
                 mt_filtered, mt, samples_qcd_fn, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
                 chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
@@ -337,6 +336,7 @@ if __name__ == "__main__":
                 sampleqc_sd_threshold=args.sampleqc_sd_threshold, force=args.force
             )
             mt = mt.checkpoint(first_samples_qc_fn, overwrite=True)
+            args.force = True
         else:
             mt = hl.read_matrix_table(first_samples_qc_fn)
 
@@ -369,10 +369,9 @@ if __name__ == "__main__":
     #####################################
     # Filter out failing genotypes, samples, and variants, export to vcf
     mt_filt_fn = out_basename + f"_low_pass_variants_samples_filtered{test_str}.mt/"
-    logging.info("Filtering out failing variants, genotypes, and samples and writing to VCF.")
+    logging.info("Filtering out failing variants, genotypes, and samples to write to VCF.")
 
     if (not utils.check_exists(mt_filt_fn)) or args.force:
-        args.force = True
         mt = hl.read_matrix_table(samples_qcd_fn)
 
         mt_filt = sq.filter_failing(
@@ -384,6 +383,7 @@ if __name__ == "__main__":
 
         mt_filt = mt_filt.checkpoint(mt_filt_fn, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=args.plot_folder)
+        args.force = True
     else:
         mt_filt = hl.read_matrix_table(mt_filt_fn)
         mt = hl.read_matrix_table(samples_qcd_fn)
@@ -404,11 +404,11 @@ if __name__ == "__main__":
 
             vcf_name = out_basename + f"_failing_variants_genotypes_filtered_chrom_{chrom}.vcf.bgz"
             if (not utils.check_exists(vcf_name)) or args.force:
-                args.force = True
 
                 mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
                 if mt_tmp.count_rows() > 0:
                     hl.export_vcf(mt_tmp, vcf_name, tabix=True)
+                    args.force = True
                 else:
                     logging.warning(f"Warning! No variants for chromosome {chrom} in dataset!")
             else:

@@ -776,6 +776,7 @@ def variant_quality_control(
     ############################################################
     # Filter genotypes failing on depth + quality
     if (not utils.check_exists(checkpoint_name + "_DP_GQ_filtered.mt/")) or force:
+        force = True
         mt_gtfilt = filter_failing_GTs_depth_quality(
             mt, checkpoint_name, prefix=annotation_prefix, min_dp=min_dp, min_gq=min_gq,
             filter_missing_measures=filter_missing_measures, count_failing=count_failing)
@@ -785,6 +786,7 @@ def variant_quality_control(
 
     # Annotate variants failing het AB measure (percentage of het GT calls for that variant *in balance*)
     if (not utils.check_exists(checkpoint_name + "_variant_het_ab_annotated.mt/")) or force:
+        force = True
         mt_abannot = annotate_variant_het_ab(
             mt_gtfilt, checkpoint_name, prefix=annotation_prefix, samples_qc=samples_qc, pheno_col=pheno_col,
             max_het_ref_reads=max_het_ref_reads, min_het_ref_reads=min_het_ref_reads
@@ -795,6 +797,7 @@ def variant_quality_control(
 
     # Filter genotypes failing on allelic balance
     if (not utils.check_exists(checkpoint_name + "_GT_ab_filtered.mt/")) or force:
+        force = True
         mt_gtfilt2 = find_failing_genotypes_ab(
             mt_abannot, checkpoint_name, prefix=annotation_prefix, max_het_ref_reads=max_het_ref_reads,
             min_het_ref_reads=min_het_ref_reads, min_hom_ref_ref_reads=min_hom_ref_ref_reads,
@@ -808,6 +811,7 @@ def variant_quality_control(
     # Annotate rest of failing variants #
     #####################################
     if (not utils.check_exists(checkpoint_name + "_failing_vars_annotated.mt/")) or force:
+        force = True
         mt_varannot = find_failing_vars(mt_gtfilt2, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col,
                                         count_failing=count_failing, snp_qd=snp_qd, indel_qd=indel_qd,
                                         ab_allowed_dev_het=ab_allowed_dev_het, p_hwe=p_hwe, sex_aware=sex_aware_call_rate,
