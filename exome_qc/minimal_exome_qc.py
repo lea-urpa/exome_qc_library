@@ -334,7 +334,7 @@ if __name__ == "__main__":
                 mt_filtered, mt, samples_qcd_fn, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
                 chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
                 contamination_max=args.contamination_max, batch_col_name=args.batch_col_name,
-                sampleqc_sd_threshold=args.sampleqc_sd_threshold
+                sampleqc_sd_threshold=args.sampleqc_sd_threshold, force=args.force
             )
             mt = mt.checkpoint(first_samples_qc_fn, overwrite=True)
         else:
