@@ -379,7 +379,7 @@ if __name__ == "__main__":
             mt, mt_filt_fn, prefix='low_pass', entries=True, variants=True, samples=True, unfilter_entries=True,
             pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force, pop_outliers=False
         )
 
         mt_filt = mt_filt.checkpoint(mt_filt_fn, overwrite=True)
