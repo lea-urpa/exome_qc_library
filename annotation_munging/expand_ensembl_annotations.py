@@ -59,12 +59,12 @@ if __name__ == "__main__":
     # Parse arguments #
     ###################
     parser = argparse.ArgumentParser(description="Expand ensembl GTF files to sparse TSVs for reading into R.")
-    parser.add_argument("--gtf_filename", type=str, help="Name and file path of GTF file to expand.")
+    parser.add_argument("--gtf_filename", type=str, help="Name and file path of GTF file to expand.", required=True)
 
     args = parser.parse_args()
 
     # Expand GTF
-    if os.path.is_file(args.gtf_filename):
+    if os.path.isfile(args.gtf_filename):
         expand_ensembl_gtf(args.gtf_filename)
     else:
         print(f"Error! File {args.gtf_filename} not found. Exiting.")
