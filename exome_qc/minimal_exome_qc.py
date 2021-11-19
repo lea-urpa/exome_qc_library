@@ -389,9 +389,39 @@ if __name__ == "__main__":
         mt_filt = hl.read_matrix_table(mt_filt_fn)
         mt = hl.read_matrix_table(samples_qcd_fn)
 
+    ################################################################
+    # Export unfiltered variant information to a separate tsv file #
+    ################################################################
+    logging.info("Exporting sample (column) and variant (row) data.")
+    variant_info_fn = out_basename + "_unfiltered_variant_info.tsv.bgz"
+
+    if (not utils.check_exists(variant_info_fn)) or args.force:
+        args.force = True
+        var_info = mt.rows()
+        var_info = var_info.flatten()
+
+        var_info.export(variant_info_fn)
+    else:
+        logging.info("Detected variant info table already exported, skipping export.")
+
+    # Export samples information to a separate tsv file
+    sample_info_fn = out_basename + "_unfiltered_sample_info.tsv.bgz"
+
+    if (not utils.check_exists(sample_info_fn)) or args.force:
+        args.force = True
+        sample_info = mt.cols()
+        sample_info = sample_info.flatten()
+
+        sample_info.export(sample_info_fn)
+    else:
+        logging.info("Detected sample info table already exported, skipping export.")
+
+    utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
+
     #############################################
     # Export filtered mt as VCF, per chromosome #
     #############################################
+    utils.remove_secondary(args.cluster_name, region=args.region)
     if args.split_by_chrom:
         logging.info("Exporting VCFs split by chromosome")
         chroms = [str(x) for x in range(1, 23)]
@@ -426,32 +456,5 @@ if __name__ == "__main__":
             logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
 
         utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
-    ################################################################
-    # Export unfiltered variant information to a separate tsv file #
-    ################################################################
-    logging.info("Exporting sample (column) and variant (row) data.")
-    variant_info_fn = out_basename + "_unfiltered_variant_info.tsv.bgz"
 
-    if (not utils.check_exists(variant_info_fn)) or args.force:
-        args.force = True
-        var_info = mt.rows()
-        var_info = var_info.flatten()
-
-        var_info.export(variant_info_fn)
-    else:
-        logging.info("Detected variant info table already exported, skipping export.")
-
-    # Export samples information to a separate tsv file
-    sample_info_fn = out_basename + "_unfiltered_sample_info.tsv.bgz"
-
-    if (not utils.check_exists(sample_info_fn)) or args.force:
-        args.force = True
-        sample_info = mt.cols()
-        sample_info = sample_info.flatten()
-
-        sample_info.export(sample_info_fn)
-    else:
-        logging.info("Detected sample info table already exported, skipping export.")
-
-    utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
 
