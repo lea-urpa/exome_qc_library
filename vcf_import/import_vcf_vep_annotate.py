@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--vcf", type=str, required=True,
                         help="Name of VCF file (or files) to import, comma separated if > 1 file.")
     parser.add_argument("--out_file", type=str, help="Name of matrix table to output.")
+    parser.add_argument("--region", default="europe-west1", help="Name of region for checking dataproc in correct region.")
     parser.add_argument("--log_dir", type=str, required=True, help="Location where logs should be written to.")
     parser.add_argument("--data_dir", type=str, required=True, help="Location where VCFs to import exist.")
     parser.add_argument("--out_dir", type=str, required=True, help="Location to write combined + vep annotated mt")
