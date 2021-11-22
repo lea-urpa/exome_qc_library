@@ -31,7 +31,8 @@ if __name__ == "__main__":
     parser.add_argument("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
                         help="Reference genome build.")
     parser.add_argument("--chr_prefix", action='store_true', help="Chromosomes are of form 'chr1', NOT '1' etc.")
-    parser.add_argument("--force_bgz", action='store_true', help="Force blog gzip import? Default true.")
+    parser.add_argument("--force_bgz", action='store_true', help="Force blog gzip import?")
+    parser.add_argument("--force_load", action='store_true', help="Force loading of gzipped vcf? ")
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
     parser.add_argument("--test", action='store_true', help="Filters data to just chr 22 for testing purposes.")
     parser.add_argument("--force", action='store_true', help="Force re-run of all steps?")
@@ -96,7 +97,7 @@ if __name__ == "__main__":
     if (not utils.check_exists(combined_mt_fn)) or args.force:
         mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
                              chr_prefix=args.chr_prefix, reference_genome=args.reference_genome, force_bgz=args.force_bgz,
-                             call_fields=args.call_fields)
+                             call_fields=args.call_fields, force_load=args.force_load)
 
         mt = mt.checkpoint(combined_mt_fn, overwrite=True)
     else:

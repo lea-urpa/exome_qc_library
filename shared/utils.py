@@ -68,7 +68,7 @@ def check_regions(cluster_region, file_url):
 
 
 def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=False,
-              reference_genome="GRCh38", force_bgz=False, call_fields="PGT", save_row_annots=False,
+              reference_genome="GRCh38", force_bgz=False, force_load=False, call_fields="PGT", save_row_annots=False,
               chrom_split=False):
     # Get combined mt output name
     if test:
@@ -102,11 +102,11 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
             if recode is None:
                 mt_tmp = hl.import_vcf(
                     vcf_name, force_bgz=force_bgz, call_fields=call_fields,
-                    reference_genome=reference_genome)
+                    reference_genome=reference_genome, force=force_load)
             else:
                 mt_tmp = hl.import_vcf(
                     vcf_name, force_bgz=force_bgz, call_fields=call_fields,
-                    reference_genome=reference_genome, contig_recoding=recode)
+                    reference_genome=reference_genome, contig_recoding=recode, force=force_load)
 
             if test:
                 logging.info('Test flag given, filtering to chrom 22.')
