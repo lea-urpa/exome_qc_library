@@ -412,8 +412,12 @@ if __name__ == "__main__":
     if (not utils.check_exists(mt_filt_fn)) or args.force:
         mt = hl.read_matrix_table(samples_qcd_fn)
 
+        if args.skip_samples_qc:
+            filter_samples = False
+        else:
+            filter_samples = True
         mt_filt = sq.filter_failing(
-            mt, mt_filt_fn, prefix='low_pass', entries=True, variants=True, samples=True, unfilter_entries=True,
+            mt, mt_filt_fn, prefix='low_pass', entries=True, variants=True, samples=filter_samples, unfilter_entries=True,
             pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force, pop_outliers=False
