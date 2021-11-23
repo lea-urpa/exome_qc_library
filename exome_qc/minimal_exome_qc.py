@@ -21,8 +21,8 @@ if __name__ == "__main__":
     # Parse arguments for imput data #
     ##################################
     parser = argparse.ArgumentParser()
-    parser.add_argument("--vcf", type=str, required=True,
-                        help="Name of VCF file (or files) to import, comma separated if > 1 file.")
+    parser.add_argument("--vcf", type=str, help="Name of VCF file (or files) to import, comma separated if > 1 file.")
+    parser.add_argument("--mt", type=str, help="Name of (single) matrix table to load.")
     parser.add_argument("--vcfs_chrom_split", action="store_true", help="Are vcfs given chrom split, e.g. same samples?")
     parser.add_argument("--samples_annotation_files", type=str,
                         help="Files to annotate the samples with, comma separated.")
@@ -138,56 +138,68 @@ if __name__ == "__main__":
     for file_url in [args.log_dir, args.out_dir, args.data_dir]:
         utils.check_regions(args.region, file_url)
 
-    ####################
-    # Import VCF files #
-    ####################
-    vcf_files = args.vcf.strip().split(",")
-
-    if (len(vcf_files) > 1) and (args.out_file is None):
-        logging.error("Error! Must give matrix table file name with --out_file if importing more than one VCF.")
-        exit(1)
-
     if args.test:
         test_str = "_test"
     else:
         test_str = ""
 
-    if args.out_file is None:
-        basename = os.path.basename(vcf_files[0]).replace(".vcf", "").replace(".gz", "").replace(".bgz", "")
-    else:
-        basename = args.out_file.rstrip("/").replace(".mt", "")
+    #######################################
+    # Import VCF files, combine and split #
+    #######################################
+    if args.vcf is not None:
+        vcf_files = args.vcf.strip().split(",")
 
-    out_basename = os.path.join(args.out_dir, basename)
-    combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
-    split_fn = out_basename + f"_split{test_str}.mt/"
+        if (len(vcf_files) > 1) and (args.out_file is None):
+            logging.error("Error! Must give matrix table file name with --out_file if importing more than one VCF.")
+            exit(1)
 
-    #############################################
-    # Combine VCF files and split multiallelics #
-    #############################################
-    if (not utils.check_exists(split_fn)) or args.force:
-        # Import VCF files and combine
-        if (not utils.check_exists(combined_mt_fn)) or args.force:
-            mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
-                                 chr_prefix=args.chr_prefix, reference_genome=args.reference_genome,
-                                 force_bgz=args.force_bgz,
-                                 call_fields=args.call_fields, chrom_split=args.vcfs_chrom_split)
+        if args.out_file is None:
+            basename = os.path.basename(vcf_files[0]).replace(".vcf", "").replace(".gz", "").replace(".bgz", "")
+        else:
+            basename = args.out_file.rstrip("/").replace(".mt", "")
 
-            mt = mt.checkpoint(combined_mt_fn, overwrite=True)
-            logging.info(f"Final matrix table count: {mt.count()}")
+        out_basename = os.path.join(args.out_dir, basename)
+
+        combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
+        split_fn = out_basename + f"_split{test_str}.mt/"
+
+        if (not utils.check_exists(split_fn)) or args.force:
+            # Import VCF files and combine
+            if (not utils.check_exists(combined_mt_fn)) or args.force:
+                mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
+                                     chr_prefix=args.chr_prefix, reference_genome=args.reference_genome,
+                                     force_bgz=args.force_bgz,
+                                     call_fields=args.call_fields, chrom_split=args.vcfs_chrom_split)
+
+                mt = mt.checkpoint(combined_mt_fn, overwrite=True)
+                logging.info(f"Final matrix table count: {mt.count()}")
+                utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=plot_dir)
+            else:
+                logging.info("Detected VCF file already converted to matrix table, skipping VCF import.")
+
+            # Split multiallelics
+            logging.info('Splitting multiallelic variants')
+            mt = hl.read_matrix_table(combined_mt_fn)
+
+            mt = hl.split_multi_hts(mt)
+            mt = mt.checkpoint(split_fn, overwrite=True)
+            logging.info('Split count: ' + str(mt.count()))
             utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=plot_dir)
         else:
-            logging.info("Detected VCF file already converted to matrix table, skipping VCF import.")
+            logging.info("Detected split mt exists, skipping splitting MT.")
 
-        # Split multiallelics
-        logging.info('Splitting multiallelic variants')
-        mt = hl.read_matrix_table(combined_mt_fn)
+    elif args.mt is not None:
+        split_fn = args.mt
+        basename = os.path.basename(args.mt).rstrip("/").replace(".mt", "")
+        out_basename = os.path.join(args.out_dir, basename)
+        if not utils.check_exists(args.mt):
+            logging.error(f"Error! file {args.mt} does not exist! Exiting now.")
+        else:
+            logging.info(f"Loading mt {args.mt} for quality control.")
 
-        mt = hl.split_multi_hts(mt)
-        mt = mt.checkpoint(split_fn, overwrite=True)
-        logging.info('Split count: ' + str(mt.count()))
-        utils.copy_logs_output(log_dir, log_file=log_file, plot_dir=plot_dir)
     else:
-        logging.info("Detected split mt exists, skipping splitting MT.")
+        logging.error("Error! Either matrix table or vcf must be given as input. Exiting now.")
+        exit(0)
 
     #######################
     # Low pass variant QC #
