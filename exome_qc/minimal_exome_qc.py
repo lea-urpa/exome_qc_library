@@ -204,7 +204,7 @@ if __name__ == "__main__":
             logging.info("Detected split mt exists, skipping splitting MT.")
 
     elif args.mt is not None:
-        utils.check_regions(args.mt)
+        utils.check_regions(args.region, args.mt)
         split_fn = args.mt
         basename = os.path.basename(args.mt).rstrip("/").replace(".mt", "")
         out_basename = os.path.join(args.out_dir, basename)

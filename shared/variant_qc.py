@@ -128,7 +128,9 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
         gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
         gt_het_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) &
                                                                 (mt.GT.is_hom_var() | mt.GT.is_het())))
+        print(f"GT HOMALR: {gt_het_homalt}")
         gt_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
+        print(f"GT HOMREF: {gt_homref}")
 
     ############################
     # Define filter conditions #
@@ -148,6 +150,7 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
     if count_failing:
         # Count failing depth
         failing_depth = mt.aggregate_entries(hl.agg.count_where(failing_dp_cond))
+        print(f"FAILING DEPTH : {failing_depth}")
         failing_depth_perc = round(failing_depth / gt_total*100, 2)
         missing_depth = mt.aggregate_entries(hl.agg.count_where(missing_dp_cond))
         missing_depth_perc = round(missing_depth / gt_total*100, 2)
@@ -159,17 +162,19 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
         missing_pl = mt.aggregate_entries(hl.agg.count_where(missing_pl_cond))
 
         logging.info(f"Number of GTs with depth < {min_dp}: {failing_depth} ({failing_depth_perc}%)")
-        logging.info(f"Number of hom ref GTs with GQ < {min_gq}: {failing_gq} "
-                     f"({round(failing_gq/gt_total*100, 2)}% of all GTs, "
-                     f"{round(failing_gq/gt_homref*100, 2)}% of homref GTs)")
+        if gt_homref > 0:
+            logging.info(f"Number of hom ref GTs with GQ < {min_gq}: {failing_gq} "
+                         f"({round(failing_gq/gt_total*100, 2)}% of all GTs, "
+                         f"{round(failing_gq/gt_homref*100, 2)}% of homref GTs)")
         logging.info(f"Number of het or hom alt GTs with PL[0] < {min_gq}: {failing_pl} "
                      f"({round(failing_pl/gt_total*100, 2)}% of all GTs, "
                      f"{round(failing_pl/gt_het_homalt*100, 2)} % of homalt + het GTs)")
 
         if missing_gq > 0:
-            logging.info(f"Number of hom ref GTs that are defined but missing GQ : {missing_gq} "
-                         f"({round(missing_gq/gt_total*100, 2)}% of all GTs, "
-                         f"{round(missing_gq/gt_homref*100, 2)}% of homref GTs)")
+            if gt_homref > 0:
+                logging.info(f"Number of hom ref GTs that are defined but missing GQ : {missing_gq} "
+                             f"({round(missing_gq/gt_total*100, 2)}% of all GTs, "
+                             f"{round(missing_gq/gt_homref*100, 2)}% of homref GTs)")
             logging.info("(these genotypes are counted as failing)")
         if missing_pl > 0:
             logging.info(f"Number of het or hom alt GTs that are defined but missing PL: {missing_pl} "
