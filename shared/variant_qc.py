@@ -449,7 +449,8 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
 
         # Filter hom ref genotypes on allelic balance
         homref_failing_ab = mt.aggregate_entries(hl.agg.count_where(hom_ab_cond))
-        homref_failing_ab_perc = round(homref_failing_ab / gthomref * 100, 4)
+        if gthomref > 0:
+            homref_failing_ab_perc = round(homref_failing_ab / gthomref * 100, 4)
 
         # Filter hom var genotypes on allelic balance
         homalt_failing_ab = mt.aggregate_entries(hl.agg.count_where(homalt_ab_cond))
@@ -471,8 +472,9 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
 
         logging.info(f"Number of het GTs missing AD info: {missing_ad_het} "
                      f"({round(missing_ad_het/gthet*100, 2)}% of het GTs)")
-        logging.info(f"Number of hom ref GTs missing AD info: {missing_ad_homref} "
-                     f"({round(missing_ad_homref/gthomref*100, 2)}% of hom ref GTs)")
+        if gthomref > 0:
+            logging.info(f"Number of hom ref GTs missing AD info: {missing_ad_homref} "
+                         f"({round(missing_ad_homref/gthomref*100, 2)}% of hom ref GTs)")
         logging.info(f"Number of hom alt GTs missing AD info: {missing_ad_homalt} "
                      f"({round(missing_ad_homalt/gthomvar*100, 2)}% of hom alt GTs)")
 
