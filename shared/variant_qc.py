@@ -128,9 +128,7 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
         gt_total = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT)))
         gt_het_homalt = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) &
                                                                 (mt.GT.is_hom_var() | mt.GT.is_het())))
-        print(f"GT HOMALR: {gt_het_homalt}")
         gt_homref = mt.aggregate_entries(hl.agg.count_where(hl.is_defined(mt.GT) & mt.GT.is_hom_ref()))
-        print(f"GT HOMREF: {gt_homref}")
 
     ############################
     # Define filter conditions #
@@ -175,6 +173,8 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
                 logging.info(f"Number of hom ref GTs that are defined but missing GQ : {missing_gq} "
                              f"({round(missing_gq/gt_total*100, 2)}% of all GTs, "
                              f"{round(missing_gq/gt_homref*100, 2)}% of homref GTs)")
+            else:
+                logging.warning("No hom ref genotypes in this data.")
             logging.info("(these genotypes are counted as failing)")
         if missing_pl > 0:
             logging.info(f"Number of het or hom alt GTs that are defined but missing PL: {missing_pl} "
@@ -475,6 +475,8 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
         if gthomref > 0:
             logging.info(f"Number of hom ref GTs missing AD info: {missing_ad_homref} "
                          f"({round(missing_ad_homref/gthomref*100, 2)}% of hom ref GTs)")
+        else:
+            logging.warning("No hom ref genotypes in this data.")
         logging.info(f"Number of hom alt GTs missing AD info: {missing_ad_homalt} "
                      f"({round(missing_ad_homalt/gthomvar*100, 2)}% of hom alt GTs)")
 
