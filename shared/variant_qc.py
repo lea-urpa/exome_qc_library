@@ -148,7 +148,6 @@ def filter_failing_GTs_depth_quality(mt, checkpoint_name, prefix="", min_dp=10, 
     if count_failing:
         # Count failing depth
         failing_depth = mt.aggregate_entries(hl.agg.count_where(failing_dp_cond))
-        print(f"FAILING DEPTH : {failing_depth}")
         failing_depth_perc = round(failing_depth / gt_total*100, 2)
         missing_depth = mt.aggregate_entries(hl.agg.count_where(missing_dp_cond))
         missing_depth_perc = round(missing_depth / gt_total*100, 2)
@@ -451,6 +450,8 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
         homref_failing_ab = mt.aggregate_entries(hl.agg.count_where(hom_ab_cond))
         if gthomref > 0:
             homref_failing_ab_perc = round(homref_failing_ab / gthomref * 100, 4)
+        else:
+            homref_failing_ab_perc = hl.null(hl.tfloat)
 
         # Filter hom var genotypes on allelic balance
         homalt_failing_ab = mt.aggregate_entries(hl.agg.count_where(homalt_ab_cond))
@@ -467,7 +468,8 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
         # Report number and percent of genotypes excluded
         logging.info("\nGenotypes failing ab, after excluding low DP and low GQ genotypes:")
         logging.info(f"Number of het GTs failing ab: {hets_failing_ab}({het_failing_ab_perc}%)")
-        logging.info(f"Number of hom ref GTs failing_ab: {homref_failing_ab} ({homref_failing_ab_perc}%)")
+        if gthomref > 0:
+            logging.info(f"Number of hom ref GTs failing_ab: {homref_failing_ab} ({homref_failing_ab_perc}%)")
         logging.info(f"Number of hom alt GTs failing_ab: {homalt_failing_ab} ({homalt_failing_ab_perc})%")
 
         logging.info(f"Number of het GTs missing AD info: {missing_ad_het} "
