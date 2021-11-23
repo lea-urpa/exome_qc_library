@@ -39,8 +39,6 @@ if __name__ == "__main__":
     parser.add_argument("--batch_col_name", type=str,
                                 help="Samples annotation in matrix table or annotation giving batch/cohort for "
                                      "stratified samples QC (TiTv, het/homvar, indel ratios, n singletons).")
-    parser.add_argument("--annotate_variants", action='store_true',
-                        help="Annotate variants with LOF + missense genes they may lie in?")
     parser.add_argument("--sex_col", type=str, help="Column in annotation files givien sex column.")
     parser.add_argument("--male_str", type=str, help="string in sex column indicating a male sample.")
     parser.add_argument("--female_str", type=str, help="string in sex column indicating a female sample.")
@@ -58,6 +56,9 @@ if __name__ == "__main__":
     parser.add_argument("--chr_prefix", action='store_true', help="Chromosomes are of form 'chr1', NOT '1' etc.")
     parser.add_argument("--force_bgz", action='store_true', help="Force blog gzip import? Default true.")
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
+    parser.add_argument("--annotate_variants", action='store_true',
+                        help="Annotate variants with LOF + missense genes they may lie in?")
+    parser.add_argument("--do_not_export_vcf", action='store_false', help="Export QCd dataset as vcf file(s)?")
     parser.add_argument("--test", action='store_true', help="Filters data to just chr 22 for testing purposes.")
     parser.add_argument("--force", action='store_true', help="Force re-run of all steps?")
 
@@ -445,40 +446,41 @@ if __name__ == "__main__":
     #############################################
     # Export filtered mt as VCF, per chromosome #
     #############################################
-    utils.remove_secondary(args.cluster_name, region=args.region)
-    if args.split_by_chrom:
-        logging.info("Exporting VCFs split by chromosome")
-        chroms = [str(x) for x in range(1, 23)]
-        chroms.extend(["X", "Y"])
-        if args.reference_genome == "GRCh38":
-            chroms = [f"chr{x}" for x in chroms]
+    if not args.do_not_export_vcf:
+        utils.remove_secondary(args.cluster_name, region=args.region)
+        if args.split_by_chrom:
+            logging.info("Exporting VCFs split by chromosome")
+            chroms = [str(x) for x in range(1, 23)]
+            chroms.extend(["X", "Y"])
+            if args.reference_genome == "GRCh38":
+                chroms = [f"chr{x}" for x in chroms]
 
-        for chrom in chroms:
-            if args.test:
-                if not "22" in chrom:
-                    pass
+            for chrom in chroms:
+                if args.test:
+                    if not "22" in chrom:
+                        pass
 
-            vcf_name = out_basename + f"_failing_variants_genotypes_filtered_chrom_{chrom}.vcf.bgz"
-            if (not utils.check_exists(vcf_name)) or args.force:
+                vcf_name = out_basename + f"_failing_variants_genotypes_filtered_chrom_{chrom}.vcf.bgz"
+                if (not utils.check_exists(vcf_name)) or args.force:
 
-                mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
-                if mt_tmp.count_rows() > 0:
-                    hl.export_vcf(mt_tmp, vcf_name, tabix=True)
-                    args.force = True
+                    mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
+                    if mt_tmp.count_rows() > 0:
+                        hl.export_vcf(mt_tmp, vcf_name, tabix=True)
+                        args.force = True
+                    else:
+                        logging.warning(f"Warning! No variants for chromosome {chrom} in dataset!")
                 else:
-                    logging.warning(f"Warning! No variants for chromosome {chrom} in dataset!")
+                    logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
+            utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
+        else:
+            logging.info("Exporting VCF as one file.")
+            vcf_name = out_basename + f"_failing_variants_genotypes_filtered.vcf.bgz"
+            if (not utils.check_exists(vcf_name)) or args.force:
+                args.force = True
+                hl.export_vcf(mt_filt, vcf_name, tabix=True)
             else:
                 logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
-        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
-    else:
-        logging.info("Exporting VCF as one file.")
-        vcf_name = out_basename + f"_failing_variants_genotypes_filtered.vcf.bgz"
-        if (not utils.check_exists(vcf_name)) or args.force:
-            args.force = True
-            hl.export_vcf(mt_filt, vcf_name, tabix=True)
-        else:
-            logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
 
-        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
+            utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
 
 
