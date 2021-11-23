@@ -39,6 +39,8 @@ if __name__ == "__main__":
     parser.add_argument("--batch_col_name", type=str,
                                 help="Samples annotation in matrix table or annotation giving batch/cohort for "
                                      "stratified samples QC (TiTv, het/homvar, indel ratios, n singletons).")
+    parser.add_argument("--annotate_variants", action='store_true',
+                        help="Annotate variants with LOF + missense genes they may lie in?")
     parser.add_argument("--sex_col", type=str, help="Column in annotation files givien sex column.")
     parser.add_argument("--male_str", type=str, help="string in sex column indicating a male sample.")
     parser.add_argument("--female_str", type=str, help="string in sex column indicating a female sample.")
@@ -88,6 +90,7 @@ if __name__ == "__main__":
 
     # Samples QC thresholds #
     samples_thresh = parser.add_argument_group("Samples QC thresholds.")
+    samples_thresh.add_argument("--skip_samples_qc", action="store_true", help="Skip samples QC?")
     samples_thresh.add_argument("--sample_call_rate", type=float, default=0.8,
                                 help="Minimum genotype call rate per sample. Default none- samples not filtered on "
                                      "call rate.")
@@ -234,6 +237,11 @@ if __name__ == "__main__":
     filtered_annot = out_basename + f"_variant_filtere_sex_annotated{test_str}.mt"
 
     if (not utils.check_exists(sex_imputed)) or args.force:
+        if args.annotate_variants:
+            logging.info("Annotating variant types:")
+
+            mt = va.annotate_variants(mt)
+
         logging.info("Imputing sex")
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
@@ -298,84 +306,88 @@ if __name__ == "__main__":
     ##################
     # Run samples QC #
     ##################
-    samples_qcd_fn = out_basename + f"_samples_qcd{test_str}.mt/"
-    annotated_fn = out_basename + f"_samples_qcd_samples_annotated{test_str}.mt"
-    filtered_mt_fn = out_basename + f"_samples_qcd_gts_vars_filtered{test_str}.mt"
-    first_samples_qc_fn = out_basename + f"_samples_qcd_no_sex_check{test_str}.mt"
+    if not args.skip_samples_qc:
+        samples_qcd_fn = out_basename + f"_samples_qcd{test_str}.mt/"
+        annotated_fn = out_basename + f"_samples_qcd_samples_annotated{test_str}.mt"
+        filtered_mt_fn = out_basename + f"_samples_qcd_gts_vars_filtered{test_str}.mt"
+        first_samples_qc_fn = out_basename + f"_samples_qcd_no_sex_check{test_str}.mt"
 
-    if (not utils.check_exists(samples_qcd_fn)) or args.force:
-        mt = hl.read_matrix_table(sex_imputed)
+        if (not utils.check_exists(samples_qcd_fn)) or args.force:
+            mt = hl.read_matrix_table(sex_imputed)
 
-        # Annotate with bam metadata
-        if (not utils.check_exists(annotated_fn)) or args.force:
-            mt = sa.annotate_cols_from_file(mt, args.samples_annotation_files, args.samples_delim, args.samples_col,
-                                            args.samples_miss)
-            mt = mt.checkpoint(annotated_fn, overwrite=True)
-            args.force = True
+            # Annotate with bam metadata
+            if (not utils.check_exists(annotated_fn)) or args.force:
+                mt = sa.annotate_cols_from_file(mt, args.samples_annotation_files, args.samples_delim, args.samples_col,
+                                                args.samples_miss)
+                mt = mt.checkpoint(annotated_fn, overwrite=True)
+                args.force = True
+            else:
+                mt = hl.read_matrix_table(annotated_fn)
+
+            # Check columns exist
+            for colname in ['chimeras_col', 'contamination_col', 'sex_col']:
+                col = getattr(args, colname)
+                try:
+                    test = hl.is_defined(mt[col])
+                except Exception as e:
+                    logging.error(f"Error! Given column annotation {col} does not actually exist after inputting sample "
+                                  f"annotations.")
+                    logging.error(e)
+                    exit(1)
+
+            # Filter failing variants and genotypes
+            if (not utils.check_exists(filtered_mt_fn)) or args.force:
+                logging.info("Filtering out failing genotypes and variants.")
+                mt_filtered = sq.filter_failing(
+                    mt, samples_qcd_fn, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
+                    pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+                    min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+                    max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+                )
+                mt_filtered = mt_filtered.checkpoint(filtered_mt_fn, overwrite=True)
+                args.force = True
+            else:
+                mt_filtered = hl.read_matrix_table(filtered_mt_fn)
+
+            # Run samples QC
+            if (not utils.check_exists(first_samples_qc_fn)) or args.force:
+                mt = sq.samples_qc(
+                    mt_filtered, mt, samples_qcd_fn, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
+                    chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
+                    contamination_max=args.contamination_max, batch_col_name=args.batch_col_name,
+                    sampleqc_sd_threshold=args.sampleqc_sd_threshold, force=args.force
+                )
+                mt = mt.checkpoint(first_samples_qc_fn, overwrite=True)
+                args.force = True
+            else:
+                mt = hl.read_matrix_table(first_samples_qc_fn)
+
+            # Convert sex_col to is_female column
+            mt = mt.annotate_cols(is_female_reported=hl.cond(
+                hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col] == args.male_str),
+                False,
+                hl.cond(
+                    hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col] == args.female_str),
+                    True, hl.null(hl.tbool)
+                )
+            ))
+
+            # Check that imputed sex matches given sex
+            mt = mt.annotate_cols(failing_samples_qc=hl.cond(
+                hl.is_defined(mt.is_female_imputed) & hl.is_defined(mt[args.sex_col]) &
+                (mt.is_female_imputed != mt.is_female_reported),
+                mt.failing_samples_qc.append("missing_sexaware_sample_call_rate"),
+                mt.failing_samples_qc
+            ))
+
+            logging.info(f"Writing checkpoint: sample QC")
+            mt = mt.checkpoint(samples_qcd_fn, overwrite=True)
+            utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
         else:
-            mt = hl.read_matrix_table(annotated_fn)
-
-        # Check columns exist
-        for colname in ['chimeras_col', 'contamination_col', 'sex_col']:
-            col = getattr(args, colname)
-            try:
-                test = hl.is_defined(mt[col])
-            except Exception as e:
-                logging.error(f"Error! Given column annotation {col} does not actually exist after inputting sample "
-                              f"annotations.")
-                logging.error(e)
-                exit(1)
-
-        # Filter failing variants and genotypes
-        if (not utils.check_exists(filtered_mt_fn)) or args.force:
-            logging.info("Filtering out failing genotypes and variants.")
-            mt_filtered = sq.filter_failing(
-                mt, samples_qcd_fn, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
-                pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
-                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
-            )
-            mt_filtered = mt_filtered.checkpoint(filtered_mt_fn, overwrite=True)
-            args.force = True
-        else:
-            mt_filtered = hl.read_matrix_table(filtered_mt_fn)
-
-        # Run samples QC
-        if (not utils.check_exists(first_samples_qc_fn)) or args.force:
-            mt = sq.samples_qc(
-                mt_filtered, mt, samples_qcd_fn, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
-                chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
-                contamination_max=args.contamination_max, batch_col_name=args.batch_col_name,
-                sampleqc_sd_threshold=args.sampleqc_sd_threshold, force=args.force
-            )
-            mt = mt.checkpoint(first_samples_qc_fn, overwrite=True)
-            args.force = True
-        else:
-            mt = hl.read_matrix_table(first_samples_qc_fn)
-
-        # Convert sex_col to is_female column
-        mt = mt.annotate_cols(is_female_reported=hl.cond(
-            hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col] == args.male_str),
-            False,
-            hl.cond(
-                hl.is_defined(mt[args.sex_col]) & (mt[args.sex_col] == args.female_str),
-                True, hl.null(hl.tbool)
-            )
-        ))
-
-        # Check that imputed sex matches given sex
-        mt = mt.annotate_cols(failing_samples_qc=hl.cond(
-            hl.is_defined(mt.is_female_imputed) & hl.is_defined(mt[args.sex_col]) &
-            (mt.is_female_imputed != mt.is_female_reported),
-            mt.failing_samples_qc.append("missing_sexaware_sample_call_rate"),
-            mt.failing_samples_qc
-        ))
-
-        logging.info(f"Writing checkpoint: sample QC")
-        mt = mt.checkpoint(samples_qcd_fn, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
+            logging.info("Detected samples QC completed, skipping this step.")
     else:
-        logging.info("Detected samples QC completed, skipping this step.")
+        logging.info("User indicated samples QC should be skipped. Moving on.")
+        samples_qcd_fn = sex_imputed
 
     #####################################
     # Filter failing gts, vars, samples #
