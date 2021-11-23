@@ -48,7 +48,7 @@ if __name__ == "__main__":
                         help='Number of secondary workers for scaling in applicable steps.')
     parser.add_argument("--out_file", type=str, help="Name of matrix table to output.")
     parser.add_argument("--log_dir", type=str, required=True, help="Location where logs should be written to.")
-    parser.add_argument("--data_dir", type=str, required=True, help="Location where VCFs to import exist.")
+    parser.add_argument("--data_dir", type=str, help="Location where VCFs to import exist.")
     parser.add_argument("--out_dir", type=str, required=True, help="Location to write combined + vep annotated mt")
     parser.add_argument("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
                         help="Reference genome build.")
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     #########################################
     # Check dataproc cluster vs file inputs #
     #########################################
-    for file_url in [args.log_dir, args.out_dir, args.data_dir]:
+    for file_url in [args.log_dir, args.out_dir, ]:
         utils.check_regions(args.region, file_url)
 
     if args.test:
@@ -156,6 +156,12 @@ if __name__ == "__main__":
         if (len(vcf_files) > 1) and (args.out_file is None):
             logging.error("Error! Must give matrix table file name with --out_file if importing more than one VCF.")
             exit(1)
+
+        if args.data_dir is None:
+            logging.error("Error! Directory of VCF files must be given with --data_dir.")
+            exit(1)
+        else:
+            utils.check_regions(args.region, args.data_dir)
 
         if args.out_file is None:
             basename = os.path.basename(vcf_files[0]).replace(".vcf", "").replace(".gz", "").replace(".bgz", "")
