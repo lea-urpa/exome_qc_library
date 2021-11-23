@@ -32,9 +32,9 @@ if __name__ == "__main__":
                         help="Delimiter in sample annotation files. Must be the same in all files. Default tab.")
     parser.add_argument("--samples_miss", type=str, default="n/a",
                         help="String for missing values in annotation files, e.g. NA. Must be the same in all files.")
-    parser.add_argument("--chimeras_col", required=True, type=str,
+    parser.add_argument("--chimeras_col", type=str,
                                 help="Column in matrix table or annotation files giving sample chimera percentage")
-    parser.add_argument("--contamination_col", required=True, type=str,
+    parser.add_argument("--contamination_col", type=str,
                                 help="Column in matrix table or annotation files giving sample contamination percent.")
     parser.add_argument("--batch_col_name", type=str,
                                 help="Samples annotation in matrix table or annotation giving batch/cohort for "
@@ -109,6 +109,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     hl.init()
+
+    if not args.skip_samples_qc:
+        if (args.chimeras_col is None) or (args.contamination_col is None):
+            logging.error("Error! If not skipping samples QC, --chimeras_col and --contamination_col must be given.")
+            exit(1)
 
     #####################################
     # Configure logging, define outputs #
