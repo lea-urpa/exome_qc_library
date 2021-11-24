@@ -220,7 +220,8 @@ if __name__ == "__main__":
     #######################
     # Low pass variant QC #
     #######################
-    variant_qcd_fn = out_basename + f"_low_pass_qcd{test_str}.mt/"
+    counter = 1
+    variant_qcd_fn = out_basename + f"{counter}_low_pass_qcd{test_str}.mt/"
 
     if (not utils.check_exists(variant_qcd_fn)) or args.force:
         logging.info("Running variant QC")
@@ -245,7 +246,8 @@ if __name__ == "__main__":
     ##############
     # Impute sex #
     ##############
-    sex_imputed = out_basename + f"_sex_imputed{test_str}.mt"
+    counter += 1
+    sex_imputed = out_basename + f"{counter}_sex_imputed{test_str}.mt"
     filtered_nohwe = out_basename + f"_variant_filtered_nohwe{test_str}.mt"
     filtered_annot = out_basename + f"_variant_filtere_sex_annotated{test_str}.mt"
 
@@ -320,7 +322,8 @@ if __name__ == "__main__":
     # Run samples QC #
     ##################
     if not args.skip_samples_qc:
-        samples_qcd_fn = out_basename + f"_samples_qcd{test_str}.mt/"
+        counter += 1
+        samples_qcd_fn = out_basename + f"{counter}_samples_qcd{test_str}.mt/"
         annotated_fn = out_basename + f"_samples_qcd_samples_annotated{test_str}.mt"
         filtered_mt_fn = out_basename + f"_samples_qcd_gts_vars_filtered{test_str}.mt"
         first_samples_qc_fn = out_basename + f"_samples_qcd_no_sex_check{test_str}.mt"
@@ -406,7 +409,8 @@ if __name__ == "__main__":
     # Filter failing gts, vars, samples #
     #####################################
     # Filter out failing genotypes, samples, and variants, export to vcf
-    mt_filt_fn = out_basename + f"_low_pass_variants_samples_filtered{test_str}.mt/"
+    counter += 1
+    mt_filt_fn = out_basename + f"{counter}_low_pass_variants_samples_filtered{test_str}.mt/"
     logging.info("Filtering out failing variants, genotypes, and samples to write to VCF.")
 
     if (not utils.check_exists(mt_filt_fn)) or args.force:
