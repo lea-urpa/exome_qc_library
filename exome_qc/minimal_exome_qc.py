@@ -221,7 +221,7 @@ if __name__ == "__main__":
     # Low pass variant QC #
     #######################
     counter = 1
-    variant_qcd_fn = out_basename + f"{counter}_low_pass_qcd{test_str}.mt/"
+    variant_qcd_fn = f"{counter}_{out_basename}_low_pass_qcd{test_str}.mt/"
 
     if (not utils.check_exists(variant_qcd_fn)) or args.force:
         logging.info("Running variant QC")
@@ -247,9 +247,9 @@ if __name__ == "__main__":
     # Impute sex #
     ##############
     counter += 1
-    sex_imputed = out_basename + f"{counter}_sex_imputed{test_str}.mt"
-    filtered_nohwe = out_basename + f"_variant_filtered_nohwe{test_str}.mt"
-    filtered_annot = out_basename + f"_variant_filtere_sex_annotated{test_str}.mt"
+    sex_imputed = f"{counter}_{out_basename}_sex_imputed{test_str}.mt"
+    filtered_nohwe = out_basename + f"_variant_filtered_nohwe{test_str}_tmp.mt"
+    filtered_annot = out_basename + f"_variant_filtere_sex_annotated{test_str}_tmp.mt"
 
     if (not utils.check_exists(sex_imputed)) or args.force:
         if args.annotate_variants:
@@ -323,10 +323,10 @@ if __name__ == "__main__":
     ##################
     if not args.skip_samples_qc:
         counter += 1
-        samples_qcd_fn = out_basename + f"{counter}_samples_qcd{test_str}.mt/"
-        annotated_fn = out_basename + f"_samples_qcd_samples_annotated{test_str}.mt"
-        filtered_mt_fn = out_basename + f"_samples_qcd_gts_vars_filtered{test_str}.mt"
-        first_samples_qc_fn = out_basename + f"_samples_qcd_no_sex_check{test_str}.mt"
+        samples_qcd_fn = f"{counter}_{out_basename}_samples_qcd{test_str}.mt/"
+        annotated_fn = out_basename + f"_samples_qcd_samples_annotated{test_str}_tmp.mt"
+        filtered_mt_fn = out_basename + f"_samples_qcd_gts_vars_filtered{test_str}_tmp.mt"
+        first_samples_qc_fn = out_basename + f"_samples_qcd_no_sex_check{test_str}_tmp.mt"
 
         if (not utils.check_exists(samples_qcd_fn)) or args.force:
             mt = hl.read_matrix_table(sex_imputed)
@@ -410,7 +410,7 @@ if __name__ == "__main__":
     #####################################
     # Filter out failing genotypes, samples, and variants, export to vcf
     counter += 1
-    mt_filt_fn = out_basename + f"{counter}_low_pass_variants_samples_filtered{test_str}.mt/"
+    mt_filt_fn = f"{counter}_{out_basename}_failing_filtered{test_str}.mt/"
     logging.info("Filtering out failing variants, genotypes, and samples to write to VCF.")
 
     if (not utils.check_exists(mt_filt_fn)) or args.force:
@@ -480,7 +480,7 @@ if __name__ == "__main__":
                     if not "22" in chrom:
                         pass
 
-                vcf_name = out_basename + f"_failing_variants_genotypes_filtered_chrom_{chrom}.vcf.bgz"
+                vcf_name = out_basename + f"_failing_filtered_chrom_{chrom}.vcf.bgz"
                 if (not utils.check_exists(vcf_name)) or args.force:
 
                     mt_tmp = mt_filt.filter_rows(mt_filt.locus.contig == chrom)
@@ -494,7 +494,7 @@ if __name__ == "__main__":
             utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
         else:
             logging.info("Exporting VCF as one file.")
-            vcf_name = out_basename + f"_failing_variants_genotypes_filtered.vcf.bgz"
+            vcf_name = out_basename + f"_failing_filtered.vcf.bgz"
             if (not utils.check_exists(vcf_name)) or args.force:
                 args.force = True
                 hl.export_vcf(mt_filt, vcf_name, tabix=True)
