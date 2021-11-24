@@ -206,7 +206,7 @@ if __name__ == "__main__":
     elif args.mt is not None:
         utils.check_regions(args.region, args.mt)
         split_fn = args.mt
-        basename = os.path.basename(args.mt).rstrip("/").replace(".mt", "")
+        basename = args.out_file.rstrip("/").replace(".mt", "")
         out_basename = os.path.join(args.out_dir, basename)
         if not utils.check_exists(args.mt):
             logging.error(f"Error! file {args.mt} does not exist! Exiting now.")
