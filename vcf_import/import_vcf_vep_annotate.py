@@ -36,6 +36,7 @@ if __name__ == "__main__":
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
     parser.add_argument("--test", action='store_true', help="Filters data to just chr 22 for testing purposes.")
     parser.add_argument("--force", action='store_true', help="Force re-run of all steps?")
+    parser.add_argument("--liftover_37_to_38", action='store_true', help="Liftover GRCh37 data to GRCh38 before VEP?")
 
     args = parser.parse_args()
 
@@ -105,11 +106,10 @@ if __name__ == "__main__":
 
     logging.info(f"Final matrix table count: {mt.count()}")
 
-    ##############################################
-    # Split multiallelic variants + VEP annotate #
-    ##############################################
+    ###############################
+    # Split multiallelic variants #
+    ###############################
     split_fn = out_basename + f"_split{test_str}.mt/"
-    vep_fn = out_basename + f"_vep_annot{test_str}.mt/"
 
     if (not utils.check_exists(split_fn)) or args.force:
         logging.info('Splitting multiallelic variants')
@@ -119,6 +119,46 @@ if __name__ == "__main__":
         logging.info("Detected split mt exists, loading that.")
         mt_split = hl.read_matrix_table(split_fn)
     logging.info('Split count: ' + str(mt_split.count()))
+
+    ################################################
+    # If indicated, liftover from GRCh37 to GRCh38 #
+    ################################################
+    if args.liftover_37_to_38:
+        lifted_fn = f"{out_basename}_lifted_to_GRCh38{test_str}.mt/"
+
+        if (not utils.check_exists(lifted_fn)) or args.force:
+            logging.info(f"Lifting over file from GRCh37 to GRCh38")
+            rg37 = hl.get_reference('GRCh37')
+            rg38 = hl.get_reference('GRCh38')
+            rg37.add_liftover('gs://hail-common/references/grch37_to_grch38.over.chain.gz', rg38)
+
+            mt_split = mt_split.annotate_rows(new_locus=hl.liftover(mt_split.locus, 'GRCh38', include_strand=True),
+                                              old_locus=mt_split.locus)
+
+            logging.info("Variants that exist in GRCh38:")
+            logging.info(mt_split.aggregate_rows(hl.agg.counter(hl.is_defined(mt_split.new_locus))))
+            logging.info("Variants that exist in GRCh38 and are not flipped strand:")
+            logging.info(mt_split.aggregate_rows(hl.agg.counter(
+                hl.is_defined(mt_split.new_locus) & ~mt_split.new_locus.is_negative_strand
+            )))
+            logging.info("Variants that are strand flipped and do not exist in GRCh38 will be removed.")
+
+            mt_split = mt_split.filter_rows(hl.is_defined(mt_split.new_locus) & ~mt_split.new_locus.is_negative_strand)
+            mt_split = mt_split.key_by(locus=mt_split.new_locus.result)
+
+            mt_split = mt_split.checkpoint(lifted_fn, overwrite=True)
+
+        else:
+            logging.info("Detected lifted file already exists, loading that.")
+            mt_split = hl.read_matrix_table(lifted_fn)
+
+        args.reference_genome = "GRCh38"
+        args.vep_config = "gs://hail-us-vep/vep95-GRCh38-loftee-gcloud.json"
+
+    ########################
+    # VEP annotate dataset #
+    ########################
+    vep_fn = out_basename + f"_vep_annot{test_str}.mt/"
 
     logging.info('VEP annotating dataset.')
     mt_vep = hl.vep(mt_split, args.vep_config)
