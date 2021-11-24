@@ -144,7 +144,7 @@ if __name__ == "__main__":
             logging.info("Variants that are strand flipped and do not exist in GRCh38 will be removed.")
 
             mt_split = mt_split.filter_rows(hl.is_defined(mt_split.new_locus) & ~mt_split.new_locus.is_negative_strand)
-            mt_split = mt_split.key_by(locus=mt_split.new_locus.result)
+            mt_split = mt_split.key_rows_by(locus=mt_split.new_locus.result)
 
             mt_split = mt_split.checkpoint(lifted_fn, overwrite=True)
 
