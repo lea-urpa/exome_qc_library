@@ -59,7 +59,7 @@ if __name__ == "__main__":
     #########################################
     # Check dataproc cluster vs file inputs #
     #########################################
-    for file_url in [args.log_dir, args.out_dir, args.data_dir]:
+    for file_url in [args.log_dir, args.out_dir, args.mt]:
         utils.check_regions(args.region, file_url)
 
     ##################################
