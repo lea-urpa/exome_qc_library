@@ -175,22 +175,22 @@ if __name__ == "__main__":
 
         mt = mt.checkpoint(low_pass_qcd, overwrite=True)
 
-        output_file(f"{low_pass_qcd}_mean_het_ab_hist.html")
+        output_file(f"low_pass_mean_het_ab_hist.html")
         ab_hist = mt.aggregate_rows(hl.agg.hist(mt.low_pass_het_ab_stats.mean, 0, 1, 50))
         p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
         save(p)
 
-        output_file(f"{low_pass_qcd}_initial_call_rate.html")
+        output_file(f"low_pass_initial_call_rate.html")
         cr_hist_1 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_initial_call_rate, 0, 1, 50))
         p1 = hl.plot.histogram(cr_hist_1, legend='call rate', title="variant call rate, before GT filters")
         save(p1)
 
-        output_file(f"{low_pass_qcd}_call_rate_after_DP_GQ_filt.html")
+        output_file(f"low_pass_call_rate_after_DP_GQ_filt.html")
         cr_hist_2 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_call_rate_after_DP_GQ_filt, 0, 1, 50))
         p2 = hl.plot.histogram(cr_hist_2, legend='call rate', title="variant call rate, before GT filters")
         save(p2)
 
-        output_file(f"{low_pass_qcd}_call_rate_after_AB_filt.html")
+        output_file(f"low_pass_call_rate_after_AB_filt.html")
         cr_hist_3 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_call_rate_after_AB_filt, 0, 1, 50))
         p3 = hl.plot.histogram(cr_hist_3, legend='call rate', title="variant call rate, before GT filters")
         save(p3)
