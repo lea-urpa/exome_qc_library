@@ -176,7 +176,7 @@ if __name__ == "__main__":
         mt = mt.checkpoint(low_pass_qcd, overwrite=True)
 
         output_file(f"{low_pass_qcd}_mean_het_ab_hist.html")
-        ab_hist = mt.aggregate_rows(hl.agg.hist(mt.het_ab_stats.mean, 0, 1, 50))
+        ab_hist = mt.aggregate_rows(hl.agg.hist(mt.low_pass_het_ab_stats.mean, 0, 1, 50))
         p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
         save(p)
 

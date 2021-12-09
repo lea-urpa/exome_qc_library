@@ -244,6 +244,7 @@ def count_variant_het_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_he
     case_het_gt_ab = prefix + 'case_frac_het_gts_in_ab'
     cont_het_gt_count = prefix + 'control_n_het'
     cont_het_gt_ab = prefix + 'control_frac_het_gts_in_ab'
+    het_ab_stats = prefix + 'het_ab_stats'
 
     ##########################################################################
     # Get total # of het GTs per variant in passing samples (or all samples) #
@@ -312,10 +313,10 @@ def count_variant_het_ab(mt, prefix="", samples_qc=False, pheno_col=None, min_he
     #########################
     # Annotate het AB stats #
     #########################
-    mt = mt.annotate_rows(het_ab_stats=hl.agg.filter(
+    mt = mt.annotate_rows(**{het_ab_stats: hl.agg.filter(
         mt.GT.is_het() & hl.is_defined(mt.GT),
         hl.agg.stats((mt.AD[0] / hl.sum(mt.AD))
-                     )))
+                     ))})
 
     ####################################################################
     # Check if het ab is missing for some samples, report if there are #
@@ -835,8 +836,10 @@ def variant_quality_control(
     # Add annotations back to main matrix table (not filtered), return that #
     #########################################################################
     varqc_name = annotation_prefix + "variant_qc"
+    het_ab_stats_name = annotation_prefix + "het_ab_stats"
     mt = mt.annotate_rows(**{varqc_name: mt_varannot.index_rows(mt.row_key)[varqc_name]})
     mt = mt.annotate_rows(**{failing_name: mt_varannot.index_rows(mt.row_key)[failing_name]})
+    mt = mt.annotate_rows(**{het_ab_stats_name: mt_varannot.index_rows(mt.row_key)[het_ab_stats_name]})
 
     if (pheno_col is not None) and (samples_qc is True):
         case_het_gt_ab = annotation_prefix + 'case_frac_het_gts_in_ab'
