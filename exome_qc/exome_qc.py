@@ -231,20 +231,7 @@ if __name__ == "__main__":
                 max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
             )
 
-            #mt_filtered = mt_gt_filt.filter_rows(
-            #    mt_gt_filt.low_pass_failing_variant_qc.contains("failing_QD") |
-            #    mt_gt_filt.low_pass_failing_variant_qc.contains("failing_VQSR_filters") |
-            #    mt_gt_filt.low_pass_failing_variant_qc.contains("failing_call_rate") |
-            #    mt_gt_filt.low_pass_failing_variant_qc.contains("failing_hwe"), keep=False
-            #)
-
             mt_filtered = mt.filter_rows(hl.len(mt.low_pass_failing_variant_qc) == 0)
-
-            mt_count = mt_filtered.count_rows()
-            if not mt_count > 20000:
-                logging.info(f"Error! Not enough variants after filtering to passing all QC measures. "
-                             f"var count: {mt_count}")
-                exit()
 
             # Filter out low MAF variants
             if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
@@ -252,11 +239,6 @@ if __name__ == "__main__":
                 mt_maffilt = mt_maffilt.checkpoint(ld_pruned_maffilt, overwrite=True)
             else:
                 mt_maffilt = hl.read_matrix_table(ld_pruned_maffilt)
-
-            mt_maf_count = mt_maffilt.count_rows()
-            if not mt_maf_count > 10000:
-                logging.info(f"Error! Not enough variants after variant and MAF filtering. var count: {mt_maf_count}")
-                exit()
 
             # LD prune if row count >80k
             mt_ldpruned = vq.downsample_variants(
@@ -379,11 +361,6 @@ if __name__ == "__main__":
                 (hl.len(mt_gt_filt.low_pass_failing_variant_qc) == 0), keep=True
             )
 
-            mt_count = mt_filtered.count_rows()
-            if not mt_count > 20000:
-                logging.info(f"Error! Not enough variants after filtering to passing all QC measures. "
-                             f"var count: {mt_count}")
-                exit()
             mt_filtered = mt_filtered.checkpoint(filtered_nohwe, overwrite=True)
         else:
             mt_filtered = hl.read_matrix_table(filtered_nohwe)
@@ -423,10 +400,6 @@ if __name__ == "__main__":
 
     stepcount += 1
     samples_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_samples_qcd{args.test_str}.mt/")
-
-
-    logging.info("Testing new variant QC, ending here. Check the logs.")
-    exit()
 
     ##############
     # Samples QC #
