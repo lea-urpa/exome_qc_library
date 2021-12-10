@@ -144,11 +144,14 @@ if __name__ == "__main__":
             string_filtered = mt.count_cols()
             logging.info(f"Sample count after filtering by strings: {string_filtered}")
 
-        logging.info(f"Writing checkpoint {stepcount}-1: sample removal")
-        mt = mt.checkpoint(samples_removed, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+        filtered_count = mt.count_cols()
 
-        samples_cleaned = samples_removed
+        if not filtered_count == samples_start:
+            logging.info(f"Writing checkpoint {stepcount}-1: sample removal")
+            mt = mt.checkpoint(samples_removed, overwrite=True)
+            utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+
+            samples_cleaned = samples_removed
     else:
         samples_cleaned = samples_annotated
 
