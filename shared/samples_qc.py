@@ -287,8 +287,8 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
     # Instantiate empty array for failing samples QC tags
     cols = cols.annotate(failing_samples_qc=hl.empty_array(hl.tstr))
 
-    ############################################################
-    # Find samples failing on chimeras or contamination values #
+    ###################################################################################################
+    # Find samples failing on chimeras or contamination values, or related to too many other samples  #
     ############################################################
     chim_cont_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_coldata_chim_cont_tmp.ht/"
     if (not utils.check_exists(chim_cont_fn)) or force:
@@ -303,6 +303,12 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
             cols.failing_samples_qc.append("failing_contamination"),
             cols.failing_samples_qc))
 
+        cols = cols.annotate(failing_samples_qc=hl.cond(
+            (cols.related_num_connections > 30) & hl.is_defined(cols.related_num_connections),
+            cols.failing_samples_qc.append("failing_too_many_relatives"),
+            cols.failing_samples_qc
+        ))
+
         cols = cols.checkpoint(chim_cont_fn, overwrite=True)
     else:
         cols = hl.read_table(chim_cont_fn)
@@ -312,11 +318,15 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
         miss_chim = cols.aggregate(hl.agg.count_where(~(hl.is_defined(cols[chimeras_col]))))
         failing_contam = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_contamination")))
         miss_contam = cols.aggregate(hl.agg.count_where(~(hl.is_defined(cols[contamination_col]))))
+        failing_rel = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_too_many_relatives")))
+        miss_rel = cols.aggregate(hl.agg.count_where(~(hl.is_defined(cols.related_num_connections))))
 
         logging.info(f"Number of samples failing on chimeras % > {chimeras_max}: {failing_chim}")
         logging.info(f"Number of samples missing chimeras %: {miss_chim}")
         logging.info(f"Number of samples failing on contamination % > {contamination_max}: {failing_contam}")
         logging.info(f"Number of samples missing contamination %: {miss_contam}")
+        logging.info(f"Number of samples failing on too many relatives (>30): {failing_rel}")
+        logging.info(f"Number of samples missing number of inferred relatives: {miss_rel}")
 
         chim_stats = cols.aggregate(hl.agg.stats(cols[chimeras_col]))
         chim_hist = cols.aggregate(hl.agg.hist(cols[chimeras_col], chim_stats.min, chim_stats.max, 50))
