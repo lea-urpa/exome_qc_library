@@ -579,18 +579,40 @@ def pc_project(mt, loadings_ht, loading_location="loadings", af_location="pca_af
     return mt.cols().select('scores')
 
 
-def project_pcs_relateds(mt, covar_pc_num):
+def project_pcs_relateds(mt, checkpoint_name, covar_pc_num, reference_genome):
     """
     Tales LD pruned matrix table, calculates PCs, and projects those PCs back to related individuals included in mt
     :param mt: matrix table, with bad variants and samples removed, relatives and popluation outliers annotated
     :param covar_pc_num: Number of principal components as covariates to calculate
     :return: returns matrix table with relatives, with PCs annotated
     """
-    logging.info("Filtering to unrelated individuals for PC calculations.")
-    mt_norelateds = mt.filter_cols(mt.related_to_remove == False, keep=True)
+    ##################
+    # Filter dataset #
+    ##################
+    # Filter to autosomes
+    if reference_genome is "GRCh38":
+        autosomes = ["chr" + str(i) for i in range(1, 23)]
+    else:
+        autosomes = [str(i) for i in range(1, 23)]
 
+    mt_autosomes = mt.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
+    var_count = mt_autosomes.count_rows()
+    logging.info(f"Variant count after filtering to autosomes: {var_count}")
+
+    # Remove related individuals
+    mt_unrelated = mt_autosomes.filter_cols(mt_autosomes.related_to_remove == False)
+    sample_count = mt_unrelated.count_cols()
+    logging.info(f'Sample count after removing related individuals: {sample_count}')
+
+    # Write checkpoint
+    mt_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_autosomes_norelatives.mt/"
+    mt_unrelated = mt_unrelated.checkpoint(mt_fn, overwrite=True)
+
+    #################
+    # Calculate PCs #
+    #################
     logging.info('Calculating principal components, annotating main dataset.')
-    eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_norelateds.GT, k=covar_pc_num, compute_loadings=True)
+    eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_unrelated.GT, k=covar_pc_num, compute_loadings=True)
 
     # Project PCs to related individuals
     related_mt = mt.filter_cols((mt.related_to_remove == True), keep=True)
