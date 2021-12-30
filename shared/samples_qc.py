@@ -289,7 +289,7 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
 
     ###################################################################################################
     # Find samples failing on chimeras or contamination values, or related to too many other samples  #
-    ############################################################
+    ###################################################################################################
     chim_cont_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_coldata_chim_cont_tmp.ht/"
     if (not utils.check_exists(chim_cont_fn)) or force:
         force = True

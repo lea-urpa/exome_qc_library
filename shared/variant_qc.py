@@ -772,15 +772,18 @@ def variant_quality_control(
     ###############################################
     if samples_qc:
         logging.info("Filtering out samples failing QC.")
-        mt = sq.filter_failing(
+        mt_samplesfilt = sq.filter_failing(
             mt, checkpoint_name, prefix=annotation_prefix, pheno_col=pheno_col, entries=False, variants=False,
             samples=True, pheno_qc=False, force=force)
+    else:
+        mt_samplesfilt = mt
 
     ###############################
     # Calculate initial call rate #
     ###############################
-    mt = mt.annotate_rows(
-        **{annotation_prefix + 'initial_call_rate': hl.agg.count_where(hl.is_defined(mt.GT)) / mt.count_cols()}
+    initial_call_rate_name = annotation_prefix + 'initial_call_rate'
+    mt_samplesfilt = mt_samplesfilt.annotate_rows(
+        **{initial_call_rate_name: hl.agg.count_where(hl.is_defined(mt_samplesfilt.GT)) / mt_samplesfilt.count_cols()}
     )
 
     ############################################################
@@ -790,7 +793,7 @@ def variant_quality_control(
     if (not utils.check_exists(checkpoint_name + "_DP_GQ_filtered.mt/")) or force:
         force = True
         mt_gtfilt = filter_failing_GTs_depth_quality(
-            mt, checkpoint_name, prefix=annotation_prefix, min_dp=min_dp, min_gq=min_gq,
+            mt_samplesfilt, checkpoint_name, prefix=annotation_prefix, min_dp=min_dp, min_gq=min_gq,
             filter_missing_measures=filter_missing_measures, count_failing=count_failing)
     else:
         logging.info("Detected DP + GQ filtered mt exists, loading that.")
@@ -840,6 +843,7 @@ def variant_quality_control(
     mt = mt.annotate_rows(**{varqc_name: mt_varannot.index_rows(mt.row_key)[varqc_name]})
     mt = mt.annotate_rows(**{failing_name: mt_varannot.index_rows(mt.row_key)[failing_name]})
     mt = mt.annotate_rows(**{het_ab_stats_name: mt_varannot.index_rows(mt.row_key)[het_ab_stats_name]})
+    mt = mt.annotate_rows(**{initial_call_rate_name: mt_varannot.index_rows(mt.row_key)[initial_call_rate_name]})
 
     if (pheno_col is not None) and (samples_qc is True):
         case_het_gt_ab = annotation_prefix + 'case_frac_het_gts_in_ab'
