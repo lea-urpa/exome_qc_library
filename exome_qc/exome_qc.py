@@ -520,8 +520,13 @@ if __name__ == "__main__":
             logging.info("Detected final LDpruned mt exists. Loading that.")
             mt_ldpruned = hl.read_matrix_table(final_ldpruned)
 
-        # Calculate PCs and project to relatives, plot
-        mt = sq.project_pcs_relateds(mt_ldpruned, pcs_calculated, args.pc_num, args.reference_genome)
+        # Calculate PCs and project to relatives, annotate to main mt, plot
+        scores, related_scores = sq.project_pcs_relateds(mt_ldpruned, pcs_calculated, args.pc_num, args.reference_genome)
+
+        mt = mt.annotate_cols(**{'pc' + str(k + 1): scores[mt.s].scores[k]
+                                 for k in range(args.pc_num)})
+        mt = mt.annotate_cols(**{'pc' + str(k + 1): hl.or_else(mt['pc' + str(k + 1)], related_scores[mt.s].scores[k])
+                                 for k in range(args.pc_num)})
 
         if args.pca_plot_annotations is not None:
             try:

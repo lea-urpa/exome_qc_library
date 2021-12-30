@@ -621,15 +621,7 @@ def project_pcs_relateds(mt, checkpoint_name, covar_pc_num, reference_genome):
     loadings = loadings.annotate(pca_af=mtrows[loadings.locus, loadings.alleles].pca_af)
     related_scores = pc_project(related_mt, loadings)
 
-    # Add pcs as annotations to main table
-    mt = mt.annotate_cols(**{'pc' + str(k+1): scores[mt.s].scores[k]
-                             for k in range(covar_pc_num)})
-
-    # Add pcs for related individuals
-    mt = mt.annotate_cols(**{'pc' + str(k+1): hl.or_else(mt['pc'+str(k+1)], related_scores[mt.s].scores[k])
-                             for k in range(covar_pc_num)})
-
-    return mt
+    return scores, related_scores
 
 
 def filter_graph_cases(graph, cases):
