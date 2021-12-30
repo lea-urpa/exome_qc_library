@@ -493,7 +493,7 @@ if __name__ == "__main__":
                 mt, pcs_calculated, prefix='final', entries=True, variants=True, samples=True, unfilter_entries=True,
                 pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
                 min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force, pop_outliers=True
             )
             mt_filtered = mt_filtered.checkpoint(final_filtered, overwrite=True)
 
@@ -504,7 +504,7 @@ if __name__ == "__main__":
         # MAF filter
         if (not utils.check_exists(final_maffilt)) or args.force:
             logging.info("Filtering to common variants and LD pruning dataset.")
-            mt_maffilt = vq.maf_filter(mt_filtered, 0.05, "final_variant_qc")
+            mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, "final_variant_qc")
             mt_maffilt = mt_maffilt.checkpoint(final_maffilt, overwrite=True)
         else:
             logging.info("Detected final MAF filtered mt exists. Loading that.")
@@ -513,7 +513,6 @@ if __name__ == "__main__":
         # LD prune
         if (not utils.check_exists(final_ldpruned)) or args.force:
             logging.info('LD pruning final dataset for PC calculation')
-            utils.remove_secondary(args.cluster_name, args.region)
             mt_ldpruned = vq.downsample_variants(
                 mt_maffilt, 80000, final_ldpruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
             mt_ldpruned = mt_ldpruned.checkpoint(final_ldpruned, overwrite=True)
@@ -522,7 +521,7 @@ if __name__ == "__main__":
             mt_ldpruned = hl.read_matrix_table(final_ldpruned)
 
         # Calculate PCs and project to relatives, plot
-        mt = sq.project_pcs_relateds(mt_ldpruned, args.pc_num)
+        mt = sq.project_pcs_relateds(mt_ldpruned, pcs_calculated, args.pc_num, args.reference_genome)
 
         if args.pca_plot_annotations is not None:
             try:
