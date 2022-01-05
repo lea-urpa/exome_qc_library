@@ -152,6 +152,8 @@ if __name__ == "__main__":
             utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
             samples_cleaned = samples_removed
+        else:
+            samples_cleaned = samples_annotated
     else:
         samples_cleaned = samples_annotated
 
