@@ -605,11 +605,22 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
     # Find variants not passing call rate filter #
     ##############################################
     if sex_aware:
-        call_rate_cond = (mt.sexaware_call_rate < min_call_rate) & hl.is_defined(mt.sexaware_call_rate)
-    else:
-        call_rate_cond = (mt[varqc_name].call_rate < min_call_rate) & hl.is_defined(mt[varqc_name].call_rate)
+        call_rate_filter = (
+            hl.if_else(
+                (hl.is_defined(mt.sexaware_call_rate) & (mt.sexaware_call_rate < min_call_rate)) |
+                (hl.is_missing(mt.sexaware_call_rate) & hl.is_defined(mt[varqc_name].call_rate) &
+                 (mt[varqc_name].call_rate < min_call_rate)),
+            mt[failing_name].append("failing_call_rate"),
+            mt[failing_name])
 
-    call_rate_filter = hl.cond(call_rate_cond, mt[failing_name].append("failing_call_rate"), mt[failing_name])
+        )
+    else:
+        call_rate_filter = hl.if_else(
+            (mt[varqc_name].call_rate < min_call_rate),
+            mt[failing_name].append("failing_call_rate"),
+            mt[failing_name]
+        )
+
     mt = mt.annotate_rows(**{failing_name: call_rate_filter})
 
     ##############
