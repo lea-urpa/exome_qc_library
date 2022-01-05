@@ -190,16 +190,6 @@ if __name__ == "__main__":
         p1 = hl.plot.histogram(cr_hist_1, legend='call rate', title="variant call rate, before GT filters")
         save(p1)
 
-        output_file(f"low_pass_call_rate_after_DP_GQ_filt.html")
-        cr_hist_2 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_call_rate_after_DP_GQ_filt, 0, 1, 50))
-        p2 = hl.plot.histogram(cr_hist_2, legend='call rate', title="variant call rate, before GT filters")
-        save(p2)
-
-        output_file(f"low_pass_call_rate_after_AB_filt.html")
-        cr_hist_3 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_call_rate_after_AB_filt, 0, 1, 50))
-        p3 = hl.plot.histogram(cr_hist_3, legend='call rate', title="variant call rate, before GT filters")
-        save(p3)
-
         logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")
 
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
