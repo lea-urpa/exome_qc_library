@@ -374,10 +374,12 @@ if __name__ == "__main__":
         mt_gt_filt, annotations_to_transfer = va.sex_aware_variant_annotations(mt_gt_filt, pheno_col=args.pheno_col)
 
         # Annotate sex-aware sample annotations, checkpoint
+        utils.remove_secondary(args.cluster_name, args.region)
         mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
         for annotation in annotations_to_transfer:
             mt_filtered = mt_filtered.annotate_rows(**{annotation: mt_gt_filt.rows()[mt_filtered.row_key][annotation]})
         mt_filtered = mt_filtered.checkpoint(filtered_annot, overwrite=True)
+        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
         # Annotate main MT with variant and sample sex-aware annotations
         for annotation in annotations_to_transfer:
