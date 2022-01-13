@@ -376,10 +376,12 @@ if __name__ == "__main__":
 
         # Calculate sex-aware sample annotations with variant filtered mt
         mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
+        mt_filtered = mt_filtered.checkpoint(filtered_annot, overwrite=True)
 
         # Annotate main MT with variant and sample sex-aware annotations
         for annotation in annotations_to_transfer:
             mt = mt.annotate_rows(**{annotation: mt_gt_filt.rows()[mt.row_key][annotation]})
+            mt = mt.checkpoint(os.path.join(args.out_dir, f"_{annotation}_deleteme.mt/"), overwrite=True)
 
         mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
 
