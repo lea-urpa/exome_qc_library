@@ -150,7 +150,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
     ##################
 
     # Filter to autosomes
-    if reference_genome is "GRCh38":
+    if reference_genome == "GRCh38":
         autosomes = ["chr" + str(i) for i in range(1, 23)]
     else:
         autosomes = [str(i) for i in range(1, 23)]

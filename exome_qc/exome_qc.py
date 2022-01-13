@@ -243,7 +243,7 @@ if __name__ == "__main__":
             mt_ldpruned = hl.read_matrix_table(ld_pruned)
 
         ## Calculate relatedness with King ##
-        if args.reference_genome is "GRCh38":
+        if args.reference_genome == "GRCh38":
             autosomes = ["chr" + str(i) for i in range(1, 23)]
         else:
             autosomes = [str(i) for i in range(1, 23)]
