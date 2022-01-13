@@ -327,7 +327,7 @@ if __name__ == "__main__":
     # Annotate variants and impute sex #
     ####################################
     filtered_nohwe = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_filtered_except_hwe{args.test_str}.mt/")
-    filtered_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_filtered_annotated")
+    filtered_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_filtered_annotated{args.test_str}.mt/")
     unfilt_annot = os.path.join(args.out_dir, f"{stepcount}-3_{args.out_name}_annotated_tmp")
 
     if (not utils.check_exists(sex_imputed)) or args.force:
@@ -362,39 +362,24 @@ if __name__ == "__main__":
         imputed_sex = sq.impute_sex_plot(mt_filtered, female_threshold=args.female_threshold,
                                          male_threshold=args.male_threshold, aaf_threshold=0.05)
 
-        # Annotate unfiltered + filtered mt with imputed sex values
+        # Annotate unfiltered + variant/GT filtered mt with imputed sex values
         mt_filtered = mt_filtered.annotate_cols(is_female_imputed=imputed_sex[mt_filtered.s].is_female)
         mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female, f_stat=imputed_sex[mt.s].f_stat)
         mt = mt.annotate_globals(
             sex_imputation_thresholds={'female_threshold': args.female_threshold,'male_threshold': args.male_threshold})
 
-        # Annotate sex-aware variant annotations (gt filt only to have for all variants)
+        # Calculate sex-aware variant annotations (in GT filtered only to have for all variants)
         gt_filt_fn = sex_imputed.rstrip("/").replace(".mt", "") + "_GT_filtered.mt/"
         mt_gt_filt = hl.read_matrix_table(gt_filt_fn)
         mt_gt_filt = mt_gt_filt.annotate_cols(is_female_imputed=imputed_sex[mt_gt_filt.s].is_female)
         mt_gt_filt, annotations_to_transfer = va.sex_aware_variant_annotations(mt_gt_filt, pheno_col=args.pheno_col)
 
-        # Annotate sex-aware sample annotations, checkpoint
+        # Calculate sex-aware sample annotations with variant filtered mt
         mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
-        mt_filtered = mt_filtered.checkpoint(filtered_annot + f"1_{args.test_str}.mt/", overwrite=True)
-
-        # Hail fails if all annotations are added at once... checkpoint after x number of annotations
-        n = 10
-        annotation_chunks = [annotations_to_transfer[i:i + n] for i in range(0, len(annotations_to_transfer), n)]
-        i = 1
-        for annot_list in annotation_chunks:
-            for annotation in annot_list:
-                mt_filtered = mt_filtered.annotate_rows(**{annotation: mt_gt_filt.rows()[mt_filtered.row_key][annotation]})
-            i += 1
-            mt_filtered = mt_filtered.checkpoint(filtered_annot + f"{i}_{args.test_str}.mt/", overwrite=True)
 
         # Annotate main MT with variant and sample sex-aware annotations
-        j = 1
-        for annot_list in annotation_chunks:
-            for annotation in annotations_to_transfer:
-                mt = mt.annotate_rows(**{annotation: mt_filtered.rows()[mt.row_key][annotation]})
-            j += 1
-            mt = mt.checkpoint(unfilt_annot + f"{j}_{args.test_str}.mt/", overwrite=True)
+        for annotation in annotations_to_transfer:
+            mt = mt.annotate_rows(**{annotation: mt_gt_filt.rows()[mt.row_key][annotation]})
 
         mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
 
