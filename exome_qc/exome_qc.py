@@ -576,12 +576,12 @@ if __name__ == "__main__":
         # Export rows and columns
         mtcols = mt.cols()
         mtcols = mtcols.flatten()
-        mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv'))
+        mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv.gz'))
 
         mtrows = mt.rows()
         mtrows = mtrows.flatten()
         mtrows = mtrows.key_by().drop("vep.input")
-        mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv'))
+        mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv.gz'))
 
     else:
         logging.info("Detected final annotated mt exists. Skipping this step.")
