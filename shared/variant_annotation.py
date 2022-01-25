@@ -248,11 +248,12 @@ def sex_aware_variant_annotations(mt, pheno_col=None):
 
         mt = mt.annotate_rows(sexaware_case_call_rate=
                               (hl.case()
-                                  .when(mt.locus.in_y_nonpar(), (mt.case_male_calls / num_case_males))
-                                  .when(mt.locus.in_x_nonpar(),
+                                  .when(mt.locus.in_y_nonpar() & hl.is_defined(mt.locus),
+                                        (mt.case_male_calls / num_case_males))
+                                  .when(mt.locus.in_x_nonpar() & hl.is_defined(mt.locus),
                                         (mt.case_male_calls + 2 * num_case_females) /
                                         (num_case_males + 2 * num_case_females))
-                                  .default((mt.case_male_homvars + mt.case_female_calls) /
+                                  .default((mt.case_male_calls + mt.case_female_calls) /
                                            (num_case_males + num_case_females))),
                               sexaware_case_AC=
                               (hl.case()  # MINOR allele count
@@ -288,11 +289,12 @@ def sex_aware_variant_annotations(mt, pheno_col=None):
 
         mt = mt.annotate_rows(sexaware_cont_call_rate=
                               (hl.case()
-                               .when(mt.locus.in_y_nonpar(), (mt.cont_male_calls / num_cont_males))
-                               .when(mt.locus.in_x_nonpar(),
+                               .when(mt.locus.in_y_nonpar() & hl.is_defined(mt.locus),
+                                     (mt.cont_male_calls / num_cont_males))
+                               .when(mt.locus.in_x_nonpar() & hl.is_defined(mt.locus),
                                      (mt.cont_male_calls + 2 * num_cont_females) /
                                      (num_cont_males + 2 * num_cont_females))
-                               .default((mt.cont_male_homvars + mt.cont_female_calls) /
+                               .default((mt.cont_male_calls + mt.cont_female_calls) /
                                         (num_cont_males + num_cont_females))),
                               sexaware_cont_AC=
                               (hl.case()  # MINOR allele count
