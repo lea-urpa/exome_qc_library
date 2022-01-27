@@ -181,7 +181,7 @@ def annotate_variants(mt):
     return mt
 
 
-def sex_aware_variant_annotations(mt, pheno_col=None):
+def sex_aware_variant_annotations(mt, pheno_col=None, prefix=""):
     '''
     Creates sex-aware variant annotations for call rate, allele count, and allele number.
 
@@ -195,6 +195,19 @@ def sex_aware_variant_annotations(mt, pheno_col=None):
     ####################################
     # Do sex-aware variant annotations #
     ####################################
+    if (not prefix.endswith("_")) and (prefix != ""):
+        prefix = prefix + "_"
+
+    male_hets = prefix + "male_hets"
+    male_homvars = prefix + "male_homvars"
+    male_calls = prefix + "male_calls"
+    female_hets = prefix + "female_hets"
+    female_homvars = prefix + "female_homvars"
+    female_calls = prefix + "female_calls"
+    sexaware_call_rate = prefix + "sexaware_call_rate"
+    sexaware_AC = prefix + "sexaware_AC"
+    sexaware_AN = prefix + "sexaware_AN"
+
     logging.info('Annotating sex-aware variant annotations.')
     is_female = (mt.is_female_imputed == True) & hl.is_defined(mt.is_female_imputed)
     is_male = (mt.is_female_imputed == False) & hl.is_defined(mt.is_female_imputed)
@@ -202,30 +215,33 @@ def sex_aware_variant_annotations(mt, pheno_col=None):
     num_males = mt.aggregate_cols(hl.agg.count_where(is_male))
     num_females = mt.aggregate_cols(hl.agg.count_where(is_female))
 
-    mt = mt.annotate_rows(male_hets=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & is_male),
-                          male_homvars=hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & is_male),
-                          male_calls=hl.agg.count_where(hl.is_defined(mt.GT) & is_male),
-                          female_hets=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & is_female),
-                          female_homvars=hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & is_female),
-                          female_calls=hl.agg.count_where(hl.is_defined(mt.GT) & is_female))
+    mt = mt.annotate_rows(
+        **{male_hets: hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & is_male),
+           male_homvars: hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & is_male),
+           male_calls: hl.agg.count_where(hl.is_defined(mt.GT) & is_male),
+           female_hets: hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & is_female),
+           female_homvars: hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & is_female),
+           female_calls: hl.agg.count_where(hl.is_defined(mt.GT) & is_female)}
+    )
 
-    mt = mt.annotate_rows(sexaware_call_rate=(hl.case()
-                                              .when(mt.locus.in_y_nonpar() & hl.is_defined(mt.locus),
-                                                    (mt.male_calls / num_males))
-                                              .when(mt.locus.in_x_nonpar() & hl.is_defined(mt.locus),
-                                                    (mt.male_calls + 2*mt.female_calls) / (num_males + 2*num_females))
-                                              .default((mt.male_calls + mt.female_calls) / (num_males + num_females))),
-                          sexaware_AC=(hl.case()  # MINOR allele count
-                                       .when(mt.locus.in_y_nonpar(), mt.male_homvars)
-                                       .when(mt.locus.in_x_nonpar(), mt.male_homvars + mt.female_hets + 2*mt.female_homvars)
-                                       .default(mt.male_hets + 2*mt.male_homvars + mt.female_hets + 2*mt.female_homvars)),
-                          sexaware_AN=(hl.case()
-                                       .when(mt.locus.in_y_nonpar(), mt.male_calls)
-                                       .when(mt.locus.in_x_nonpar(), mt.male_calls + 2*mt.female_calls)
-                                       .default(2*mt.male_calls + 2*mt.female_calls)))
+    mt = mt.annotate_rows(
+        **{sexaware_call_rate: (hl.case()
+                                  .when(mt.locus.in_y_nonpar() & hl.is_defined(mt.locus),
+                                        (mt[male_calls] / num_males))
+                                  .when(mt.locus.in_x_nonpar() & hl.is_defined(mt.locus),
+                                        (mt[male_calls] + 2*mt[female_calls]) / (num_males + 2*num_females))
+                                  .default((mt[male_calls] + mt[female_calls]) / (num_males + num_females))),
+           sexaware_AC: (hl.case()  # MINOR allele count
+                           .when(mt.locus.in_y_nonpar(), mt.male_homvars)
+                           .when(mt.locus.in_x_nonpar(), mt.male_homvars + mt.female_hets + 2*mt.female_homvars)
+                           .default(mt.male_hets + 2*mt.male_homvars + mt.female_hets + 2*mt.female_homvars)),
+           sexaware_AN: (hl.case()
+                           .when(mt.locus.in_y_nonpar(), mt.male_calls)
+                           .when(mt.locus.in_x_nonpar(), mt.male_calls + 2*mt.female_calls)
+                           .default(2*mt.male_calls + 2*mt.female_calls))}
+    )
 
-    annotations_to_transfer = ['male_hets', 'male_homvars', 'male_calls', 'female_hets', 'female_homvars',
-                               'female_calls', 'sexaware_call_rate', 'sexaware_AC', 'sexaware_AN']
+    annotations_to_transfer = [sexaware_call_rate, sexaware_AC, sexaware_AN]
 
     ##################################################
     # Do case-specific sex-aware variant annotations #
@@ -238,39 +254,51 @@ def sex_aware_variant_annotations(mt, pheno_col=None):
         num_case_females = mt.aggregate_cols(hl.agg.count_where(case_female))
         num_case_males = mt.aggregate_cols(hl.agg.count_where(case_male))
 
-        mt = mt.annotate_rows(case_male_hets=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & case_male),
-                              case_male_homvars=hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & case_male),
-                              case_male_calls=hl.agg.count_where(hl.is_defined(mt.GT) & case_male),
-                              case_female_hets=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & case_female),
-                              case_female_homvars=hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) &
-                                                                     case_female),
-                              case_female_calls=hl.agg.count_where(hl.is_defined(mt.GT) & case_female))
+        case_male_hets = prefix + "case_male_hets"
+        case_male_homvars = prefix + "case_male_homvars"
+        case_male_calls = prefix + "case_male_calls"
+        case_female_hets = prefix + "case_female_hets"
+        case_female_homvars = prefix + "case_female_homvars"
+        case_female_calls = prefix + "case_female_calls"
+        sexaware_case_call_rate = prefix + "sexaware_case_call_rate"
+        sexaware_case_AC = prefix + "sexaware_case_AC"
+        sexaware_case_AN = prefix + "sexaware_case_AN"
 
-        mt = mt.annotate_rows(sexaware_case_call_rate=
+        mt = mt.annotate_rows(
+            **{case_male_hets: hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & case_male),
+               case_male_homvars: hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & case_male),
+               case_male_calls: hl.agg.count_where(hl.is_defined(mt.GT) & case_male),
+               case_female_hets: hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & case_female),
+               case_female_homvars: hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & case_female),
+               case_female_calls:hl.agg.count_where(hl.is_defined(mt.GT) & case_female)}
+        )
+
+        mt = mt.annotate_rows(**{
+            sexaware_case_call_rate:
                               (hl.case()
                                   .when(mt.locus.in_y_nonpar() & hl.is_defined(mt.locus),
-                                        (mt.case_male_calls / num_case_males))
+                                        (mt[case_male_calls] / num_case_males))
                                   .when(mt.locus.in_x_nonpar() & hl.is_defined(mt.locus),
-                                        (mt.case_male_calls + 2 * num_case_females) /
+                                        (mt[case_male_calls] + 2 * num_case_females) /
                                         (num_case_males + 2 * num_case_females))
-                                  .default((mt.case_male_calls + mt.case_female_calls) /
+                                  .default((mt[case_male_calls] + mt[case_female_calls]) /
                                            (num_case_males + num_case_females))),
-                              sexaware_case_AC=
+            sexaware_case_AC:
                               (hl.case()  # MINOR allele count
-                                 .when(mt.locus.in_y_nonpar(), mt.case_male_homvars)
+                                 .when(mt.locus.in_y_nonpar(), mt[case_male_homvars])
                                  .when(mt.locus.in_x_nonpar(),
-                                       mt.case_male_homvars + mt.case_female_hets + 2 * mt.case_female_homvars)
-                                  .default(mt.case_male_hets + 2 * mt.case_male_homvars +
-                                           mt.case_female_hets + 2 * mt.case_female_homvars)),
-                              sexaware_case_AN=
+                                       mt[case_male_homvars] + mt[case_female_hets] + 2 * mt[case_female_homvars])
+                                  .default(mt[case_male_hets] + 2 * mt[case_male_homvars] +
+                                           mt[case_female_hets] + 2 * mt[case_female_homvars])),
+            sexaware_case_AN:
                               (hl.case()
-                                 .when(mt.locus.in_y_nonpar(), mt.case_male_calls)
-                                 .when(mt.locus.in_x_nonpar(), mt.case_male_calls + 2 * mt.case_female_calls)
-                                 .default(2 * mt.case_male_calls + 2 * mt.case_female_calls)))
+                                 .when(mt.locus.in_y_nonpar(), mt[case_male_calls])
+                                 .when(mt.locus.in_x_nonpar(), mt[case_male_calls] + 2 * mt[case_female_calls])
+                                 .default(2 * mt[case_male_calls] + 2 * mt[case_female_calls]))})
 
         annotations_to_transfer.extend(
-            ['case_male_hets', 'case_male_homvars', 'case_male_calls', 'case_female_hets','case_female_homvars',
-             'case_female_calls', 'sexaware_case_call_rate', 'sexaware_case_AC', 'sexaware_case_AN'])
+            [case_male_hets, case_male_homvars, case_male_calls, case_female_hets, case_female_homvars,
+             case_female_calls, sexaware_case_call_rate, sexaware_case_AC, sexaware_case_AN])
 
         cont_female = (mt.is_female_imputed == True) & (mt[pheno_col] == False)
         cont_male = (mt.is_female_imputed == False) & (mt[pheno_col] == False)
@@ -278,40 +306,50 @@ def sex_aware_variant_annotations(mt, pheno_col=None):
         num_cont_females = mt.aggregate_cols(hl.agg.count_where(cont_female))
         num_cont_males = mt.aggregate_cols(hl.agg.count_where(cont_male))
 
-        mt = mt.annotate_rows(cont_male_hets=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & cont_male),
-                              cont_male_homvars=hl.agg.count_where(
-                                  mt.GT.is_hom_var() & hl.is_defined(mt.GT) & cont_male),
-                              cont_male_calls=hl.agg.count_where(hl.is_defined(mt.GT) & cont_male),
-                              cont_female_hets=hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & cont_female),
-                              cont_female_homvars=hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) &
-                                                                     cont_female),
-                              cont_female_calls=hl.agg.count_where(hl.is_defined(mt.GT) & cont_female))
+        cont_male_hets = prefix + "cont_male_hets"
+        cont_male_homvars = prefix + "cont_male_homvars"
+        cont_male_calls = prefix + "cont_male_calls"
+        cont_female_hets = prefix + "cont_female_hets"
+        cont_female_homvars = prefix + "cont_female_homvars"
+        cont_female_calls = prefix + "cont_female_calls"
+        sexaware_cont_call_rate = prefix + "sexaware_cont_call_rate"
+        sexaware_cont_AC = prefix + "sexaware_cont_AC"
+        sexaware_cont_AN = prefix + "sexaware_cont_AN"
 
-        mt = mt.annotate_rows(sexaware_cont_call_rate=
+        mt = mt.annotate_rows(
+            **{cont_male_hets: hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & cont_male),
+               cont_male_homvars: hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & cont_male),
+               cont_male_calls: hl.agg.count_where(hl.is_defined(mt.GT) & cont_male),
+               cont_female_hets: hl.agg.count_where(mt.GT.is_het() & hl.is_defined(mt.GT) & cont_female),
+               cont_female_homvars: hl.agg.count_where(mt.GT.is_hom_var() & hl.is_defined(mt.GT) & cont_female),
+               cont_female_calls: hl.agg.count_where(hl.is_defined(mt.GT) & cont_female)})
+
+        mt = mt.annotate_rows(
+            **{sexaware_cont_call_rate:
                               (hl.case()
                                .when(mt.locus.in_y_nonpar() & hl.is_defined(mt.locus),
-                                     (mt.cont_male_calls / num_cont_males))
+                                     (mt[cont_male_calls] / num_cont_males))
                                .when(mt.locus.in_x_nonpar() & hl.is_defined(mt.locus),
-                                     (mt.cont_male_calls + 2 * num_cont_females) /
+                                     (mt[cont_male_calls] + 2 * num_cont_females) /
                                      (num_cont_males + 2 * num_cont_females))
-                               .default((mt.cont_male_calls + mt.cont_female_calls) /
+                               .default((mt[cont_male_calls] + mt[cont_female_calls]) /
                                         (num_cont_males + num_cont_females))),
-                              sexaware_cont_AC=
+               sexaware_cont_AC:
                               (hl.case()  # MINOR allele count
-                               .when(mt.locus.in_y_nonpar(), mt.cont_male_homvars)
+                               .when(mt.locus.in_y_nonpar(), mt[cont_male_homvars])
                                .when(mt.locus.in_x_nonpar(),
-                                     mt.cont_male_homvars + mt.cont_female_hets + 2 * mt.cont_female_homvars)
-                               .default(mt.cont_male_hets + 2 * mt.cont_male_homvars +
-                                        mt.cont_female_hets + 2 * mt.cont_female_homvars)),
-                              sexaware_cont_AN=
+                                     mt[cont_male_homvars] + mt[cont_female_hets] + 2 * mt[cont_female_homvars])
+                               .default(mt[cont_male_hets] + 2 * mt[cont_male_homvars] +
+                                        mt[cont_female_hets] + 2 * mt[cont_female_homvars])),
+               sexaware_cont_AN:
                               (hl.case()
-                               .when(mt.locus.in_y_nonpar(), mt.cont_male_calls)
-                               .when(mt.locus.in_x_nonpar(), mt.cont_male_calls + 2 * mt.cont_female_calls)
-                               .default(2 * mt.cont_male_calls + 2 * mt.cont_female_calls)))
+                               .when(mt.locus.in_y_nonpar(), mt[cont_male_calls])
+                               .when(mt.locus.in_x_nonpar(), mt[cont_male_calls] + 2 * mt[cont_female_calls])
+                               .default(2 * mt[cont_male_calls] + 2 * mt[cont_female_calls]))})
 
-        annotations_to_transfer.extend(['cont_male_hets', 'cont_male_homvars', 'cont_male_calls', 'cont_female_hets',
-                                        'cont_female_homvars', 'cont_female_calls', 'sexaware_cont_call_rate',
-                                        'sexaware_cont_AC', 'sexaware_cont_AN'])
+        annotations_to_transfer.extend([cont_male_hets, cont_male_homvars, cont_male_calls, cont_female_hets,
+                                        cont_female_homvars, cont_female_calls, sexaware_cont_call_rate,
+                                        sexaware_cont_AC, sexaware_cont_AN])
 
     return mt, annotations_to_transfer
 

@@ -533,6 +533,7 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
 
     failing_name = prefix + "failing_variant_qc"
     varqc_name = prefix + "variant_qc"
+    sexaware_name = prefix + "sexaware_call_rate"
 
     mt = hl.variant_qc(mt, name=varqc_name)
 
@@ -607,8 +608,8 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
     if sex_aware:
         call_rate_filter = (
             hl.if_else(
-                (hl.is_defined(mt.sexaware_call_rate) & (mt.sexaware_call_rate < min_call_rate)) |
-                (hl.is_missing(mt.sexaware_call_rate) & hl.is_defined(mt[varqc_name].call_rate) &
+                (hl.is_defined(mt[sexaware_name]) & (mt[sexaware_name] < min_call_rate)) |
+                (hl.is_missing(mt[sexaware_name]) & hl.is_defined(mt[varqc_name].call_rate) &
                  (mt[varqc_name].call_rate < min_call_rate)),
             mt[failing_name].append("failing_call_rate"),
             mt[failing_name])
@@ -682,7 +683,7 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
 
         # Call rate
         if sex_aware:
-            cr_defined = mt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt.sexaware_call_rate)))
+            cr_defined = mt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt[sexaware_name])))
             low_passing_vars = mt.aggregate_rows(hl.agg.count_where(hl.len(mt.low_pass_failing_variant_qc) == 0))
             if cr_defined < low_passing_vars:
                 logging.error(f"Note! sex aware call rate annotation defined for only {cr_defined} variants, where "
@@ -883,7 +884,7 @@ def variant_quality_control(
     return mt
 
 
-def find_variants_failing_by_pheno(mt, ab_allowed_dev_het=0.8, pheno_call_rate=0.9):
+def find_variants_failing_by_pheno(mt, ab_allowed_dev_het=0.8, pheno_call_rate=0.9, prefix= ""):
     """
     Finds variants failing call rate filters specifically by phenotype.
     :param mt:
@@ -903,19 +904,29 @@ def find_variants_failing_by_pheno(mt, ab_allowed_dev_het=0.8, pheno_call_rate=0
     # Count total variants
     total_vars = mt.count_rows()
 
+    # Fix prefix
+    if (not prefix.endswith("_")) and (prefix != ""):
+        prefix = prefix + "_"
+
+    case_frac_het_gts_in_ab = prefix + "case_frac_het_gts_in_ab"
+    control_frac_het_gts_in_ab = prefix + "control_frac_het_gts_in_ab"
+
+    sexaware_case_call_rate = prefix + "sexaware_case_call_rate"
+    sexaware_cont_call_rate = prefix + "sexaware_cont_call_rate"
+
     ##############################################################
     # Annotate variants failing on case-specific allelic balance #
     ##############################################################
-    case_cond = hl.cond(hl.is_defined(mt.final_case_frac_het_gts_in_ab) &
-                        (mt.final_case_frac_het_gts_in_ab < ab_allowed_dev_het),
+    case_cond = hl.cond(hl.is_defined(mt[case_frac_het_gts_in_ab]) &
+                        (mt[case_frac_het_gts_in_ab] < ab_allowed_dev_het),
                         mt.failing_pheno_varqc.append("failing_case_het_ab"),
                         mt.failing_pheno_varqc)
     mt = mt.annotate_rows(failing_pheno_varqc=case_cond)
     failing_ab_case = mt.aggregate_rows(hl.agg.count_where(mt.failing_pheno_varqc.contains("failing_case_het_ab")))
     ab_case_perc = round(failing_ab_case/total_vars*100, 2)
 
-    control_cond = hl.cond(hl.is_defined(mt.final_control_frac_het_gts_in_ab) &
-                           (mt.final_control_frac_het_gts_in_ab < ab_allowed_dev_het),
+    control_cond = hl.cond(hl.is_defined(mt[control_frac_het_gts_in_ab]) &
+                           (mt[control_frac_het_gts_in_ab] < ab_allowed_dev_het),
                            mt.failing_pheno_varqc.append("failing_control_het_ab"),
                            mt.failing_pheno_varqc)
     mt = mt.annotate_rows(failing_pheno_varqc=control_cond)
@@ -925,16 +936,16 @@ def find_variants_failing_by_pheno(mt, ab_allowed_dev_het=0.8, pheno_call_rate=0
     ################################################################
     # Find variants failing on case-specific call rate (sex aware) #
     ################################################################
-    case_cr_cond = hl.cond(hl.is_defined(mt.sexaware_case_call_rate) &
-                           (mt.sexaware_case_call_rate < pheno_call_rate),
+    case_cr_cond = hl.cond(hl.is_defined(mt[sexaware_case_call_rate]) &
+                           (mt[sexaware_case_call_rate] < pheno_call_rate),
                            mt.failing_pheno_varqc.append("failing_case_call_rate"),
                            mt.failing_pheno_varqc)
     mt = mt.annotate_rows(failing_pheno_varqc=case_cr_cond)
     failing_cr_case = mt.aggregate_rows(hl.agg.count_where(mt.failing_pheno_varqc.contains("failing_case_call_rate")))
     cr_case_perc = round(failing_cr_case/total_vars*100, 2)
 
-    cont_cr_cond = hl.cond(hl.is_defined(mt.sexaware_cont_call_rate) &
-                           (mt.sexaware_cont_call_rate < pheno_call_rate),
+    cont_cr_cond = hl.cond(hl.is_defined(mt[sexaware_cont_call_rate]) &
+                           (mt[sexaware_cont_call_rate] < pheno_call_rate),
                            mt.failing_pheno_varqc.append("failing_cont_call_rate"),
                            mt.failing_pheno_varqc)
     mt = mt.annotate_rows(failing_pheno_varqc=cont_cr_cond)
