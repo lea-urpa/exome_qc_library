@@ -368,21 +368,9 @@ if __name__ == "__main__":
         mt = mt.annotate_globals(
             sex_imputation_thresholds={'female_threshold': args.female_threshold,'male_threshold': args.male_threshold})
 
-        # Calculate sex-aware variant annotations (in GT filtered only to have for all variants)
-        gt_filt_fn = sex_imputed.rstrip("/").replace(".mt", "") + "_GT_filtered.mt/"
-        mt_gt_filt = hl.read_matrix_table(gt_filt_fn)
-        mt_gt_filt = mt_gt_filt.annotate_cols(is_female_imputed=imputed_sex[mt_gt_filt.s].is_female)
-        mt_gt_filt, annotations_to_transfer = va.sex_aware_variant_annotations(mt_gt_filt, pheno_col=args.pheno_col,
-                                                                               prefix="low_pass")
-
         # Calculate sex-aware sample annotations with variant filtered mt
         mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
         mt_filtered = mt_filtered.checkpoint(filtered_annot, overwrite=True)
-
-        # Annotate main MT with variant and sample sex-aware annotations
-        for annotation in annotations_to_transfer:
-            mt = mt.annotate_rows(**{annotation: mt_gt_filt.rows()[mt.row_key][annotation]})
-            mt = mt.checkpoint(os.path.join(args.out_dir, f"_{annotation}_deleteme.mt/"), overwrite=True)
 
         mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
 
@@ -460,20 +448,11 @@ if __name__ == "__main__":
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
         )
 
-        # Calculate sex-aware variant annotations (in GT filtered only to have for all variants)
-        mt_gt_filt, annotations_to_transfer = va.sex_aware_variant_annotations(mt_filtered, pheno_col=args.pheno_col,
-                                                                               prefix="final")
-
-        # Annotate main MT with variant and sample sex-aware annotations
-        for annotation in annotations_to_transfer:
-            mt = mt.annotate_rows(**{annotation: mt_gt_filt.rows()[mt.row_key][annotation]})
-            mt = mt.checkpoint(os.path.join(args.out_dir, f"_{annotation}_deleteme.mt/"), overwrite=True)
-
         # Run case status-specific variant QC
         if args.pheno_col is not None:
             logging.info("Running case-status specific variant QC")
             mt = vq.find_variants_failing_by_pheno(mt, ab_allowed_dev_het=args.ab_allowed_dev_het,
-                                                   pheno_call_rate=args.pheno_call_rate)
+                                                   pheno_call_rate=args.pheno_call_rate, prefix = "final")
         else:
             logging.info("Phenotype column not given, skipping filtering variants by phenotype.")
 

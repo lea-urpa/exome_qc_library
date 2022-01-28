@@ -6,6 +6,7 @@ Author: Lea Urpa, August 2020
 import logging
 import hail as hl
 import samples_qc as sq
+import variant_annotation as va
 import utils
 
 
@@ -834,6 +835,13 @@ def variant_quality_control(
         logging.info("Detected genotype AB filtered mt exists, loading that.")
         mt_gtfilt2 = hl.read_matrix_table(checkpoint_name + "_GT_ab_filtered.mt/")
 
+    ###########################################
+    # Calculate sex-aware variant annotations #
+    ###########################################
+    if sex_aware_call_rate:
+        mt_gtfilt2, annotations_to_transfer = va.sex_aware_variant_annotations(
+            mt_gtfilt2, pheno_col=pheno_col, prefix=annotation_prefix)
+
     #####################################
     # Annotate rest of failing variants #
     #####################################
@@ -856,6 +864,9 @@ def variant_quality_control(
     mt = mt.annotate_rows(**{failing_name: mt_varannot.index_rows(mt.row_key)[failing_name]})
     mt = mt.annotate_rows(**{het_ab_stats_name: mt_varannot.index_rows(mt.row_key)[het_ab_stats_name]})
     mt = mt.annotate_rows(**{initial_call_rate_name: mt_varannot.index_rows(mt.row_key)[initial_call_rate_name]})
+    if sex_aware_call_rate:
+        for annotation in annotations_to_transfer:
+            mt = mt.annotate_rows(**{annotation: mt_varannot.rows()[mt.row_key][annotation]})
 
     if (pheno_col is not None) and (samples_qc is True):
         case_het_gt_ab = annotation_prefix + 'case_frac_het_gts_in_ab'
