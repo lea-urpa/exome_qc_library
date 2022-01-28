@@ -867,6 +867,7 @@ def variant_quality_control(
     if sex_aware_call_rate:
         for annotation in annotations_to_transfer:
             mt = mt.annotate_rows(**{annotation: mt_varannot.rows()[mt.row_key][annotation]})
+            mt = mt.checkpoint(checkpoint_name + f"_{annotation}_tmp_deleteme.mt/")
 
     if (pheno_col is not None) and (samples_qc is True):
         case_het_gt_ab = annotation_prefix + 'case_frac_het_gts_in_ab'
