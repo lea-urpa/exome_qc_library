@@ -232,13 +232,13 @@ def sex_aware_variant_annotations(mt, pheno_col=None, prefix=""):
                                         (mt[male_calls] + 2*mt[female_calls]) / (num_males + 2*num_females))
                                   .default((mt[male_calls] + mt[female_calls]) / (num_males + num_females))),
            sexaware_AC: (hl.case()  # MINOR allele count
-                           .when(mt.locus.in_y_nonpar(), mt.male_homvars)
-                           .when(mt.locus.in_x_nonpar(), mt.male_homvars + mt.female_hets + 2*mt.female_homvars)
-                           .default(mt.male_hets + 2*mt.male_homvars + mt.female_hets + 2*mt.female_homvars)),
+                           .when(mt.locus.in_y_nonpar(), mt[male_homvars])
+                           .when(mt.locus.in_x_nonpar(), mt[male_homvars] + mt[female_hets] + 2*mt[female_homvars])
+                           .default(mt[male_hets] + 2*mt[male_homvars] + mt[female_hets] + 2*mt[female_homvars])),
            sexaware_AN: (hl.case()
-                           .when(mt.locus.in_y_nonpar(), mt.male_calls)
-                           .when(mt.locus.in_x_nonpar(), mt.male_calls + 2*mt.female_calls)
-                           .default(2*mt.male_calls + 2*mt.female_calls))}
+                           .when(mt.locus.in_y_nonpar(), mt[male_calls])
+                           .when(mt.locus.in_x_nonpar(), mt[male_calls] + 2*mt[female_calls])
+                           .default(2*mt[male_calls] + 2*mt[female_calls]))}
     )
 
     annotations_to_transfer = [sexaware_call_rate, sexaware_AC, sexaware_AN]
