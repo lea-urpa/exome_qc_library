@@ -439,15 +439,6 @@ if __name__ == "__main__":
             samples_qc=True, force=args.force
         )
 
-        # Annotate phenotype-specific callrate and proportion het genotypes out of allelic balance
-        logging.info("Filtering out failing genotypes and samples for pheno-specific call rate + het AB annotation.")
-        mt_filtered = sq.filter_failing(
-            mt, variant_qcd, prefix='final', entries=True, variants=False, samples=True, unfilter_entries=False,
-            pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
-            min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
-        )
-
         # Run case status-specific variant QC
         if args.pheno_col is not None:
             logging.info("Running case-status specific variant QC")
