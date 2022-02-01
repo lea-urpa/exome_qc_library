@@ -379,8 +379,6 @@ if __name__ == "__main__":
     ######################################
     import os
     import argparse
-    import hail as hl
-    hl.init()
 
     parser = argparse.ArgumentParser(description="Parse kinship output from King and write report of errors.")
     parser.add_argument("--kin_file", type=str, help="King output, .kin file")
