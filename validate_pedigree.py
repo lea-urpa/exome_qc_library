@@ -229,7 +229,7 @@ def count_families_kin(kin_file, cohorts):
         ##############################################################################
         # Create an edgelist containing just the expected families, minus the errors #
         ##############################################################################
-        filestem = os.path.splitext(kin_file)
+        filestem = os.path.splitext(kin_file)[0]
         edgelist_name = f"{filestem}_{cohort}.edgelist_kin"
         edgelist = open(edgelist_name, "w")
 
