@@ -135,17 +135,18 @@ def parse_kin0_errors(kin0_file, cohorts, args):
         delim = utils.check_delimiter(kin0_file)
         with open(kin0_file) as in_kin0:
             for line in in_kin0:
-                fid1, id1, fid2, id2, n_snp, hethet, ibs0, kinship = line.strip().split(delim)
+                if not line.startswith("FID"):
+                    fid1, id1, fid2, id2, n_snp, hethet, ibs0, kinship = line.strip().split(delim)
 
-                ####################################################
-                # Infer actual relationships from ibs0 and kinship #
-                ####################################################
-                actual = infer_relationship(ibs0, kinship)
+                    ####################################################
+                    # Infer actual relationships from ibs0 and kinship #
+                    ####################################################
+                    actual = infer_relationship(ibs0, kinship)
 
-                line = f"Unexpected kinship between {id1} ({fid1}) and {id2} ({fid2}). Expected to be unrelated; kinship " \
-                    f"supports {actual}. IBS0: {ibs0}. Kinship: {kinship}"
+                    line = f"Unexpected kinship between {id1} ({fid1}) and {id2} ({fid2}). Expected to be unrelated; kinship " \
+                        f"supports {actual}. IBS0: {ibs0}. Kinship: {kinship}"
 
-                error_report.write(line)
+                    error_report.write(line)
 
         error_report.close()
         in_kin0.close()
