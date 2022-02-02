@@ -415,6 +415,7 @@ if __name__ == "__main__":
         else:
             args.output_name = os.path.splitext(os.path.basename(args.kin0_file)[0])
 
+    args.output_stem = os.path.join(args.output_dir, args.output_name
 
     # Parse kin and kin0 errors
     parse_kin_errors(args.kin_file, cohorts, args)
