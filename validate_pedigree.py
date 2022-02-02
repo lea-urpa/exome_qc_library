@@ -11,7 +11,7 @@ import time
 import os
 import networkx as nx
 from collections import OrderedDict
-import utils
+from shared import utils
 import shutil
 
 
