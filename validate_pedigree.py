@@ -23,6 +23,7 @@ def infer_relationship(ibs0, kinship):
     :return: returns string giving inferred relationship
     """
     kinship = float(kinship)
+    ibs0 = float(ibs0)
     if kinship > 0.354:
         actual = "MZ twin or duplicate"
     elif (kinship <= 0.354) and (kinship > 0.177) and (ibs0 < 0.1):
