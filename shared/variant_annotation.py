@@ -439,3 +439,34 @@ def annotate_variants_mpc(mt, mpc_ht):
     mt = mt.annotate_globals(mpc_file=mpc_ht)
 
     return mt
+
+
+def test_missing_annotations(mt):
+    """
+    Function to test whether main annotations are missing and return tuple of boolean values for each.
+    """
+    try:
+        test = mt.gnomad_freq
+        gnomad_missing = False
+    except:
+        gnomad_missing = True
+
+    try:
+        test = mt.gnomad_mismatch_pvalue
+        mismatch_missing = False
+    except:
+        mismatch_missing = True
+
+    try:
+        test = mt.CADD_PHRED
+        cadd_missing = False
+    except:
+        cadd_missing = True
+
+    try:
+        test = mt.MPC
+        mpc_missing = False
+    except:
+        mpc_missing = True
+
+    return gnomad_missing, mismatch_missing, cadd_missing, mpc_missing
