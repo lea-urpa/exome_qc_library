@@ -209,26 +209,5 @@ if __name__ == "__main__":
                 hl.int32((hl.agg.count_where(mt.GT.is_hom_var()) * 2) + hl.agg.count_where(mt.GT.is_het())))}
         )
 
-    # Run pairwise AF test for each variant
-    for pair in utils.get_upper_triangle(input_files_short):
-        chip1 = pair[0]
-        chip2 = pair[1]
-        mt = mt.annotate_rows(
-            **{f"af_test_{chip1}_{chip2}":
-                   hl.contingency_table_test(mt[f"{chip1}_AC_ref"], mt[f"{chip2}_AC_ref"],
-                                             mt[f"{chip1}_AC_alt"], mt[f"{chip2}_AC_alt"],
-                                             min_cell_count=500)
-               }
-        )
-
-        output_file(f"{datestr}_AF_comparison_pvalue_hist_{chip1}_{chip2}")
-        info_hist = mt.aggregate_rows(hl.expr.aggregators.hist(mt[f"af_test_{chip1}_{chip2}"].p_value, 0, 1, 50))
-        p = hl.plot.histogram(info_hist, legend='p value',
-                              title=f'Distribution of p values for AF difference test \nbetween {chip1} and {chip2}')
-        save(p)
-
-    final_checkpoint = out_basename + f"_info_af_comparison_final{test_str}.mt/"
-
-    mt = mt.checkpoint(final_checkpoint)
     utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
     logging.info("Pipeline completed successfully!")
