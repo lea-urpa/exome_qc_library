@@ -256,6 +256,26 @@ def remove_secondary(cluster_name, region='europe-west1'):
         subprocess.call(cmd)
 
 
+def add_primary(cluster_name, num_primary, region='europe-west1'):
+    if cluster_name is not None:
+        logging.info(f"Adding {str(num_primary)} secondary workers to cluster {cluster_name}")
+
+        cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
+                          f"--num-workers {str(num_primary)}")
+
+        subprocess.call(cmd)
+
+
+def remove_primary(cluster_name, region='europe-west1'):
+    if cluster_name is not None:
+        logging.info('Removing extra primary workers.')
+
+        cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
+                          f"--num-workers 2")
+
+        subprocess.call(cmd)
+
+
 def check_counts(mt, args):
     counts = mt.count()
     defined_rows = mt.aggregate_rows(hl.agg.count_where(hl.is_defined(mt.locus)))
