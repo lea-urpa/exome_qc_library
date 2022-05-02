@@ -94,7 +94,7 @@ if __name__ == "__main__":
         basename = args.merged_file_name.rstrip("/").replace(".mt", "")
 
     out_basename = os.path.join(args.out_dir, basename)
-    combined_mt_fn = out_basename + f"_combined{test_str}_tmp.mt/"
+    combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
 
     if (not utils.check_exists(combined_mt_fn)) or args.force:
         mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     #######################################
     # Annotate data sample info, if given #
     #######################################
-    samples_annotated = out_basename + f"_samples_annotated{test_str}_tmp.mt/"
+    samples_annotated = out_basename + f"_samples_annotated{test_str}.mt/"
 
     if args.samples_annotation_files is not None:
 
@@ -137,56 +137,47 @@ if __name__ == "__main__":
     logging.info(f"Finding variants with INFO score > {args.info_score_cutoff} in all input chip VCFs.")
     info_checkpoint =  out_basename + f"_passing_info_annotated{test_str}.mt/"
 
-    if (not utils.check_exists(info_checkpoint)) or args.force:
-        # Given list of info scores, find which structure name they correspond to
-        info_score_structs = []
-        for name in info_score_names:
-            fail = True
-            for i in range(len(vcf_files)):
-                if i == 0:
-                    struct_name = "info"
-                else:
-                    struct_name = f"info_{i}"
+    # Given list of info scores, find which structure name they correspond to
+    info_score_structs = []
+    for name in info_score_names:
+        fail = True
+        for i in range(len(vcf_files)):
+            if i == 0:
+                struct_name = "info"
+            else:
+                struct_name = f"info_{i}"
 
-                try:
-                    test = mt[struct_name][name]
-                    info_score_structs.append(f"{struct_name}.{name}")
-                    fail = False
-                except:
-                    pass
-            if fail == True:
-                logging.warning(f"Info name {name} not found! This info score field will not be included in calculating "
-                                f"whether a variant passes INFO score thresholds in all chip sets.")
+            try:
+                test = mt[struct_name][name]
+                info_score_structs.append(f"{struct_name}.{name}")
+                fail = False
+            except:
+                pass
+        if fail == True:
+            logging.warning(f"Info name {name} not found! This info score field will not be included in calculating "
+                            f"whether a variant passes INFO score thresholds in all chip sets.")
 
-        if len(info_score_structs) == 0:
-            logging.error("No info score names given were found in the dataset. Check the VCF headers with zcat vcf_name.vcf "
-                          "| less for the names, and check your spelling.")
-            exit()
+    if len(info_score_structs) == 0:
+        logging.error("No info score names given were found in the dataset. Check the VCF headers with zcat vcf_name.vcf "
+                      "| less for the names, and check your spelling.")
+        exit()
 
-        # Pull rows and calculate which variants pass INFO score threshold in all datasets
-        row_info = mt.rows()
-        row_info = row_info.flatten()
+    # Pull rows and calculate which variants pass INFO score threshold in all datasets
+    row_info = mt.rows()
+    row_info = row_info.flatten()
 
-        row_info = row_info.annotate(
-            passing_all_info=hl.all([(row_info[x][0] > args.info_score_cutoff) for x in info_score_structs])
-        )
+    # Plot hists for info scores for each chip set
+    for name in info_score_structs:
+        output_file(f"{datestr}_info_score_hist_{name}")
+        info_hist = row_info.aggregate(hl.expr.aggregators.hist(row_info[name][0], 0, 1, 50))
+        p = hl.plot.histogram(info_hist, legend='IMPUTE2 Info Score', title=f'INFO scores chipset {name}')
+        save(p)
 
-        # Plot hists for info scores for each chip set
-        for name in info_score_structs:
-            output_file(f"{datestr}_info_score_hist_{name}")
-            info_hist = row_info.aggregate(hl.expr.aggregators.hist(row_info[name][0], 0, 1, 50))
-            p = hl.plot.histogram(info_hist, legend='IMPUTE2 Info Score', title=f'INFO scores chipset {name}')
-            save(p)
+    info_count = row_info.aggregate(hl.agg.counter(
+        hl.all([(row_info[x][0] > args.info_score_cutoff) for x in info_score_structs])
+    ))
+    logging.info(f"Number of variants passing/failing INFO thresholds at all chipsets:\n"
+                 f"passing:{info_count[True]}, failing:{info_count[False]}")
 
-        info_count = row_info.aggregate(hl.agg.counter(row_info.passing_all_info))
-        logging.info(f"Number of variants passing/failing INFO thresholds at all chipsets:\n"
-                     f"passing:{info_count[True]}, failing:{info_count[False]}")
-
-        row_info = row_info.key_by("locus", "alleles")
-        mt = mt.annotate_rows(passing_all_info=row_info[mt.locus, mt.alleles].passing_all_info)
-        mt = mt.checkpoint(info_checkpoint, overwrite=True)
-    else:
-        logging.info("Detected info score annotated mt exists, loading that.")
-        mt = mt.read_matrix_table(info_checkpoint)
     utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
     logging.info("Pipeline completed successfully!")
