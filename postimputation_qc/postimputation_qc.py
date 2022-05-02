@@ -94,7 +94,7 @@ if __name__ == "__main__":
         basename = args.merged_file_name.rstrip("/").replace(".mt", "")
 
     out_basename = os.path.join(args.out_dir, basename)
-    combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
+    combined_mt_fn = out_basename + f"_combined{test_str}_tmp.mt/"
 
     if (not utils.check_exists(combined_mt_fn)) or args.force:
         mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     #######################################
     # Annotate data sample info, if given #
     #######################################
-    samples_annotated = out_basename + f"_samples_annotated{test_str}.mt/"
+    samples_annotated = out_basename + f"_samples_annotated{test_str}_tmp.mt/"
 
     if args.samples_annotation_files is not None:
 
@@ -188,26 +188,3 @@ if __name__ == "__main__":
     else:
         logging.info("Detected info score annotated mt exists, loading that.")
         mt = mt.read_matrix_table(info_checkpoint)
-
-    ############################
-    # Batch-wise AF comparison #
-    ############################
-    logging.info("Running pairwise AF comparison (Fisher or Chisq) for each variant, pairwise between input chips.")
-    # Annotate ref and alt allele count for all input chip sets
-    input_files_short = []
-    for input_file in vcf_files:
-        annot_name = input_file.replace("/", "").replace("*", "").replace(".vcf", "").replace(".gz", "")
-        input_files_short.append(annot_name)
-        mt = mt.annotate_rows(
-            **{f"{annot_name}_AC_ref": hl.agg.filter(
-                mt.input_file == input_file,
-                hl.int32((hl.agg.count_where(mt.GT.is_hom_ref()) * 2) + hl.agg.count_where(mt.GT.is_het())))}
-        )
-        mt = mt.annotate_rows(
-            **{f"{annot_name}_AC_alt": hl.agg.filter(
-                mt.input_file == input_file,
-                hl.int32((hl.agg.count_where(mt.GT.is_hom_var()) * 2) + hl.agg.count_where(mt.GT.is_het())))}
-        )
-
-    utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-    logging.info("Pipeline completed successfully!")
