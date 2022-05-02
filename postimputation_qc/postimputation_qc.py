@@ -188,3 +188,5 @@ if __name__ == "__main__":
     else:
         logging.info("Detected info score annotated mt exists, loading that.")
         mt = mt.read_matrix_table(info_checkpoint)
+    utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+    logging.info("Pipeline completed successfully!")
