@@ -258,7 +258,7 @@ def remove_secondary(cluster_name, region='europe-west1'):
 
 def add_primary(cluster_name, num_primary, region='europe-west1'):
     if cluster_name is not None:
-        logging.info(f"Adding {str(num_primary)} secondary workers to cluster {cluster_name}")
+        logging.info(f"Adding {str(num_primary)} primary workers to cluster {cluster_name}")
 
         cmd = shlex.split(f"gcloud dataproc clusters update {cluster_name} --region {region} "
                           f"--num-workers {str(num_primary)}")
