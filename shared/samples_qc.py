@@ -579,7 +579,7 @@ def pc_project(mt, loadings_ht, loading_location="loadings", af_location="pca_af
     return mt.cols().select('scores')
 
 
-def project_pcs_relateds(mt, checkpoint_name, covar_pc_num, reference_genome):
+def project_pcs_relateds(mt, checkpoint_name, covar_pc_num, reference_genome, force=False):
     """
     Tales LD pruned matrix table, calculates PCs, and projects those PCs back to related individuals included in mt
     :param mt: matrix table, with bad variants and samples removed, relatives and popluation outliers annotated
@@ -589,24 +589,28 @@ def project_pcs_relateds(mt, checkpoint_name, covar_pc_num, reference_genome):
     ##################
     # Filter dataset #
     ##################
-    # Filter to autosomes
-    if reference_genome is "GRCh38":
-        autosomes = ["chr" + str(i) for i in range(1, 23)]
-    else:
-        autosomes = [str(i) for i in range(1, 23)]
-
-    mt_autosomes = mt.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
-    var_count = mt_autosomes.count_rows()
-    logging.info(f"Variant count after filtering to autosomes: {var_count}")
-
-    # Remove related individuals
-    mt_unrelated = mt_autosomes.filter_cols(mt_autosomes.related_to_remove == False)
-    sample_count = mt_unrelated.count_cols()
-    logging.info(f'Sample count after removing related individuals: {sample_count}')
-
-    # Write checkpoint
     mt_fn = checkpoint_name.rstrip("/").replace(".mt", "") + "_autosomes_norelatives.mt/"
-    mt_unrelated = mt_unrelated.checkpoint(mt_fn, overwrite=True)
+    if (not utils.check_exists(mt_fn)) | force:
+        # Filter to autosomes
+        if reference_genome is "GRCh38":
+            autosomes = ["chr" + str(i) for i in range(1, 23)]
+        else:
+            autosomes = [str(i) for i in range(1, 23)]
+
+        mt_autosomes = mt.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
+        var_count = mt_autosomes.count_rows()
+        logging.info(f"Variant count after filtering to autosomes: {var_count}")
+
+        # Remove related individuals
+        mt_unrelated = mt_autosomes.filter_cols(mt_autosomes.related_to_remove == False)
+        sample_count = mt_unrelated.count_cols()
+        logging.info(f'Sample count after removing related individuals: {sample_count}')
+
+        # Write checkpoint
+        mt_unrelated = mt_unrelated.checkpoint(mt_fn, overwrite=True)
+    else:
+        logging.info("Detected mt filtered to autosomes and non-relatives exists, loading that.")
+        mt_unrelated = hl.read_matrix_table(mt_fn)
 
     #################
     # Calculate PCs #
