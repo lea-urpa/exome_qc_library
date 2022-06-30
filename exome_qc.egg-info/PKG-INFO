@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: exome-qc
+Version: 2.0.0
+Summary: Exome seq QC with Hail
+Home-page: UNKNOWN
+Author: Lea M. Urpa
+Author-email: lea.urpa@helsinki.fi
+License: UNKNOWN
+Keywords: genetics,genomics,hail,sequencing,exome
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Programming Language :: Python :: 3
+License-File: LICENSE
+
+Exome sequencing quality control pipeline with Hail
+
