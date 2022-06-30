@@ -23,11 +23,10 @@ if __name__ == "__main__":
                         help="Name of VCF file (or files) to import, comma separated if > 1 file.")
     parser.add_argument("--out_file", type=str, help="Name of matrix table to output.")
     parser.add_argument("--region", default="europe-west1", help="Name of region for checking dataproc in correct region.")
+    parser.add_argument("--project", required=True, help="Project name for requester pays config.")
     parser.add_argument("--log_dir", type=str, required=True, help="Location where logs should be written to.")
     parser.add_argument("--data_dir", type=str, required=True, help="Location where VCFs to import exist.")
     parser.add_argument("--out_dir", type=str, required=True, help="Location to write combined + vep annotated mt")
-    parser.add_argument("--vep_config", default="gs://hail-us-vep/vep95-GRCh38-loftee-gcloud.json",
-                        help="Location of Hail VEP configuration json file. Default for cluster started with --vep")
     parser.add_argument("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
                         help="Reference genome build.")
     parser.add_argument("--chr_prefix", action='store_true', help="Chromosomes are of form 'chr1', NOT '1' etc.")
@@ -40,7 +39,22 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    hl.init()
+    if args.region.contains('europe'):
+        vep_bucket = "hail-eu-vep"
+        args.vep_config = "gs://hail-eu-vep/vep95-GRCh38-loftee-gcloud.json"
+    elif args.region.contains('us'):
+        vep_bucket = "hail-eu-vep"
+        args.vep_config = "gs://hail-us-vep/vep95-GRCh38-loftee-gcloud.json"
+    else:
+        logging.error("Error- region not in Europe or US. Are you sure you want to VEP annotate with files from "
+                      "another region? Network egress charges add up VERY quickly. Exiting.")
+        exit()
+
+    hl.init(spark_conf={
+        'spark.hadoop.fs.gs.requester.pays.mode': 'CUSTOM',
+        'spark.hadoop.fs.gs.requester.pays.buckets': vep_bucket,
+        'spark.hadoop.fs.gs.requester.pays.project.id': args.project
+        })
 
     #####################################
     # Configure logging, define outputs #
