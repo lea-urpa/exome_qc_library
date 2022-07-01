@@ -39,11 +39,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.region.contains('europe'):
+    if 'europe' in args.region:
         vep_bucket = "hail-eu-vep"
         args.vep_config = "gs://hail-eu-vep/vep95-GRCh38-loftee-gcloud.json"
-    elif args.region.contains('us'):
-        vep_bucket = "hail-eu-vep"
+    elif 'us' in args.region:
+        vep_bucket = "hail-us-vep"
         args.vep_config = "gs://hail-us-vep/vep95-GRCh38-loftee-gcloud.json"
     else:
         logging.error("Error- region not in Europe or US. Are you sure you want to VEP annotate with files from "
