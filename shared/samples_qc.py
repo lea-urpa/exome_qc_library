@@ -280,6 +280,15 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
     if (not utils.check_exists(cols_fn)) or force:
         force = True
         cols = mt.cols()
+        # Select only needed columns for sample QC
+        cols_to_keep = [chimeras_col, contamination_col, 'related_num_connections', 'sample_qc']
+        if sample_call_rate is not None:
+            cols_to_keep.append('sexaware_sample_call_rate')
+
+        if batch_col_name is not None:
+            cols_to_keep.append(batch_col_name)
+
+        cols = cols.select(*cols_to_keep)
         cols = cols.checkpoint(cols_fn, overwrite=True)
     else:
         cols = hl.read_table(cols_fn)
