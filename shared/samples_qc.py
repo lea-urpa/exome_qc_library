@@ -288,6 +288,9 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
         if batch_col_name is not None:
             cols_to_keep.append(batch_col_name)
 
+        if pheno_col is not None:
+            cols_to_keep.append(pheno_col)
+
         cols = cols.select(*cols_to_keep)
         cols = cols.checkpoint(cols_fn, overwrite=True)
     else:
@@ -317,7 +320,6 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
             cols.failing_samples_qc.append("failing_too_many_relatives"),
             cols.failing_samples_qc
         ))
-
         cols = cols.checkpoint(chim_cont_fn, overwrite=True)
     else:
         cols = hl.read_table(chim_cont_fn)
