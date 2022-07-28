@@ -561,19 +561,19 @@ if __name__ == "__main__":
 
         mt = mt.checkpoint(variant_annotated, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-
-        # Export rows and columns
-        mtcols = mt.cols()
-        mtcols = mtcols.flatten()
-        mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv.gz'))
-
-        mtrows = mt.rows()
-        mtrows = mtrows.flatten()
-        mtrows = mtrows.key_by().drop("vep.input")
-        mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv.gz'))
-
     else:
+        mt = hl.read_matrix_table(variant_annotated)
         logging.info("Detected final annotated mt exists. Skipping this step.")
+
+    # Export rows and columns
+    mtcols = mt.cols()
+    mtcols = mtcols.flatten()
+    mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv.gz'))
+
+    mtrows = mt.rows()
+    mtrows = mtrows.flatten()
+    mtrows = mtrows.key_by().drop("vep.input")
+    mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv.gz'))
 
 
     # Send logs and finish-up notice
