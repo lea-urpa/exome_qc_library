@@ -405,6 +405,8 @@ if __name__ == "__main__":
         logging.info("User indicated samples QC should be skipped. Moving on.")
         samples_qcd_fn = sex_imputed
 
+    # Add pop oulier analysis
+
     #####################################
     # Filter failing gts, vars, samples #
     #####################################
@@ -426,6 +428,9 @@ if __name__ == "__main__":
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force, pop_outliers=False
         )
+
+        # Add final variant QC measures after filtering
+        mt_filt = hl.variant_qc(mt_filt, name='final_variant_qc_')
 
         mt_filt = mt_filt.checkpoint(mt_filt_fn, overwrite=True)
         utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
