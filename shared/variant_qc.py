@@ -606,6 +606,8 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
     ##############################################
     # Find variants not passing call rate filter #
     ##############################################
+    # add option if, given flag, filters call rate by batch only
+
     if sex_aware:
         call_rate_filter = (
             hl.if_else(
