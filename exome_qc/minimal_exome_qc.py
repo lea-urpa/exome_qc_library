@@ -199,8 +199,10 @@ if __name__ == "__main__":
         split_fn = out_basename + f"_split{test_str}.mt/"
 
         if (not utils.check_exists(split_fn)) or args.force:
+            args.force = True
             # Import VCF files and combine
             if (not utils.check_exists(combined_mt_fn)) or args.force:
+                args.force = True
                 mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
                                      chr_prefix=args.chr_prefix, reference_genome=args.reference_genome,
                                      force_bgz=args.force_bgz,
@@ -244,6 +246,7 @@ if __name__ == "__main__":
     variant_qcd_fn = os.path.join(args.out_dir, f"{counter}_{basename}_low_pass_qcd{test_str}.mt/")
 
     if (not utils.check_exists(variant_qcd_fn)) or args.force:
+        args.force = True
         logging.info("Running variant QC")
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
         mt = hl.read_matrix_table(split_fn)
@@ -272,6 +275,7 @@ if __name__ == "__main__":
     filtered_annot = out_basename + f"_variant_filtere_sex_annotated{test_str}_tmp.mt"
 
     if (not utils.check_exists(sex_imputed)) or args.force:
+        args.force = True
         if args.annotate_variants:
             logging.info("Annotating variant types:")
 
@@ -283,6 +287,7 @@ if __name__ == "__main__":
         mt = hl.read_matrix_table(variant_qcd_fn)
 
         if (not utils.check_exists(filtered_nohwe)) or args.force:
+            args.force = True
             # Filter out failing variants, genotypes, rare variants
             mt_gt_filt= sq.filter_failing(
                 mt, sex_imputed, prefix='low_pass', variants=False, entries=True, samples=False,
@@ -349,10 +354,12 @@ if __name__ == "__main__":
         first_samples_qc_fn = out_basename + f"_samples_qcd_no_sex_check{test_str}_tmp.mt"
 
         if (not utils.check_exists(samples_qcd_fn)) or args.force:
+            args.force = True
             mt = hl.read_matrix_table(sex_imputed)
 
             # Annotate with bam metadata
             if (not utils.check_exists(annotated_fn)) or args.force:
+                args.force = True
                 mt = sa.annotate_cols_from_file(mt, args.samples_annotation_files, args.samples_delim, args.samples_col,
                                                 args.samples_miss)
                 mt = mt.checkpoint(annotated_fn, overwrite=True)
@@ -373,6 +380,7 @@ if __name__ == "__main__":
 
             # Filter failing variants and genotypes
             if (not utils.check_exists(filtered_mt_fn)) or args.force:
+                args.force = True
                 logging.info("Filtering out failing genotypes and variants.")
                 mt_filtered = sq.filter_failing(
                     mt, samples_qcd_fn, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
@@ -387,6 +395,7 @@ if __name__ == "__main__":
 
             # Run samples QC
             if (not utils.check_exists(first_samples_qc_fn)) or args.force:
+                args.force = True
                 mt = sq.samples_qc(
                     mt_filtered, mt, samples_qcd_fn, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
                     chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
@@ -435,6 +444,7 @@ if __name__ == "__main__":
         pop_outliers_found = os.path.join(args.out_dir, f"{counter}_{basename}_pop_outliers_found{args.test_str}.mt/")
 
         if (not utils.check_exists(pop_outliers_found)) or args.force:
+            args.force = True
             logging.info("Finding population outliers")
             utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
@@ -442,6 +452,7 @@ if __name__ == "__main__":
 
             ## LD prune and checkpoint ##
             if (not utils.check_exists(maf_filtered)) or args.force:
+                args.force = True
                 logging.info("Filtering out failing entries, samples, and variants for population outlier analysis.")
                 # Filter failing samples, variants, and genotypes
                 mt_gt_filt = sq.filter_failing(
@@ -461,6 +472,7 @@ if __name__ == "__main__":
                 mt_gt_filt = hl.read_matrix_table(maf_filtered)
 
             if (not utils.check_exists(ld_pruned_annot)) or args.force:
+                args.force = True
                 utils.remove_secondary(args.cluster_name, region=args.region)
 
                 logging.info("LD pruning and downsampling for population outlier analysis.")
@@ -501,7 +513,7 @@ if __name__ == "__main__":
     logging.info("Filtering out failing variants, genotypes, and samples to write to VCF.")
 
     if (not utils.check_exists(mt_filt_fn)) or args.force:
-        # TODO check that forcing following steps after missing one work
+        args.force = True
         mt = hl.read_matrix_table(pop_outliers_found)
 
         if args.skip_samples_qc:
