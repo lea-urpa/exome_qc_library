@@ -101,6 +101,26 @@ if __name__ == "__main__":
     samples_thresh.add_argument("--sampleqc_sd_threshold", default=4, type=int,
                                 help="Number of standard deviations from mean sample can deviate on heterozygosity.")
 
+    # Pop outlier options #
+    pop_opts = parser.add_argument_group("Options for population outlier removal")
+    pop_opts.add_argument("--remove_population_outliers", action='store_true',
+                          help="Find and remove popuation outliers?")
+    pop_opts.add_argument("--pop_sd_threshold", default=4, type=int,
+                          help="Number of standard deviations from mean of PC1 and PC2 on which we mark samples as "
+                               "population outliers.")
+    pop_opts.add_argument("--pca_plot_annotations", type=str,
+                          help="column annotations with which to annotate PCA plots, comma separated if > 1.")
+    pop_opts.add_argument("--pca_plots", default=True,
+                          help="Plot PCA plots for each round in the population outlier detection?")
+    pop_opts.add_argument("--max_iter", default=5,
+                          help="Max iteration rounds for PCA outlier detection, for debugging.")
+
+    # LD pruning thresholds #
+    ld_thresh = parser.add_argument_group("Thresholds for LD pruning.")
+    ld_thresh.add_argument("--r2", default=0.2, type=float, help="r2 correlation cutoff for LD pruning.")
+    ld_thresh.add_argument("--bp_window_size", default=500000, type=int,
+                           help="Sliding window size for LD pruning in bp.")
+
     # Impute sex thresholds #
     sex_thresh = parser.add_argument_group("Impute sex thresholds.")
     sex_thresh.add_argument("--female_threshold", default=0.2, type=float, help="F-stat cutoff for defining female")
@@ -221,7 +241,7 @@ if __name__ == "__main__":
     # Low pass variant QC #
     #######################
     counter = 1
-    variant_qcd_fn = f"{args.out_dir}{counter}_{basename}_low_pass_qcd{test_str}.mt/"
+    variant_qcd_fn = os.path.join(args.out_dir, f"{counter}_{basename}_low_pass_qcd{test_str}.mt/")
 
     if (not utils.check_exists(variant_qcd_fn)) or args.force:
         logging.info("Running variant QC")
@@ -247,7 +267,7 @@ if __name__ == "__main__":
     # Impute sex #
     ##############
     counter += 1
-    sex_imputed = f"{args.out_dir}{counter}_{basename}_sex_imputed{test_str}.mt"
+    sex_imputed = os.path.join(args.out_dir, f"{counter}_{basename}_sex_imputed{test_str}.mt")
     filtered_nohwe = out_basename + f"_variant_filtered_nohwe{test_str}_tmp.mt"
     filtered_annot = out_basename + f"_variant_filtere_sex_annotated{test_str}_tmp.mt"
 
@@ -323,7 +343,7 @@ if __name__ == "__main__":
     ##################
     if not args.skip_samples_qc:
         counter += 1
-        samples_qcd_fn = f"{args.out_dir}{counter}_{basename}_samples_qcd{test_str}.mt/"
+        samples_qcd_fn = os.path.join(args.out_dir, f"{counter}_{basename}_samples_qcd{test_str}.mt/")
         annotated_fn = out_basename + f"_samples_qcd_samples_annotated{test_str}_tmp.mt"
         filtered_mt_fn = out_basename + f"_samples_qcd_gts_vars_filtered{test_str}_tmp.mt"
         first_samples_qc_fn = out_basename + f"_samples_qcd_no_sex_check{test_str}_tmp.mt"
@@ -405,18 +425,84 @@ if __name__ == "__main__":
         logging.info("User indicated samples QC should be skipped. Moving on.")
         samples_qcd_fn = sex_imputed
 
-    # Add pop oulier analysis
+    ############################
+    # Find population outliers #
+    ############################
+    if args.remove_population_outliers:
+        counter += 1
+        maf_filtered = f"{out_basename}_min_maf_0.05{test_str}_tmp.mt/"
+        ld_pruned_popannot = f"{out_basename}_{basename}_ld_pruned_popoutliers{args.test_str}_tmp.mt/"
+        pop_outliers_found = os.path.join(args.out_dir, f"{counter}_{basename}_pop_outliers_found{args.test_str}.mt/")
+
+        if (not utils.check_exists(pop_outliers_found)) or args.force:
+            logging.info("Finding population outliers")
+            utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
+
+            mt = hl.read_matrix_table(samples_qcd_fn)
+
+            ## LD prune and checkpoint ##
+            if (not utils.check_exists(maf_filtered)) or args.force:
+                logging.info("Filtering out failing entries, samples, and variants for population outlier analysis.")
+                # Filter failing samples, variants, and genotypes
+                mt_gt_filt = sq.filter_failing(
+                    mt, ld_pruned_annot, prefix='low_pass', entries=True, variants=True, samples=True,
+                    unfilter_entries=True,
+                    pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
+                    min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+                    max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+                )
+
+                logging.info("Excluding variants with MAF < 0.05 to calculate principal components.")
+                mt_gt_filt = mt_gt_filt.filter_rows(mt_gt_filt.variant_qc.AF[1] >= 0.05, keep=True)
+                mt_gt_filt = mt_gt_filt.checkpoint(maf_filtered, overwrite=True)
+            else:
+                logging.info("Detected mt filtered to MAF > 0.05 and passing samples, variants, and entries exists, "
+                             "loading that.")
+                mt_gt_filt = hl.read_matrix_table(maf_filtered)
+
+            if (not utils.check_exists(ld_pruned_annot)) or args.force:
+                utils.remove_secondary(args.cluster_name, region=args.region)
+
+                logging.info("LD pruning and downsampling for population outlier analysis.")
+                # LD prune and downsmample if row count >80k
+                mt_ldpruned = vq.downsample_variants(
+                    mt_maffilt, 80000, ld_pruned_annot, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
+
+                logging.info(f"Writing checkpoint {counter}-1: LD pruned dataset")
+                mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
+            else:
+                logging.info("Detected LD pruned dataset written, loading that.")
+                mt_ldpruned = hl.read_matrix_table(ld_pruned_annot)
+
+            utils.remove_secondary(args.cluster_name, region=args.region)
+            logging.info("Finding population outliers.")
+            pop_outliers = sq.find_pop_outliers(
+                mt_ldpruned, pop_outliers_found, pop_sd_threshold=args.pop_sd_threshold,
+                plots=args.pca_plots, max_iter=args.max_iter, reference_genome=args.reference_genome,
+                pca_plot_annotations=args.pca_plot_annotations)
+
+            mt = mt.annotate_cols(pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt.s), True, False))
+
+            logging.info(f"Writing checkpoint {counter}: population outliers annotated")
+            mt = mt.checkpoint(pop_outliers_found, overwrite=True)
+            utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
+        else:
+            logging.info("Detected mt with population outliers annotated exists, skipping finding pop outliers.")
+    else:
+        logging.info("Skipping population outlier analysis and removal. Add with flag --remove_population_outliers.")
+        pop_outliers_found = samples_qcd_fn
 
     #####################################
     # Filter failing gts, vars, samples #
     #####################################
     # Filter out failing genotypes, samples, and variants, export to vcf
     counter += 1
-    mt_filt_fn = f"{args.out_dir}{counter}_{basename}_failing_filtered{test_str}.mt/"
+    mt_filt_fn = os.path.join(args.out_dir, f"{counter}_{basename}_failing_filtered{test_str}.mt/")
     logging.info("Filtering out failing variants, genotypes, and samples to write to VCF.")
 
     if (not utils.check_exists(mt_filt_fn)) or args.force:
-        mt = hl.read_matrix_table(samples_qcd_fn)
+        # TODO check that forcing following steps after missing one work
+        mt = hl.read_matrix_table(pop_outliers_found)
 
         if args.skip_samples_qc:
             filter_samples = False
@@ -426,7 +512,8 @@ if __name__ == "__main__":
             mt, mt_filt_fn, prefix='low_pass', entries=True, variants=True, samples=filter_samples, unfilter_entries=True,
             pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
             min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force, pop_outliers=False
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force,
+            pop_outliers=args.remove_population_outliers
         )
 
         # Add final variant QC measures after filtering
