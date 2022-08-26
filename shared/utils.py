@@ -48,6 +48,9 @@ def check_regions(cluster_region, file_url):
     :return:
     """
     # Get bucket region
+    if not file_url.startswith("gs://"):
+        print("Error! File url input does not start with gs://. Is this a google bucket url?")
+        exit()
     bucket = "gs://" + file_url.split("/")[2]
     bucket_describe = f"gsutil ls -L -b {bucket}"
 
