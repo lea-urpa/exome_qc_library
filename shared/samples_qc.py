@@ -259,7 +259,8 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
 
 def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_call_rate=None,
                chimeras_col="", chimeras_max=0.05, contamination_col="", contamination_max=0.05,
-               batch_col_name=None, sampleqc_sd_threshold=4, pheno_col=None, force=False):
+               batch_col_name=None, sampleqc_sd_threshold=4, pheno_col=None, force=False,
+               relatives_found=True):
     """
     Performs samples QC on a matrix table, removing samples on chimera and contamination %, as well as being +/- 4
     standard deviations from mean on TiTv, het/homvar, insertion/deletion ratios and n_singletons for a specific
@@ -281,7 +282,9 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
         force = True
         cols = mt.cols()
         # Select only needed columns for sample QC
-        cols_to_keep = [chimeras_col, contamination_col, 'related_num_connections', 'sample_qc']
+        cols_to_keep = [chimeras_col, contamination_col, 'sample_qc']
+        if relatives_found:
+            cols_to_keep.append('related_num_connections')
         if sample_call_rate is not None:
             cols_to_keep.append('sexaware_sample_call_rate')
 
@@ -315,11 +318,12 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
             cols.failing_samples_qc.append("failing_contamination"),
             cols.failing_samples_qc))
 
-        cols = cols.annotate(failing_samples_qc=hl.cond(
-            (cols.related_num_connections > 30) & hl.is_defined(cols.related_num_connections),
-            cols.failing_samples_qc.append("failing_too_many_relatives"),
-            cols.failing_samples_qc
-        ))
+        if relatives_found:
+            cols = cols.annotate(failing_samples_qc=hl.cond(
+                (cols.related_num_connections > 30) & hl.is_defined(cols.related_num_connections),
+                cols.failing_samples_qc.append("failing_too_many_relatives"),
+                cols.failing_samples_qc
+            ))
         cols = cols.checkpoint(chim_cont_fn, overwrite=True)
     else:
         cols = hl.read_table(chim_cont_fn)
@@ -330,14 +334,16 @@ def samples_qc(mt, mt_to_annotate, checkpoint_name, count_failing=True, sample_c
         failing_contam = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_contamination")))
         miss_contam = cols.aggregate(hl.agg.count_where(~(hl.is_defined(cols[contamination_col]))))
         failing_rel = cols.aggregate(hl.agg.count_where(cols.failing_samples_qc.contains("failing_too_many_relatives")))
-        miss_rel = cols.aggregate(hl.agg.count_where(~(hl.is_defined(cols.related_num_connections))))
+        if relatives_found:
+            miss_rel = cols.aggregate(hl.agg.count_where(~(hl.is_defined(cols.related_num_connections))))
 
         logging.info(f"Number of samples failing on chimeras % > {chimeras_max}: {failing_chim}")
         logging.info(f"Number of samples missing chimeras %: {miss_chim}")
         logging.info(f"Number of samples failing on contamination % > {contamination_max}: {failing_contam}")
         logging.info(f"Number of samples missing contamination %: {miss_contam}")
         logging.info(f"Number of samples failing on too many relatives (>30): {failing_rel}")
-        logging.info(f"Number of samples missing number of inferred relatives: {miss_rel}")
+        if relatives_found:
+            logging.info(f"Number of samples missing number of inferred relatives: {miss_rel}")
 
         chim_stats = cols.aggregate(hl.agg.stats(cols[chimeras_col]))
         chim_hist = cols.aggregate(hl.agg.hist(cols[chimeras_col], chim_stats.min, chim_stats.max, 50))
