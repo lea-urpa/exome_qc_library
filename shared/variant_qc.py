@@ -397,7 +397,7 @@ def annotate_variant_het_ab(mt, checkpoint_name, prefix="", samples_qc=False, ph
     return mt
 
 
-def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=0.2, min_het_ref_reads=0.8,
+def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=0.8, min_het_ref_reads=0.2,
                               min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1, count_failing=True):
     """
     Finds genotypes failing allelic balance, defined as the percentage of ref reads that should correspond to that
@@ -413,7 +413,7 @@ def find_failing_genotypes_ab(mt, checkpoint_name, prefix="", max_het_ref_reads=
     # Log and annotate thresholds #
     ###############################
     logging.info(f"\nFinding failing het genotypes with ref reads > {max_het_ref_reads}"
-                 f"\nor het ref reads < {min_het_ref_reads}"
+                 f"\nor het ref reads <{min_het_ref_reads}"
                  f"\nor failing hom ref genotypes with ref reads < {min_hom_ref_ref_reads}"
                  f"\nor failing hom alt genotypes with ref reads > {max_hom_alt_ref_reads}")
 
@@ -710,7 +710,8 @@ def find_failing_vars(mt, checkpoint_name, prefix="", pheno_col=None, count_fail
 
         logging.info(f"\nVariants failing VQSR filters: {failing_vqsr}, {failing_vqsr_perc}%"
                      f"\nsnp QD < {snp_qd} or indel QD < {indel_qd}: {failing_qd}, {failing_qd_perc}%"
-                     f"\n>{ab_allowed_dev_het * 100}% of het genotypes out of allelic balance: "
+                     f"\n<{ab_allowed_dev_het * 100}% of het genotypes with ref ratios inside "
+                     f"{min_het_ref_reads}-{max_het_ref_reads}% boundary: "
                      f"{failing_ab}, {failing_ab_perc}%"
                      f"\np value HWE < {p_hwe} in {hwe_tag}: {failing_hwe}, {failing_hwe_perc}%"
                      f"\ncall rate < {min_call_rate}: {failing_call_rate}, {failing_cr_perc}%"
