@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
     parser.add_argument("--annotate_variants", action='store_true',
                         help="Annotate variants with LOF + missense genes they may lie in?")
-    parser.add_argument("--do_not_export_vcf", action='store_false', help="Export QCd dataset as vcf file(s)?")
+    parser.add_argument("--do_not_export_vcf", action='store_true', help="Export QCd dataset as vcf file(s)?")
     parser.add_argument("--test", action='store_true', help="Filters data to just chr 22 for testing purposes.")
     parser.add_argument("--force", action='store_true', help="Force re-run of all steps?")
 
@@ -441,8 +441,8 @@ if __name__ == "__main__":
     if args.remove_population_outliers:
         counter += 1
         maf_filtered = f"{out_basename}_min_maf_0.05{test_str}_tmp.mt/"
-        ld_pruned_popannot = f"{out_basename}_{basename}_ld_pruned_popoutliers{args.test_str}_tmp.mt/"
-        pop_outliers_found = os.path.join(args.out_dir, f"{counter}_{basename}_pop_outliers_found{args.test_str}.mt/")
+        ld_pruned_annot = f"{out_basename}_{basename}_ld_pruned_popoutliers{test_str}_tmp.mt/"
+        pop_outliers_found = os.path.join(args.out_dir, f"{counter}_{basename}_pop_outliers_found{test_str}.mt/")
 
         if (not utils.check_exists(pop_outliers_found)) or args.force:
             args.force = True
@@ -461,11 +461,11 @@ if __name__ == "__main__":
                     unfilter_entries=True,
                     pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
                     min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                    max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
+                    max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force, pop_outliers=False
                 )
 
                 logging.info("Excluding variants with MAF < 0.05 to calculate principal components.")
-                mt_gt_filt = mt_gt_filt.filter_rows(mt_gt_filt.variant_qc.AF[1] >= 0.05, keep=True)
+                mt_gt_filt = mt_gt_filt.filter_rows(mt_gt_filt["low_pass_variant_qc"].AF[1] >= 0.05, keep=True)
                 mt_gt_filt = mt_gt_filt.checkpoint(maf_filtered, overwrite=True)
             else:
                 logging.info("Detected mt filtered to MAF > 0.05 and passing samples, variants, and entries exists, "
@@ -479,7 +479,7 @@ if __name__ == "__main__":
                 logging.info("LD pruning and downsampling for population outlier analysis.")
                 # LD prune and downsmample if row count >80k
                 mt_ldpruned = vq.downsample_variants(
-                    mt_maffilt, 80000, ld_pruned_annot, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
+                    mt_gt_filt, 80000, ld_pruned_annot, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
 
                 logging.info(f"Writing checkpoint {counter}-1: LD pruned dataset")
                 mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
@@ -489,6 +489,38 @@ if __name__ == "__main__":
 
             utils.remove_secondary(args.cluster_name, region=args.region)
             logging.info("Finding population outliers.")
+
+            ## Calculate relatedness with King ##
+            if args.reference_genome == "GRCh38":
+                autosomes = ["chr" + str(i) for i in range(1, 23)]
+            else:
+                autosomes = [str(i) for i in range(1, 23)]
+
+            counter += 1
+            relatedness_calculated = os.path.join(
+                args.out_dir, f"{counter}_{out_basename}_relatedness_calculated{test_str}.mt/")
+            
+            mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
+            related_to_remove, related_info_ht = sq.king_relatedness(
+                mt_autosomes, relatedness_calculated, kinship_threshold=0.0883, pheno_col=None,
+                force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
+                region=args.region)
+
+            mt = mt.annotate_cols(
+                related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False),
+                related_graph_id=related_info_ht[mt.s].related_graph_id,
+                related_num_connections=related_info_ht[mt.s].related_num_connections
+            )
+
+            mt = mt.annotate_cols(related_num_connections=hl.or_else(mt.related_num_connections, 0))
+
+            mt_ldpruned = mt_ldpruned.annotate_cols(
+                related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned.s), True, False),
+                related_graph_id=related_info_ht[mt_ldpruned.s].related_graph_id,
+                related_num_connections=related_info_ht[mt_ldpruned.s].related_num_connections)
+            
+            mt_ldpruned = mt_ldpruned.annotate_cols(related_num_connections=hl.or_else(mt_ldpruned.related_num_connections, 0))
+            
             pop_outliers = sq.find_pop_outliers(
                 mt_ldpruned, pop_outliers_found, pop_sd_threshold=args.pop_sd_threshold,
                 plots=args.pca_plots, max_iter=args.max_iter, reference_genome=args.reference_genome,
@@ -554,6 +586,17 @@ if __name__ == "__main__":
     else:
         logging.info("Detected variant info table already exported, skipping export.")
 
+    variant_info_fn = out_basename + "_final_variant_info.tsv.bgz"
+
+    if (not utils.check_exists(variant_info_fn)) or args.force:
+        args.force = True
+        var_info = mt_filt.rows()
+        var_info = var_info.flatten()
+
+        var_info.export(variant_info_fn)
+    else:
+        logging.info("Detected final variant info table already exported, skipping export.")
+        
     # Export samples information to a separate tsv file
     sample_info_fn = out_basename + "_unfiltered_sample_info.tsv.bgz"
 
@@ -572,6 +615,7 @@ if __name__ == "__main__":
     # Export filtered mt as VCF, per chromosome #
     #############################################
     if not args.do_not_export_vcf:
+        logging.info("Exporting VCFs")        
         utils.remove_secondary(args.cluster_name, region=args.region)
         if args.split_by_chrom:
             logging.info("Exporting VCFs split by chromosome")
@@ -607,5 +651,6 @@ if __name__ == "__main__":
                 logging.info(f"Detected {os.path.basename(vcf_name)} already exported, skipping export.")
 
             utils.copy_logs_output(args.log_dir, log_file=log_file, plot_dir=plot_dir)
-
-
+    else:
+        logging.info("Not exporting VCFs")        
+        logging.info(args.do_not_export_vcf)        
