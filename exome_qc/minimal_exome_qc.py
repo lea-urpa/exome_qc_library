@@ -450,8 +450,9 @@ if __name__ == "__main__":
             utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
 
             mt = hl.read_matrix_table(samples_qcd_fn)
-
-            ## LD prune and checkpoint ##
+            ###########################
+            # LD prune and checkpoint #
+            ###########################
             if (not utils.check_exists(maf_filtered)) or args.force:
                 args.force = True
                 logging.info("Filtering out failing entries, samples, and variants for population outlier analysis.")
@@ -490,7 +491,9 @@ if __name__ == "__main__":
             utils.remove_secondary(args.cluster_name, region=args.region)
             logging.info("Finding population outliers.")
 
-            ## Calculate relatedness with King ##
+            ###################################
+            # Calculate relatedness with King #
+            ###################################
             if args.reference_genome == "GRCh38":
                 autosomes = ["chr" + str(i) for i in range(1, 23)]
             else:
@@ -498,9 +501,10 @@ if __name__ == "__main__":
 
             counter += 1
             relatedness_calculated = os.path.join(
-                args.out_dir, f"{counter}_{out_basename}_relatedness_calculated{test_str}.mt/")
+                args.out_dir, f"{counter}_{basename}_relatedness_calculated{test_str}.mt/")
             
             mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
+
             related_to_remove, related_info_ht = sq.king_relatedness(
                 mt_autosomes, relatedness_calculated, kinship_threshold=0.0883, pheno_col=None,
                 force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
@@ -520,7 +524,10 @@ if __name__ == "__main__":
                 related_num_connections=related_info_ht[mt_ldpruned.s].related_num_connections)
             
             mt_ldpruned = mt_ldpruned.annotate_cols(related_num_connections=hl.or_else(mt_ldpruned.related_num_connections, 0))
-            
+
+            #####################################
+            # Actually find population outliers #
+            #####################################
             pop_outliers = sq.find_pop_outliers(
                 mt_ldpruned, pop_outliers_found, pop_sd_threshold=args.pop_sd_threshold,
                 plots=args.pca_plots, max_iter=args.max_iter, reference_genome=args.reference_genome,
