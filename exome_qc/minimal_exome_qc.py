@@ -92,7 +92,7 @@ if __name__ == "__main__":
     # Samples QC thresholds #
     samples_thresh = parser.add_argument_group("Samples QC thresholds.")
     samples_thresh.add_argument("--skip_samples_qc", action="store_true", help="Skip samples QC?")
-    samples_thresh.add_argument("--sample_call_rate", type=float, default=0.8,
+    samples_thresh.add_argument("--sample_call_rate", type=float,
                                 help="Minimum genotype call rate per sample. Default none- samples not filtered on "
                                      "call rate.")
     samples_thresh.add_argument("--chimeras_max", default=0.05, type=float, help="Max % of chimeras allowed for sample")
