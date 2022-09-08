@@ -184,6 +184,21 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
         logging.info(f"Count of samples and variants for matrix table PCA is calculated on: {mt_count}")
         eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_unrelated.GT, k=2)
 
+        # Project PCs to related individuals
+        logging.info("Projecting principal components to related individuals for population outlier detection.")
+        related_mt = mt_autosomes.filter_cols((mt_autosomes.related_to_remove == True), keep=True)
+        mt_autosomes = mt_autosomes.annotate_rows(pca_af=hl.agg.mean(mt_autosomes.GT.n_alt_alleles()) / 2)
+        mtrows = mt_autosomes.rows()
+        loadings = loadings.annotate(pca_af=mtrows[loadings.locus, loadings.alleles].pca_af)
+        related_scores = pc_project(related_mt, loadings)
+
+        pca_tmp_name = checkpoint_name.rstrip("/").replace(".mt", "") + f"_principal_components_round{round_num}.ht/"
+        pca_tmp_tsv = checkpoint_name.rstrip("/").replace(".mt", "") + f"_principal_components_round{round_num}.tsv"
+
+        logging.info(f"Writing principal components for round {round_num} to {pca_tmp_name}")
+        related_scores.write(pca_tmp_name, overwrite=True)
+        related_scores.export(pca_tmp_tsv)
+
         # Do PCA plots, if specified
         if plots:
             coldata = mt_unrelated.cols()
@@ -192,12 +207,12 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
                 try:
                     pca_annotations = pca_plot_annotations.strip().split(",")
                     for annotation in pca_annotations:
-                        scores = scores.annotate(**{annotation: coldata[scores.s][annotation]})
-                    label_dict = {i: scores[i] for i in pca_annotations}
+                        related_scores = related_scores.annotate(**{annotation: coldata[related_scores.s][annotation]})
+                    label_dict = {i: related_scores[i] for i in pca_annotations}
 
                     output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
-                    p = hl.plot.scatter(scores.scores[0], scores.scores[1], label=label_dict,
-                                        title=f"PCA plot round {round_num}", collect_all=collect_all)
+                    p = hl.plot.scatter(related_scores.related_scores[0], related_scores.related_scores[1],
+                                        label=label_dict, title=f"PCA plot round {round_num}", collect_all=collect_all)
                     save(p)
                 except Exception as e:
                     logging.error(f"Error! Creating PCA plots with labels failed. Are the label categories you provided"
@@ -205,28 +220,29 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
                                   f"labels")
                     logging.error(e)
                     output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
-                    p = hl.plot.scatter(scores.scores[0], scores.scores[1], title=f"PCA plot round {round_num}",
+                    p = hl.plot.scatter(related_scores.related_scores[0], related_scores.related_scores[1],
+                                        title=f"PCA plot round {round_num}",
                                         collect_all=collect_all)
                     save(p)
             else:
                 output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
-                p = hl.plot.scatter(scores.scores[0], scores.scores[1], title=f"PCA plot round {round_num}",
-                                    collect_all=collect_all)
+                p = hl.plot.scatter(related_scores.related_scores[0], related_scores.related_scores[1],
+                                    title=f"PCA plot round {round_num}", collect_all=collect_all)
                 save(p)
 
         # Calculate upper and lower limits for each principal component
-        pc1_stats = scores.aggregate(hl.agg.stats(scores.scores[0]))
+        pc1_stats = related_scores.aggregate(hl.agg.stats(related_scores.related_scores[0]))
         cutoff1_upper = pc1_stats.mean + (pop_sd_threshold * pc1_stats.stdev)
         cutoff1_lower = pc1_stats.mean - (pop_sd_threshold * pc1_stats.stdev)
 
-        pc2_stats = scores.aggregate(hl.agg.stats(scores.scores[1]))
+        pc2_stats = related_scores.aggregate(hl.agg.stats(related_scores.related_scores[1]))
         cutoff2_upper = pc2_stats.mean + (pop_sd_threshold * pc2_stats.stdev)
         cutoff2_lower = pc2_stats.mean - (pop_sd_threshold * pc2_stats.stdev)
 
         # Make table of those failing cutoffs
-        pc1_cut = (scores.scores[0] > cutoff1_upper) | (scores.scores[0] < cutoff1_lower)
-        pc2_cut = (scores.scores[1] > cutoff2_upper) | (scores.scores[1] < cutoff2_lower)
-        outlier_table = scores.filter(pc1_cut | pc2_cut, keep=True)
+        pc1_cut = (related_scores.related_scores[0] > cutoff1_upper) | (related_scores.related_scores[0] < cutoff1_lower)
+        pc2_cut = (related_scores.related_scores[1] > cutoff2_upper) | (related_scores.related_scores[1] < cutoff2_lower)
+        outlier_table = related_scores.filter(pc1_cut | pc2_cut, keep=True)
 
         # Get iterator for number of failing individuals
         outliers = outlier_table.count()
