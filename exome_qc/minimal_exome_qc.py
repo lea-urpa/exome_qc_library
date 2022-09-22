@@ -451,10 +451,10 @@ if __name__ == "__main__":
 
             mt = hl.read_matrix_table(samples_qcd_fn)
             logging.info("Number of samples where failing_sample_qc is defined (True) or not (False)")
-            logging.info(mt.aggregate(hl.agg.counter(hl.is_defined(mt.failing_samples_qc))))
+            logging.info(mt.aggregate_cols(hl.agg.counter(hl.is_defined(mt.failing_samples_qc))))
             logging.info("Number of samples where length failing_samples_qc == 0 (True) or not (False)")
-            logging.info(mt.aggregate(hl.agg.counter(hl.len(mt.failing_samples_qc) == 0)))
-            
+            logging.info(mt.aggregate_cols(hl.agg.counter(hl.len(mt.failing_samples_qc) == 0)))
+
             ###########################
             # LD prune and checkpoint #
             ###########################
