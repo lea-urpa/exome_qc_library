@@ -183,6 +183,12 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
         mt_count = mt_unrelated.count()
         logging.info(f"Count of samples and variants for matrix table PCA is calculated on: {mt_count}")
         eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_unrelated.GT, k=2)
+        logging.info("Loadings description:")
+        logging.info(loadings.describe())
+        logging.info("Score description:")
+        logging.info(scores.describe())
+        logging.info("Eigenvalues description:")
+        logging.info(eigenvalues.describe())
 
         # Project PCs to related individuals
         logging.info("Projecting principal components to related individuals for population outlier detection.")

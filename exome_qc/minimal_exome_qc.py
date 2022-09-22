@@ -457,6 +457,11 @@ if __name__ == "__main__":
                 args.force = True
                 logging.info("Filtering out failing entries, samples, and variants for population outlier analysis.")
                 # Filter failing samples, variants, and genotypes
+                logging.info("Number of samples where failing_sample_qc is defined (True) or not (False)")
+                logging.info(mt.aggregate(hl.agg.counter(hl.is_defined(mt.failing_samples_qc))))
+                logging.info("Number of samples where length failing_samples_qc == 0 (True) or not (False)")
+                logging.info(mt.aggregate(hl.agg.counter(hl.len(mt.failing_samples_qc) == 0)))
+
                 mt_gt_filt = sq.filter_failing(
                     mt, ld_pruned_annot, prefix='low_pass', entries=True, variants=True, samples=True,
                     unfilter_entries=True,
