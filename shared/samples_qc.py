@@ -182,13 +182,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
         # Calculate pcs
         mt_count = mt_unrelated.count()
         logging.info(f"Count of samples and variants for matrix table PCA is calculated on: {mt_count}")
-        eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_unrelated.GT, k=2)
-        logging.info("Loadings description:")
-        logging.info(loadings.describe())
-        logging.info("Score description:")
-        logging.info(scores.describe())
-        logging.info("Eigenvalues description:")
-        logging.info(eigenvalues.describe())
+        eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt_unrelated.GT, k=2, loadings=True)
 
         # Project PCs to related individuals
         logging.info("Projecting principal components to related individuals for population outlier detection.")
@@ -217,7 +211,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
                     label_dict = {i: related_scores[i] for i in pca_annotations}
 
                     output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
-                    p = hl.plot.scatter(related_scores.related_scores[0], related_scores.related_scores[1],
+                    p = hl.plot.scatter(related_scores.scores[0], related_scores.scores[1],
                                         label=label_dict, title=f"PCA plot round {round_num}", collect_all=collect_all)
                     save(p)
                 except Exception as e:
@@ -226,7 +220,7 @@ def find_pop_outliers(mt, checkpoint_name, pop_sd_threshold=4, plots=True, max_i
                                   f"labels")
                     logging.error(e)
                     output_file(f"{datestr}_find_population_outliers_pcsplots_round{round_num}.html")
-                    p = hl.plot.scatter(related_scores.related_scores[0], related_scores.related_scores[1],
+                    p = hl.plot.scatter(related_scores.scores[0], related_scores.scores[1],
                                         title=f"PCA plot round {round_num}",
                                         collect_all=collect_all)
                     save(p)
