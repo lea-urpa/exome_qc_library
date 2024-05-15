@@ -72,7 +72,7 @@ def check_regions(cluster_region, file_url):
 
 def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=False,
               reference_genome="GRCh38", force_bgz=False, force_load=False, call_fields="PGT", save_row_annots=False,
-              chrom_split=False):
+              chrom_split=False, sample_vcfs=False):
     # Get combined mt output name
     if test:
         test_str = "_test"
@@ -90,6 +90,21 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
         recode = {f"{i}": f"chr{i}" for i in (list(range(1, 23)) + ['X', 'Y'])}
     else:
         recode = None
+
+    # If sample_vcfs flag, read gcloud bucket to get filenames
+    if sample_vcfs:
+        vcf_files_tmp = []
+        for vcf_file in vcf_files:
+            if sample_vcfs:
+                read_cmd = f"gsutil ls {os.path.join(data_dir, vcf_file)}"
+                file_list = subprocess.check_output(shlex.split(read_cmd))
+
+                file_list_clean = str(file_list).replace("\\t", "").split("\\n")
+                file_list_clean = [x.replace("b'", "") for x in file_list_clean if x != "'"]
+
+                vcf_files_tmp.extend(file_list_clean)
+
+        vcf_files = vcf_files_tmp
 
     counter = 1
     for vcf in vcf_files:

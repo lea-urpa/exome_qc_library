@@ -14,7 +14,13 @@ import hail as hl
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--vcf", default=None, help="File name of vcf datasets, comma sep if more than one.")
+    parser.add_argument(
+        "--vcf", default=None,
+        help="File name of vcf datasets, comma sep if more than one. NOTE: wildcard input only works with VCF files "
+             "with identical sample IDs, split by variants, unless you add --sample_vcfs flag.")
+    parser.argument(
+        "--sample_vcfs", action="store_true",
+        help="Indicates wildcard in --vcf shows sample files, with each VCF containing one sample ID.")
     parser.add_argument("--data_dir", default="", type=str, help="Directory/folder of VCF file(s).")
     parser.add_argument("--out_dir", type=str, help="Output directory for merged and QCd data.")
     parser.add_argument("--log_dir", type=str, help="Output directory for logs.")
@@ -99,7 +105,7 @@ if __name__ == "__main__":
     if (not utils.check_exists(combined_mt_fn)) or args.force:
         mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
                              chr_prefix=args.chr_prefix, reference_genome=args.reference_genome, force_bgz=args.force_bgz,
-                             call_fields=args.call_fields, save_row_annots=True)
+                             call_fields=args.call_fields, save_row_annots=True, sample_vcfs=args.sample_vcfs)
 
         logging.info(f"Writing checkpoint after importing and merging VCFs")
         mt = mt.checkpoint(combined_mt_fn, overwrite=True)
