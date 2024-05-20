@@ -148,7 +148,7 @@ def load_vcfs(vcf_files, data_dir, out_dir, combined_mt_fn, force=False, test=Fa
     # Load VCFs #
     #############
     counter = 1
-    row_tmp_fn = os.path.join(out_dir, f"/tmp/{combied_mt_fn.replace('.mt/','')}_rows.ht/")
+    row_tmp_fn = os.path.join(out_dir, f"/tmp/{combined_mt_fn.replace('.mt/','')}_rows.ht/")
     for vcf in vcf_files:
         #############################################################################################
         # If MT does not already exist, load in VCF and then write it to disk as a single-sample MT #
