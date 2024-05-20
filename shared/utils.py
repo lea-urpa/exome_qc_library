@@ -154,9 +154,11 @@ def load_vcfs(vcf_files, data_dir, out_dir, combined_mt_fn, force=False, test=Fa
         # If MT does not already exist, load in VCF and then write it to disk as a single-sample MT #
         #############################################################################################
         vcf_name = os.path.join(data_dir, vcf)
+        info.debug(f"vcf_name: {vcf_name}")
 
         vcf_stem = vcf.replace("/","").replace(".vcf", "").replace(".gz", "").replace(".bgz", "").replace("*", "")
         mt_name = os.path.join(out_dir, vcf_stem + f"{test_str}.mt/")
+        info.debug(f"output MT name: {mt_name}")
 
         if (not check_exists(mt_name)) or force:
             logging.info(f'Detected {mt_name} does not exist, importing vcf.')
