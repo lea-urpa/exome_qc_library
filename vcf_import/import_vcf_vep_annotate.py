@@ -3,7 +3,7 @@ Script to import VCF file to Hail format, VEP annotate the dataset, and then sav
 
 Author: Lea Urpa, August 2020
 """
-
+# TODO mark all temp files with tmp in output name. Mark final output file
 
 if __name__ == "__main__":
     import os
@@ -19,19 +19,25 @@ if __name__ == "__main__":
     # Parse arguments for imput data #
     ##################################
     parser = argparse.ArgumentParser()
-    parser.add_argument("--vcf", type=str, required=True,
-                        help="Name of VCF file (or files) to import, comma separated if > 1 file.")
+    parser.add_argument(
+        "--vcf", type=str, required=True,
+        help="File name of vcf datasets, comma sep if more than one. NOTE: wildcard input only works with VCF files "
+             "with identical sample IDs, split by variants, unless you add --sample_split flag.")
+    parser.argument(
+        "--sample_split", action="store_true",
+        help="Indicates wildcard in --vcf shows sample files, with each VCF containing one sample ID.")
     parser.add_argument("--out_file", type=str, help="Name of matrix table to output.")
     parser.add_argument("--region", default="europe-west1", help="Name of region for checking dataproc in correct region.")
     parser.add_argument("--project", required=True, help="Project name for requester pays config.")
     parser.add_argument("--log_dir", type=str, required=True, help="Location where logs should be written to.")
+    parser.add_argument("--log_debug", action=store_true, help="Print debugging information?")
     parser.add_argument("--data_dir", type=str, required=True, help="Location where VCFs to import exist.")
     parser.add_argument("--out_dir", type=str, required=True, help="Location to write combined + vep annotated mt")
     parser.add_argument("--reference_genome", default='GRCh37', choices=['GRCh37', 'GRCh38'],
                         help="Reference genome build.")
     parser.add_argument("--chr_prefix", action='store_true', help="Chromosomes are of form 'chr1', NOT '1' etc.")
     parser.add_argument("--force_bgz", action='store_true', help="Force blog gzip import?")
-    parser.add_argument("--force_load", action='store_true', help="Force loading of gzipped vcf? ")
+    parser.add_argument("--force_load", action='store_true', help="Force loading of gzipped vcf?")
     parser.add_argument("--call_fields", default="PGT", help="Name of genotype call field in VCF, default PGT.")
     parser.add_argument("--test", action='store_true', help="Filters data to just chr 22 for testing purposes.")
     parser.add_argument("--force", action='store_true', help="Force re-run of all steps?")
@@ -69,7 +75,10 @@ if __name__ == "__main__":
 
     # Add file handler
     fh = logging.FileHandler(log_file)
-    fh.setLevel(logging.INFO)
+    if args.log_debug:
+        fh.setLevel(logging.DEBUG)
+    else:
+        fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     root.addHandler(fh)
 
@@ -110,11 +119,10 @@ if __name__ == "__main__":
     combined_mt_fn = out_basename + f"_combined{test_str}.mt/"
 
     if (not utils.check_exists(combined_mt_fn)) or args.force:
-        mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, force=args.force, test=args.test,
+        mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, combined_mt_fn, force=args.force, test=args.test,
                              chr_prefix=args.chr_prefix, reference_genome=args.reference_genome, force_bgz=args.force_bgz,
-                             call_fields=args.call_fields, force_load=args.force_load)
+                             call_fields=args.call_fields, force_load=args.force_load, sample_split=args.sample_vcfs)
 
-        mt = mt.checkpoint(combined_mt_fn, overwrite=True)
     else:
         mt = hl.read_matrix_table(combined_mt_fn)
 

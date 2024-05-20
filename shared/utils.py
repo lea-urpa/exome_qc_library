@@ -70,9 +70,42 @@ def check_regions(cluster_region, file_url):
         exit()
 
 
-def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=False,
+def load_vcfs(vcf_files, data_dir, out_dir, combined_mt_fn, force=False, test=False, chr_prefix=False,
               reference_genome="GRCh38", force_bgz=False, force_load=False, call_fields="PGT", save_row_annots=False,
-              chrom_split=False, sample_vcfs=False):
+              chrom_split=False, sample_split=False):
+    """
+    Given a list of VCF files, imports and combines them into a single matrix table.
+    :param vcf_files: list of strings (vcf files names)
+    :param data_dir: string, directory (in the cloud or local) in which the VCF files are located.
+    :param out_dir: string, location to save imported data
+    :param combined_mt_fn: combined matrix table file name
+    :param force: Force re-import even if files exist?
+    :param test: Filter to chr22 for each file when importing?
+    :param chr_prefix: Recodes chromosome prefix (e.g. Chr11) while loading data if mismatching with reference genome.
+    :param reference_genome: either GRCh38 or GRCh37, exactly.
+    :param force_bgz: Force block gzip load
+    :param force_load: Forces loading of standard (non-block) gzipped file. Takes longer!
+    :param call_fields: Call field for VCF file
+    :param save_row_annots: Save variant (row) annotations from multiple input VCFs?
+    :param chrom_split: Is the dataset split by chromosome? Must have exactly same samples in each file.
+    :param sample_split: Are all your VCFs single-sample VCFS? If so, takes wildcard to get list of matching VCF files.
+    """
+    logging.debug(
+        f"Load vcfs parameters:\n"
+        f"vcf_files: {vcf_files}\n"
+        f"data_dir: {data_dir}\n"
+        f"out_dir: {out_dir}\n"
+        f"force reloading vcfs?: {force}\n"
+        f"test: {test}\n"
+        f"Fix chromosome prefixes? {chr_prefix}\n"
+        f"reference genome: {reference_genome}\n"
+        f"force block gzip loading? {force_bgz}\n"
+        f"force load non-block-gzipped (standard gzipped) file?: {force_load}\n"
+        f"call_fields: {call_fields}\n"
+        f"save row annotations? {save_row_annots}\n"
+        f"\n"
+    )
+
     # Get combined mt output name
     if test:
         test_str = "_test"
@@ -82,7 +115,9 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
     logging.info('Importing genotype vcfs.')
     matrix_tables = []
 
-    # Deal with mismatching chromosome codes with reference genome
+    ################################################################
+    # Deal with mismatching chromosome codes with reference genome #
+    ################################################################
     if (chr_prefix is True) and (reference_genome == "GRCh37"):
         recode = {f"chr{i}": f"{i}" for i in (list(range(1, 23)) + ['X', 'Y'])}
 
@@ -91,11 +126,14 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
     else:
         recode = None
 
-    # If sample_vcfs flag, read gcloud bucket to get filenames
-    if sample_vcfs:
+    ############################################################
+    # If sample_split flag, read gcloud bucket to get filenames #
+    ############################################################
+    # Fixes issue with loading VCF files with wildcard requiring same samples in all VCFs
+    if sample_split:
         vcf_files_tmp = []
         for vcf_file in vcf_files:
-            if sample_vcfs:
+            if sample_split:
                 read_cmd = f"gsutil ls {os.path.join(data_dir, vcf_file)}"
                 file_list = subprocess.check_output(shlex.split(read_cmd))
 
@@ -106,17 +144,23 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
 
         vcf_files = vcf_files_tmp
 
+    #############
+    # Load VCFs #
+    #############
     counter = 1
+    row_tmp_fn = os.path.join(out_dir, f"/tmp/{combied_mt_fn.replace('.mt/','')}_rows.ht/")
     for vcf in vcf_files:
-        # Write MT first, then read it from disk #
+        #############################################################################################
+        # If MT does not already exist, load in VCF and then write it to disk as a single-sample MT #
+        #############################################################################################
         vcf_name = os.path.join(data_dir, vcf)
 
         vcf_stem = vcf.replace("/","").replace(".vcf", "").replace(".gz", "").replace(".bgz", "").replace("*", "")
         mt_name = os.path.join(out_dir, vcf_stem + f"{test_str}.mt/")
 
-        # If MT does not already exist, load in VCF and then write it to disk
         if (not check_exists(mt_name)) or force:
             logging.info(f'Detected {mt_name} does not exist, importing vcf.')
+            # Recode chromosomes/contigs if needed
             if recode is None:
                 mt_tmp = hl.import_vcf(
                     vcf_name, force_bgz=force_bgz, call_fields=call_fields,
@@ -126,6 +170,7 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
                     vcf_name, force_bgz=force_bgz, call_fields=call_fields,
                     reference_genome=reference_genome, contig_recoding=recode, force=force_load)
 
+            # Filter to chr22 only if test flag given
             if test:
                 logging.info('Test flag given, filtering to chrom 22.')
                 if reference_genome == "GRCh38":
@@ -140,22 +185,28 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
             logging.info(f"Detected mt of input vcf {vcf} already exists, reading mt directly.")
             mt_tmp = hl.read_matrix_table(mt_name)
 
+        # Annotate matrix table with input file name
         mt_tmp = mt_tmp.annotate_cols(input_file=vcf)
         logging.info('%s imported count: %s' % (vcf, mt_tmp.count()))
 
-        # Union to main matrix table
+        #################################################
+        # Combine VCF with main matrix table with union #
+        #################################################
         if counter == 1:
+            counter += 1
             if save_row_annots:
                 row_info = mt_tmp.rows()
+                row_info = row_info.checkpoint(row_tmp_fn, overwrite=True)
 
             mt = mt_tmp
-            counter += 1
+
         else:
+            counter += 1
             if save_row_annots:
                 row_tmp = mt_tmp.rows()
                 row_info = row_info.join(row_tmp, how="left")
+                row_info = row_info.checkpoint(row_tmp_fn, overwrite=True)
 
-            counter += 1
             if chrom_split:
                 mt = mt.union_rows(mt_tmp)
             else:
@@ -164,6 +215,9 @@ def load_vcfs(vcf_files, data_dir, out_dir, force=False, test=False, chr_prefix=
         # Annotate matrix table with row info from all the separate VCFs
         if save_row_annots and (len(vcf_files) > 1):
             mt = mt.annotate_rows(**row_info.index(mt.row_key))
+
+        # Checkpoint to avoid running out of memory
+        mt = mt.checkpoint(combined_mt_fn, overwrite=True)
 
     return mt
 
