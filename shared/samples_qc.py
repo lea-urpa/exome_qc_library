@@ -764,10 +764,10 @@ def king_relatedness(mt, checkpoint_name, kinship_threshold=0.0883, pheno_col=No
     connection_plot_fn = basename.rstrip("/").replace(".mt", "") + f"_{datestr}_num_connections_per_individual_hist.html"
 
     var_count = mt.count_rows()
-    if var_count < 10000:
-        logging.warning("Warning! Number of variants to calculate kinship is less than 10 000, it is likely that "
+    if var_count < 80000:
+        logging.warning("Warning! Number of variants to calculate kinship is less than 80 000, it is likely that "
                         "kinship calculations will be incorrect (more relatedness than reality). Number of variants "
-                        f"left after removing sex chromosomes: {var_count}.")
+                        f"left after removing sex chromosomes: {var_count}. Consider increasing MAF threshold.")
 
     #####################
     # Calculate kinship #
