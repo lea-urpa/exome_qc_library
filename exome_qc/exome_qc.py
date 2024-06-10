@@ -227,13 +227,16 @@ if __name__ == "__main__":
             )
 
             mt_filtered = mt.filter_rows(hl.len(mt.low_pass_failing_variant_qc) == 0)
+            logging.debug(f"Number of variants in low-pass QCd matrix table: {mt_filtered.count_rows()}")
 
             # Filter out low MAF variants
             if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
                 mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, "low_pass_variant_qc")
                 mt_maffilt = mt_maffilt.checkpoint(ld_pruned_maffilt, overwrite=True)
+                logging.debug(f"Number of variants in MAF filtered {args.ind_maf} matrix table: {mt_maffilt.count_rows()}")
             else:
                 mt_maffilt = hl.read_matrix_table(ld_pruned_maffilt)
+                logging.debug(f"Number of variants in MAF filtered {args.ind_maf} matrix table: {mt_maffilt.count_rows()}")
 
             # LD prune if row count >80k
             mt_ldpruned = vq.downsample_variants(
