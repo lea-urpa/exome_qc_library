@@ -25,6 +25,7 @@ def parse_arguments(arguments):
                         default="GRCh38")
     params.add_argument("--test", action='store_true', help="run test with just chrom 22?")
     params.add_argument('--pc_num', default=10, type=int, help="Number of PCs to calculate.")
+    parser.add_argument("--log_debug", action="store_true", help="Print debugging information?")
     params.add_argument('--verbosity', type=int, default=1,
                         help='Verbosity? Does counts, takes extra time for processing. 0 is least verbose.')
     params.add_argument('--cluster_name', type=str, help='Name of cluster for scaling in pipeline.')

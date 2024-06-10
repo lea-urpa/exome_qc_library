@@ -37,7 +37,10 @@ if __name__ == "__main__":
 
     # Add file handler
     fh = logging.FileHandler(args.log_file)
-    fh.setLevel(logging.INFO)
+    if args.log_debug:
+        fh.setLevel(logging.DEBUG)
+    else:
+        fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     root.addHandler(fh)
 
@@ -237,9 +240,11 @@ if __name__ == "__main__":
                 mt_maffilt, 80000, ld_pruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
 
             logging.info(f"Writing checkpoint {stepcount}-1: LD pruned dataset")
+            logging.debug(f"Count of variants in downsampled matrix table: {mt_ldpruned.count_rows()}")
             mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
         else:
             logging.info("Detected LD pruned dataset written, loading that.")
+            logging.debug(f"Count of variants in downsampled matrix table: {mt_ldpruned.count_rows()}")
             mt_ldpruned = hl.read_matrix_table(ld_pruned)
 
         ## Calculate relatedness with King ##
