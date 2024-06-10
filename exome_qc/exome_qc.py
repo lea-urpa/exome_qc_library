@@ -217,6 +217,8 @@ if __name__ == "__main__":
 
         ## LD prune and checkpoint ##
         if (not utils.check_exists(ld_pruned)) or args.force:
+            logging.debug(f"MAF distribution for variants, before MAF filtering and before filtering failing variants:"
+                          f" {mt.low_pass_variant_qc.AF[1].summarize()}")
 
             # Filter failing samples, variants, and genotypes
             mt_gt_filt = sq.filter_failing(
@@ -228,7 +230,8 @@ if __name__ == "__main__":
 
             mt_filtered = mt.filter_rows(hl.len(mt.low_pass_failing_variant_qc) == 0)
             logging.debug(f"Number of variants in low-pass QCd matrix table: {mt_filtered.count_rows()}")
-            logging.debug(f"MAF distribution for variants: {mt_filtered.low_pass_variant_qc.AF[1].summarize()}")
+            logging.debug(f"MAF distribution for variants, before MAF filtering but after filtering failing variants:"
+                          f" {mt_filtered.low_pass_variant_qc.AF[1].summarize()}")
 
             # Filter out low MAF variants
             if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
