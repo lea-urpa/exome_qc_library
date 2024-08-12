@@ -12,10 +12,10 @@ library to the cloud as well.
 
 # Import VCF and VEP annotate
 `import_vcf_vep_annotate.py` takes one or more VCF files, imports them to Hail matrix table format, combines them, and 
-then runs Variant Effect Predictor (VEP) annotation on the files. **Note**: this assumes your VCF files are 
-not/no longer split by chromosome, as
-it combines the VCF files sample-wise. It's (usually) trivial to combine VCFs split by chromosome with
-[bcftools concat](http://www.htslib.org/doc/bcftools.html#concat) first.
+then runs Variant Effect Predictor (VEP) annotation on the files.
+**Update**: you can now give wild card to the --vcf argument, which indicates that the files are split by chromosome e.g.
+`--vcf my_vcf_chr*.vcf.gz`. If the wild card indicates VCF files that have *nonidentical* sample names, e.g. 
+different cohorts, add the flag `--sample_split` to import and merge these vcfs.
 
 To submit the script to a Google Cloud dataproc cluster, use `hailctl dataproc submit` 
 ([more info](https://hail.is/docs/0.2/cloud/google_cloud.html).) 
