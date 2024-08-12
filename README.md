@@ -31,17 +31,29 @@ in the bucket for the script to find the helper functions.
 
 ```
 # Start Hail cluster
-hailctl dataproc start vep-test --vep GRCh37
+hailctl dataproc start vep-test --vep GRCh37 --max-idle 10m --requester-pays-allow-buckets hail-eu-vep
+# Optionally, add secondary workers to make it faster: --num-secondary-workers 50
+```
+`--requester-pays-allow-buckets hail-eu-vep` is required to access VEP resources stored by the Hail team. Access costs
+are usually not significant, *if you choose a bucket in the same region as your data*. `--max-idle 10m` automatically
+shuts down your cluster after 10 minutes if the job fails- useful if you are running a large cluster overnight, for
+example. `--num-secondary-workers` adds secondary workers to get the VEP step done faster.
 
+```
 # Submit script
-hailctl dataproc submit vep-test \
-/local/path/exome_qc_library/import_vcf_vep_annotate.py \
+gcloud dataproc jobs submit pyspark \
+/local/path/exome_qc_library/vcf_import/import_vcf_vep_annotate.py \
+--cluster vep-test \
+--py-files /local/path/exome_qc_library/shared/utils.py \
+-- \
 --vcf sampleset_1.vcf.gz,sampleset_2.vcf.gz \
 --out_file combined_samples_vep_annotated \
---scripts_dir gs://my-bucket/exome_qc_library \
 --log_dir gs://my-bucket/logs/ \
 --data_dir gs://my_bucket/input_vcfs/ \
---force_bgz --test
+--out_dir gs://my_bucket/output/ \
+--reference_genome GRCh38 \
+--force_bgz --test \
+--project my_project
 ```
 
 # Exome sequencing data QC
