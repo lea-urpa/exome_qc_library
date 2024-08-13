@@ -52,9 +52,31 @@ gcloud dataproc jobs submit pyspark \
 --data_dir gs://my_bucket/input_vcfs/ \
 --out_dir gs://my_bucket/output/ \
 --reference_genome GRCh38 \
---force_bgz --test \
 --project my_project
 ```
+
+This script uses pyspark to submit a python job to the dataproc cluster
+(see [this link](https://medium.com/@saiteja71690/google-cloud-dataproc-a-beginners-guide-part-3-different-ways-to-submit-pyspark-job-9a1d8e0cb072) 
+for more information). The flag `--cluster` indicates the name of the cluster to submit the job to (same name as in 
+the code to start the cluster above) and `--py-files` indicates the path of dependency files that the 
+`import_vcf_vep_annotate.py` script needs to run. Note: you'll need to supply the local path of these files in the 
+location you cloned this repository to on your computer. 
+
+
+The `hailctl` command `hailctl dataproc submit` is a wrapper for `gcloud dataproc jobs submit pyspark`, but I've given
+the gcloud command here since one can add additional flags not supported by the `hailctl dataproc submit` command.
+
+
+The `--` indicates to gcloud that the following flags are for the `import_vcf_vep_annotate.py` script, not gcloud itself.
+
+ - `--vcf` should be the name of the VCF file you want to import, *without path information*. You can include a wildcard, for example to upload many files separated by chromosome (see above).
+ - `--out_file` is the name of the output matrix table.
+ - `--log_dir` is the directory to save log files
+ - `--data_dir` is the path/directory that the VCF file(s) are in.
+ - `--out_dir` is the directory to save the output matrix table.
+ - `--reference_genome` gives the reference genome of the VCF input files.
+ - `--project` is teh google cloud project that the dataproc cluster has been created in.
+
 
 # Exome sequencing data QC
 
