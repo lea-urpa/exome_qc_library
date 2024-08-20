@@ -172,6 +172,8 @@ def load_vcfs(vcf_files, data_dir, out_dir, combined_mt_fn, force=False, test=Fa
                     vcf_name, force_bgz=force_bgz, call_fields=call_fields,
                     reference_genome=reference_genome, contig_recoding=recode, force=force_load)
 
+            logging.debug(f"Imported matrix table count: {mt_tmp.count()}")
+
             # Filter to chr22 only if test flag given
             if test:
                 logging.info('Test flag given, filtering to chrom 22.')
