@@ -70,15 +70,16 @@ if __name__ == "__main__":
     log_file = 'import_vep_annotate-' + timestr + '.txt'
 
     root = logging.getLogger()  # creates logger
-    root.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
     # Add file handler
     fh = logging.FileHandler(log_file)
     if args.log_debug:
         fh.setLevel(logging.DEBUG)
+        root.setLevel(logging.DEBUG)
     else:
         fh.setLevel(logging.INFO)
+        root.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     root.addHandler(fh)
 
