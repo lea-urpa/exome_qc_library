@@ -175,7 +175,7 @@ def load_vcfs(vcf_files, data_dir, out_dir, combined_mt_fn, force=False, test=Fa
             logging.debug(f"Imported matrix table count: {mt_tmp.count()}")
 
             # Filter to chr22 only if test flag given
-            if test:
+            if test and not chrom_split:
                 logging.info('Test flag given, filtering to chrom 22.')
                 if reference_genome == "GRCh38":
                     chrom_code = "chr22"
@@ -192,6 +192,7 @@ def load_vcfs(vcf_files, data_dir, out_dir, combined_mt_fn, force=False, test=Fa
         # Annotate matrix table with input file name
         mt_tmp = mt_tmp.annotate_cols(input_file=vcf)
         logging.info('%s imported count: %s' % (vcf, mt_tmp.count()))
+        logging.debug(f"mt_tmp name: {mt_tmp}")
 
         #################################################
         # Combine VCF with main matrix table with union #
@@ -220,8 +221,8 @@ def load_vcfs(vcf_files, data_dir, out_dir, combined_mt_fn, force=False, test=Fa
         if save_row_annots and (len(vcf_files) > 1):
             mt = mt.annotate_rows(**row_info.index(mt.row_key))
 
-        # Checkpoint to avoid running out of memory
-        mt = mt.checkpoint(combined_mt_fn, overwrite=True)
+    # Checkpoint to avoid running out of memory
+    mt = mt.checkpoint(combined_mt_fn, overwrite=True)
 
     return mt
 

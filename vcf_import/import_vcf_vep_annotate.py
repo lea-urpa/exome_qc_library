@@ -25,7 +25,11 @@ if __name__ == "__main__":
              "with identical sample IDs, split by variants, unless you add --sample_split flag.")
     parser.add_argument(
         "--sample_split", action="store_true",
-        help="Indicates wildcard in --vcf shows sample files, with each VCF containing one sample ID.")
+        help="Indicates wildcard in --vcf  or list of files in --vcf shows sample files,"
+             " with each VCF containing one sample ID.")
+    parser.add_argument("--chrom_split", action="store_true",
+                        help="Indicates list of files in --vcf shows files split by chromosome. "
+                             "Unneeded if input contains wildcard.")
     parser.add_argument("--out_file", type=str, help="Name of matrix table to output.")
     parser.add_argument("--region", default="europe-west1", help="Name of region for checking dataproc in correct region.")
     parser.add_argument("--project", required=True, help="Project name for requester pays config.")
@@ -122,7 +126,8 @@ if __name__ == "__main__":
     if (not utils.check_exists(combined_mt_fn)) or args.force:
         mt = utils.load_vcfs(vcf_files, args.data_dir, args.out_dir, combined_mt_fn, force=args.force, test=args.test,
                              chr_prefix=args.chr_prefix, reference_genome=args.reference_genome, force_bgz=args.force_bgz,
-                             call_fields=args.call_fields, force_load=args.force_load, sample_split=args.sample_split)
+                             call_fields=args.call_fields, force_load=args.force_load, sample_split=args.sample_split,
+                             chrom_split=args.chrom_split)
 
     else:
         mt = hl.read_matrix_table(combined_mt_fn)
