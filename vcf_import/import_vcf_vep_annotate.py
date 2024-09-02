@@ -33,6 +33,9 @@ if __name__ == "__main__":
     parser.add_argument("--out_file", type=str, help="Name of matrix table to output.")
     parser.add_argument("--region", default="europe-west1", help="Name of region for checking dataproc in correct region.")
     parser.add_argument("--project", required=True, help="Project name for requester pays config.")
+    parser.add_argument("--vep_bucket", default="hail-europe-west1-vep", help="Bucket containing Hail vep config.")
+    parser.add_argument("--vep_config", default="gs:",
+                        help="Config file for initiating VEP.")
     parser.add_argument("--log_dir", type=str, required=True, help="Location where logs should be written to.")
     parser.add_argument("--log_debug", action="store_true", help="Print debugging information?")
     parser.add_argument("--data_dir", type=str, required=True, help="Location where VCFs to import exist.")
@@ -49,14 +52,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if 'europe' in args.region:
-        vep_bucket = "hail-eu-vep"
-        args.vep_config = "gs://hail-eu-vep/vep95-GRCh38-loftee-gcloud.json"
-    elif 'us' in args.region:
-        vep_bucket = "hail-us-vep"
-        args.vep_config = "gs://hail-us-vep/vep95-GRCh38-loftee-gcloud.json"
-    else:
-        logging.error("Error- region not in Europe or US. Are you sure you want to VEP annotate with files from "
+    vep_bucket = args.vep_bucket
+    args.vep_config = args.vep_config
+
+    if (('europe' in args.region) and not("europe" in args.vep_bucket)) or \
+            (('us' in arg.region) and not ('us' in args.vep_bucket)):
+        logging.error("Error- your region settings and the VEP bucket are different. "
+                      "Are you sure you want to VEP annotate with files from "
                       "another region? Network egress charges add up VERY quickly. Exiting.")
         exit()
 
