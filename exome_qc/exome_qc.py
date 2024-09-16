@@ -78,6 +78,7 @@ if __name__ == "__main__":
         mt.annotate_globals(original_mt_input={'file': args.mt, 'date': datestr})
 
         utils.check_vep(mt)
+        utils.check_entry(mt)
 
         if args.test:
             utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)

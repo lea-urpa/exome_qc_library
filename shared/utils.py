@@ -400,6 +400,14 @@ def check_vep(mt):
         exit()
 
 
+def check_entry(mt):
+    entry_struct = mt.entry.dtype
+
+    if not all(field in entry_struct for field in ["GQ", "GT", "PL", "DP", "AD"]):
+        logging.error("Error! Input matrix table must have the following entry fields: GQ, GT, PL, DP, AD.")
+        exit()
+
+
 def check_multi_split(mt):
     try:
         test = hl.is_defined(mt.was_split)
