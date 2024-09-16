@@ -392,18 +392,13 @@ def tmp_bash(cmd, check=False):
 
 
 def check_vep(mt):
-    try:
-        test = hl.is_defined(mt.vep)
-    except Exception as e:
+    if not "vep" in mt.row.dtype:
         logging.error("Error! Input matrix table has not been VEP annotated!")
-        logging.error(e)
         exit()
 
 
 def check_entry(mt):
-    entry_struct = mt.entry.dtype
-
-    if not all(field in entry_struct for field in ["GQ", "GT", "PL", "DP", "AD"]):
+    if not all(field in mt.entry.dtype for field in ["GQ", "GT", "PL", "DP", "AD"]):
         logging.error("Error! Input matrix table must have the following entry fields: GQ, GT, PL, DP, AD.")
         exit()
 
