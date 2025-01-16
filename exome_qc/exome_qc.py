@@ -147,7 +147,7 @@ def plot_variant_stats(mt, qc_type):
     save(p1)
 
 
-def filter_failing_variants_and_genotypes(mt, args, checkpoint_name, qc_type):
+def filter_failing_variants_and_genotypes(mt, args, checkpoint_name, qc_type, unfilter_entries, keep_hwe):
     """Filters failing variants and genotypes, and filters out low MAF variants."""
     if not utils.check_exists(checkpoint_name) or args.force:
         logging.info(f"Filtering out failing variants and genotypes.")
@@ -158,8 +158,9 @@ def filter_failing_variants_and_genotypes(mt, args, checkpoint_name, qc_type):
             entries=True,
             variants=True,
             samples=False,
-            unfilter_entries=True,
+            unfilter_entries=unfilter_entries,
             pheno_qc=False,
+            keep_hwe=keep_hwe,
             min_dp=args.min_dp,
             min_gq=args.min_gq,
             max_het_ref_reads=args.max_het_ref_reads,
@@ -229,7 +230,14 @@ def calculate_relatedness(mt, args, qc_type):
         filtered_failing_path = os.path.join(args.out_dir, "filtered_variants.mt")
         maf_filtered_path = os.path.join(args.out_dir, "maf_filtered.mt")
 
-        mt_downsampled = filter_failing_variants_and_genotypes(mt, args, filtered_failing_path, qc_type)
+        mt_downsampled = filter_failing_variants_and_genotypes(
+            mt,
+            args,
+            checkpoint_name=filtered_failing_path,
+            qc_type=qc_type,
+            unfilter_entries= True,
+            keep_hwe=False
+        )
         mt_downsampled = filter_maf(mt_downsampled, args, maf_filtered_path, qc_type)
         mt_downsampled = downsample(mt_downsampled, args, downsampled_path)
         mt_downsampled = filter_to_autosomes(mt_downsampled, args)
@@ -295,6 +303,54 @@ def find_population_outliers(mt, mt_downsampled, args):
     return mt, mt_downsampled
 
 
+def annotate_variants(mt, args):
+    """Adds custom variant annotations from VEP."""
+    annotated_path = os.path.join(args.out_dir, "variants_annotated.mt")
+
+    if not utils.check_exists(annotated_path) or args.force:
+        logging.info("Adding custom annotations to variants.")
+        mt = va.annotate_variants(mt)
+        mt = mt.checkpoint(annotated_path, overwrite=True)
+    else:
+        mt = hl.read_matrix_table(annotated_path)
+
+    return mt
+
+
+def impute_sex(mt, args, qc_type):
+    """Imputes sex of variants."""
+    sex_imputed_path = os.path.join(args.out_dir, "sex_imputed.mt")
+    filtered_failing_keephwe_path = os.path.join(args.out_dir, "filtered_variants_keephwe_failing.mt")
+
+    if not utils.check_exists(sex_imputed_path) or args.force:
+        logging.info("Imputing sex and calculating sex-aware sample annotations.")
+        mt_filtered = filter_failing_variants_and_genotypes(
+            mt,
+            args,
+            checkpoint_name=filtered_failing_keephwe_path,
+            qc_type=qc_type,
+            unfilter_entries=False,
+            keep_hwe=True
+        )
+
+        imputed_sex = sq.impute_sex_plot(
+            mt_filtered,
+            female_threshold=args.female_threshold,
+            male_threshold=args.male_threshold
+        )
+
+        mt_filtered = mt_filtered.annotate_cols(is_female_imputed=imputed_sex[mt_filtered.s].is_female)
+        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female, f_stat=imputed_sex[mt.s].f_stat)
+
+        mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
+        mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
+
+        mt = mt.checkpoint(sex_imputed_path, overwrite=True)
+    else:
+        mt = hl.read_matrix_table(sex_imputed_path)
+
+    return mt
+
 
 def main():
     hl.init()
@@ -306,8 +362,12 @@ def main():
     mt = load_and_annotate_samples(args)
     mt = run_variant_qc(mt, args, "low_pass")
     plot_variant_stats(mt, "low_pass")
+
     mt, mt_downsampled = calculate_relatedness(mt, args, "low_pass")
     mt, mt_downsampled = find_population_outliers(mt, mt_downsampled, args)
+    mt = annotate_variants(mt, args)
+    mt = impute_sex(mt, args, "low_pass")
+
 
     mt = run_samples_qc(mt, args)
 
@@ -325,68 +385,6 @@ if __name__ == "__main__":
 
 
 
-    stepcount += 1
-    sex_imputed = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_sex_imputed{args.test_str}.mt/")
-
-    ####################################
-    # Annotate variants and impute sex #
-    ####################################
-    filtered_nohwe = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_filtered_except_hwe{args.test_str}.mt/")
-    filtered_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_filtered_annotated{args.test_str}.mt/")
-    unfilt_annot = os.path.join(args.out_dir, f"{stepcount}-3_{args.out_name}_annotated_tmp")
-
-    if (not utils.check_exists(sex_imputed)) or args.force:
-        logging.info("Annotating variants and imputing sex")
-        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
-
-        mt = hl.read_matrix_table(pop_outliers_found)
-
-        # Annotate variants
-        mt = va.annotate_variants(mt)
-
-        if (not utils.check_exists(filtered_nohwe)) or args.force:
-            # Filter out failing variants, genotypes, rare variants
-            mt_gt_filt= sq.filter_failing(
-                mt, sex_imputed, prefix='low_pass', variants=False, entries=True, samples=False,
-                unfilter_entries=False, pheno_qc=False, min_dp=args.min_dp,
-                min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
-                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
-            )
-
-            mt_filtered = mt_gt_filt.filter_rows(
-                (mt_gt_filt.low_pass_failing_variant_qc == ["failing_hwe"]) |
-                (hl.len(mt_gt_filt.low_pass_failing_variant_qc) == 0), keep=True
-            )
-
-            mt_filtered = mt_filtered.checkpoint(filtered_nohwe, overwrite=True)
-        else:
-            mt_filtered = hl.read_matrix_table(filtered_nohwe)
-
-        # Impute sex
-        imputed_sex = sq.impute_sex_plot(mt_filtered, female_threshold=args.female_threshold,
-                                         male_threshold=args.male_threshold, aaf_threshold=0.05)
-
-        # Annotate unfiltered + variant/GT filtered mt with imputed sex values
-        mt_filtered = mt_filtered.annotate_cols(is_female_imputed=imputed_sex[mt_filtered.s].is_female)
-        mt = mt.annotate_cols(is_female_imputed=imputed_sex[mt.s].is_female, f_stat=imputed_sex[mt.s].f_stat)
-        mt = mt.annotate_globals(
-            sex_imputation_thresholds={'female_threshold': args.female_threshold,'male_threshold': args.male_threshold})
-
-        # Calculate sex-aware sample annotations with variant filtered mt
-        mt_filtered = sa.sex_aware_sample_annotations(mt_filtered)
-        mt_filtered = mt_filtered.checkpoint(filtered_annot, overwrite=True)
-
-        mt = mt.annotate_cols(sexaware_sample_call_rate=mt_filtered.cols()[mt.s].sexaware_sample_call_rate)
-
-        logging.info(f"Writing checkpoint {stepcount}: variants annotated and sex imputed")
-        mt = mt.checkpoint(sex_imputed, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-    else:
-        logging.info("Detected variant annotation and sex imputation completed, skipping this step.")
-
-    stepcount += 1
-    samples_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_samples_qcd{args.test_str}.mt/")
 
     ##############
     # Samples QC #

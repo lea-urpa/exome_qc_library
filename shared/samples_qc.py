@@ -16,7 +16,7 @@ import pandas as pd
 def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True, variants=True, samples=True,
                    unfilter_entries=False, pheno_qc=False, min_dp=10, min_gq=20, max_het_ref_reads=0.8,
                    min_het_ref_reads=0.2, min_hom_ref_ref_reads=0.9, max_hom_alt_ref_reads=0.1, force=False,
-                   pop_outliers=True):
+                   pop_outliers=True, keep_hwe=False):
     """
     Filters failing samples, variants, and entries from a given matrix table
     :param mt: matrix table to filter
@@ -73,8 +73,15 @@ def filter_failing(mt, checkpoint_name, prefix="", pheno_col=None, entries=True,
     if variants:
         if (not utils.check_exists(checkpoint_name + "_variants_filtered.mt/")) or force:
             force = True
-            mt = mt.filter_rows((hl.len(mt[prefix + 'failing_variant_qc']) == 0) &
-                                hl.is_defined(mt[prefix + "failing_variant_qc"]), keep=True)
+            if keep_hwe:
+                filter_statement = (
+                        (mt[prefix + 'failing_variant_qc'] == ["failing_hwe"]) |
+                        (hl.len(mt[prefix + 'failing_variant_qc']) == 0)
+                )
+            else:
+                filter_statement = (hl.len(mt[prefix + 'failing_variant_qc']) == 0)
+
+            mt = mt.filter_rows(filter_statement, keep=True)
 
             if (pheno_col is not None) and (pheno_qc is True):
                 mt = mt.filter_rows((hl.len(mt.failing_pheno_varqc) == 0) & hl.is_defined(mt.failing_pheno_varqc),
