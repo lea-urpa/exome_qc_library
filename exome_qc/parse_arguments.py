@@ -8,6 +8,7 @@ import subprocess
 import shlex
 import logging
 import utils
+import os
 
 def parse_arguments(arguments):
     # TODO think about how we could make this less... extra
@@ -186,6 +187,16 @@ def parse_arguments(arguments):
     # Format input mt
     if not parsed_args.mt.endswith("/"):
         parsed_args.mt = parsed_args.mt + "/"
+
+    # Add test str
+    if parsed_args.test:
+        parsed_args.test_str = "_test"
+    else:
+        parsed_args.test_str = ""
+
+    # Add subfolder paths
+    parsed_args.checkpoint_folder = os.path.join(parsed_args.out_dir, "tmp/")
+    parsed_args.plot_folder = os.path.join(parsed_args.out_dir, "plots")
 
     return parsed_args
 

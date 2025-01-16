@@ -4,12 +4,9 @@ Script for doing exome sequencing data quality control from a Hail matrix table 
 Author: Lea Urpa, August 2020
 This pipeline is dedicated to Thao and the Get Down Stay Down, whose album A Man Alive was the mojo for writing
 """
-import sys
-import os
 import logging
-import time
+import os
 import hail as hl
-from bokeh.io import output_file, save
 from parse_arguments import parse_arguments, check_inputs
 import utils
 import samples_annotation as sa
@@ -17,66 +14,42 @@ import variant_qc as vq
 import samples_qc as sq
 import variant_annotation as va
 
-if __name__ == "__main__":
-    ###################################################################
-    # Initialize Hail and import scripts, configure logger and inputs #
-    ###################################################################
-    hl.init()
 
-    args = parse_arguments(sys.argv[1:])
-    check_inputs(args)
+def initialize_logger(args):
+    """Initializes and configures the logger."""
+    datestr = time.strftime("%Y.%m.%d")
+    timestr = time.strftime("%Y.%m.%d-%H.%M.%S")
+    args.log_file = f'exome_qc_{timestr}.txt'
 
-    ## Configure logger ##
-    datestr = time.strftime("%Y.%m.%d")  # Used for output folder
-    timestr = time.strftime("%Y.%m.%d-%H.%M.%S")  # Used for output files, for more than one run per day
-    args.log_file = 'exome-qc_' + timestr + '.txt'
-
-    root = logging.getLogger() # creates logger
-    root.setLevel(logging.INFO)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO if not args.log_debug else logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
-    # Add file handler
-    fh = logging.FileHandler(args.log_file)
-    if args.log_debug:
-        fh.setLevel(logging.DEBUG)
-    else:
-        fh.setLevel(logging.INFO)
-    fh.setFormatter(formatter)
-    root.addHandler(fh)
+    file_handler = logging.FileHandler(args.log_file)
+    file_handler.setFormatter(formatter)
+    root.addHandler(file_handler)
 
-    # Add streaming handler
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    root.addHandler(ch)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    root.addHandler(console_handler)
 
-    ## Configure inputs ##
-    args.checkpoint_folder = os.path.join(args.out_dir, "checkpoint_mts/")
-    args.plot_folder = os.path.join(args.out_dir, "plots")
-    stepcount = 1
-    if args.test:
-        args.test_str = "_test"
-    else:
-        args.test_str = ""
 
-    #########################################
-    # Check dataproc cluster vs file inputs #
-    #########################################
-    for file_url in [args.log_dir, args.out_dir, args.mt]:
-        utils.check_regions(args.region, file_url)
+def verify_inputs(args):
+    """Verifies that all input arguments are correct, and that the input file GC bucket matches the dataproc cluster"""
+    for folder in [args.log_dir, args.out_dir, args.mt]:
+        utils.check_regions(args.region, folder)
 
-    ##################################
-    # Load data and annotate samples #
-    ##################################
-    samples_annotated = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_samples_annotated{args.test_str}.mt/")
+    check_inputs(args)
 
-    if (not utils.check_exists(samples_annotated)) or args.force:
 
-        ## Load data ##
+def load_and_annotate_samples(args):
+    """Loads and annotates samples based on input arguments."""
+    checkpoint_path = os.path.join(args.checkpoint_dir, f"samples_annotated.mt")
+
+    if not utils.check_exists(checkpoint_path) or args.force:
         logging.info(f"Loading matrix table: {args.mt}")
         mt = hl.read_matrix_table(args.mt)
-        mt.annotate_globals(original_mt_input={'file': args.mt, 'date': datestr})
-
+        mt.annotate_globals(original_mt_input={'file': args.mt})
         utils.check_vep(mt)
         utils.check_entry(mt)
 
@@ -85,39 +58,100 @@ if __name__ == "__main__":
             mt = utils.create_test_dataset(mt, args.reference_genome, args.mt, args.out_dir)
             utils.remove_secondary(args.cluster_name, args.region)
 
-        ## Annotate samples ##
-        logging.info('Annotating samples.')
+        if args.samples_annotation_files:
+            logging.info('Annotating samples.')
+            for annotation_file in args.samples_annotation_files.split(","):
+                mt = sa.annotate_cols_from_file(
+                    mt,
+                    annotation_file,
+                    args.samples_delim,
+                    args.samples_col,
+                    args.samples_miss
+                )
 
-        # Annotate with optional samples annotation files
-        if args.samples_annotation_files is not None:
-            annotation_files = args.samples_annotation_files.strip().split(",")
+        if args.bam_metadata:
+            mt = sa.annotate_cols_from_file(
+                mt,
+                args.bam_metadata,
+                args.bam_delim,
+                args.bam_sample_col,
+                args.bam_miss
+            )
 
-            for file in annotation_files:
-                mt = sa.annotate_cols_from_file(mt, file, args.samples_delim, args.samples_col, args.samples_miss)
-
-        # Annotate with bam metadata
-        if args.bam_metadata is not None:
-            mt = sa.annotate_cols_from_file(mt, args.bam_metadata, args.bam_delim, args.bam_sample_col, args.bam_miss)
-
-        # Check columns exist
-        for colname in args.sample_cols_check:
-            col = getattr(args, colname)
-            try:
-                test = hl.is_defined(mt[col])
-            except Exception as e:
-                logging.error(f"Error! Given column annotation {col} does not actually exist after inputting sample "
-                              f"annotations.")
-                logging.error(e)
-                exit(1)
-
-        logging.info(f"Writing checkpoint {stepcount}: annotating samples")
-        mt = mt.checkpoint(samples_annotated, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-
+        mt = mt.checkpoint(checkpoint_path, overwrite=True)
     else:
         logging.info("Detected sample-annotated mt exists, skipping samples annotation.")
+        mt = hl.read_matrix_table(checkpoint_path)
 
-    samples_removed = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_samples_removed{args.test_str}.mt/")
+    return mt
+
+
+def verify_annotations(args):
+    """Confirms necessary annotations exist in the data after annotation."""
+    for column_name in args.sample_cols_check:
+        col = getattr(args, column_name)
+        try:
+            test = hl.is_defined(mt[col])
+        except Exception as e:
+            logging.error(f"Error! Given column annotation {col} does not actually exist after inputting sample "
+                          f"annotations.")
+            logging.error(e)
+            exit(1)
+
+def run_variant_qc(mt, args):
+    """Performs variant quality control."""
+    qc_path = os.path.join(args.out_dir, "variant_qc.mt")
+
+    if not utils.check_exists(qc_path) or args.force:
+        mt = vq.variant_quality_control(
+            mt,
+            qc_path,
+            annotation_prefix="low_pass",
+            min_dp=args.min_dp,
+            min_gq=args.min_gq,
+            max_het_ref_reads=args.max_het_ref_reads,
+            min_het_ref_reads=args.min_het_ref_reads,
+            call_rate=args.low_pass_min_call_rate,
+            p_hwe=args.low_pass_p_hwe,
+            snp_qd=args.snp_qd,
+            indel_qd=args.indel_qd,
+            ab_allowed_dev_het=args.ab_allowed_dev_het,
+            count_failing=args.count_failing
+        )
+    else:
+        mt = hl.read_matrix_table(qc_path)
+
+    return mt
+
+
+
+
+
+def main():
+    hl.init()
+
+    args = parse_arguments(sys.argv[1:])
+    initialize_logger(args)
+    verify_inputs(args)
+
+    mt = load_and_annotate_samples(args)
+    mt = run_variant_qc(mt, args)
+    mt = run_samples_qc(mt, args)
+
+    mt.write(os.path.join(args.out_dir, "final_qc.mt"), overwrite=True)
+
+if __name__ == "__main__":
+    main()
+
+
+import sys
+import time
+from bokeh.io import output_file, save
+
+if __name__ == "__main__":
+
+
+
 
     ##################
     # Remove samples #
