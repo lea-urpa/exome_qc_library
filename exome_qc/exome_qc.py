@@ -153,49 +153,7 @@ if __name__ == "__main__":
 
 
 
-    ##################
-    # Remove samples #
-    ##################
-    if (not utils.check_exists(samples_removed) or args.force) and (
-            (args.sample_removal_strings is not None) or (args.sample_removal_list is not None)):
 
-        logging.info("Removing indicated samples.")
-        mt = hl.read_matrix_table(samples_annotated)
-
-        samples_start = mt.count_cols()
-        logging.info(f"Initial sample count: {samples_start}")
-
-        # Filter out samples from arbitrary list uploaded with args
-        if args.sample_removal_list is not None:
-            rm_list = hl.import_table(args.sample_removal_list, no_header=True)
-            rm_list = rm_list.annotate(s=rm_list.f0)
-            rm_list = rm_list.key_by("s")
-            mt = mt.anti_join_cols(rm_list)
-            list_filtered = mt.count_cols()
-            logging.info(f"Sample count after filtering by input list: {list_filtered}")
-
-        # Filter out samples that have sample names containing a particular string
-        if args.sample_removal_strings is not None:
-            removal_strings = args.sample_removal_strings.strip().split(",")
-            for key_string in removal_strings:
-                mt = mt.filter_cols(mt.s.contains(key_string), keep=False)
-            string_filtered = mt.count_cols()
-            logging.info(f"Sample count after filtering by strings: {string_filtered}")
-
-        filtered_count = mt.count_cols()
-
-        if not filtered_count == samples_start:
-            logging.info(f"Writing checkpoint {stepcount}-1: sample removal")
-            mt = mt.checkpoint(samples_removed, overwrite=True)
-            utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-
-            samples_cleaned = samples_removed
-        else:
-            samples_cleaned = samples_annotated
-    else:
-        samples_cleaned = samples_annotated
-
-    stepcount += 1
     low_pass_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_low_pass_qcd{args.test_str}.mt/")
 
     #######################
