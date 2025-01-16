@@ -102,6 +102,18 @@ def verify_annotations(args):
             exit(1)
 
 
+def case_specific_variant_qc(mt, args, qc_type):
+    """Runs case-specific variant QC."""
+    if args.pheno_col is not None:
+        logging.info("Running case-status specific variant QC")
+        mt = vq.find_variants_failing_by_pheno(mt, ab_allowed_dev_het=args.ab_allowed_dev_het,
+                                               pheno_call_rate=args.pheno_call_rate, prefix=qc_type)
+    else:
+        logging.info("Phenotype column not given, skipping filtering variants by phenotype.")
+
+    return mt
+
+
 def run_variant_qc(mt, args, qc_type):
     """Performs variant quality control."""
     qc_path = os.path.join(args.out_dir, f"{qc_type}_variant_qc.mt")
@@ -109,6 +121,14 @@ def run_variant_qc(mt, args, qc_type):
     if not utils.check_exists(qc_path) or args.force:
         logging.info(f"Running {qc_type} variant and genotype QC.")
         utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
+
+        if qc_type == "final":
+            sex_aware_call_rate = True
+            samples_qc = True
+        else:
+            sex_aware_call_rate = False
+            samples_qc = False
+
         mt = vq.variant_quality_control(
             mt,
             qc_path,
@@ -119,15 +139,23 @@ def run_variant_qc(mt, args, qc_type):
             min_het_ref_reads=args.min_het_ref_reads,
             min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
-            call_rate=args.low_pass_min_call_rate,
-            p_hwe=args.low_pass_p_hwe,
+            call_rate=args[f"{qc_type}_min_call_rate"],
+            p_hwe=args[f"{qc_type}_p_hwe"],
             snp_qd=args.snp_qd,
             indel_qd=args.indel_qd,
             ab_allowed_dev_het=args.ab_allowed_dev_het,
             count_failing=args.count_failing,
+            sex_aware_call_rate=sex_aware_call_rate,
             pheno_col=args.pheno_col,
+            samples_qc=samples_qc,
             force=args.force
         )
+
+        if qc_type == "final":
+            mt = case_specific_variant_qc(mt, args, qc_type)
+
+        mt = mt.checkpoint(qc_path, overwrite=True)
+
     else:
         logging.info(f"Detected {qc_type} variant and genotype QC already performed.")
         mt = hl.read_matrix_table(qc_path)
@@ -352,6 +380,48 @@ def impute_sex(mt, args, qc_type):
     return mt
 
 
+def run_samples_qc(mt, args):
+    """Runs quality control on samples."""
+    qc_path = os.path.join(args.out_dir, "samples_qc.mt")
+    filtered_failing_path = os.path.join(args.out_dir, "filtered_variants.mt")
+
+    if not utils.check_exists(qc_path) or args.force:
+        logging.info("Running samples QC.")
+
+        mt_filtered = filter_failing_variants_and_genotypes(
+            mt,
+            args,
+            checkpoint_name=filtered_failing_path,
+            qc_type="low_pass",
+            unfilter_entries=False,
+            keep_hwe=True
+        )
+
+        utils.remove_secondary(args.cluster_name, args.region)
+
+        mt = sq.samples_qc(
+            mt_filtered,
+            mt,
+            qc_path,
+            count_failing=args.count_failing,
+            sample_call_rate=args.sample_call_rate,
+            chimeras_col=args.chimeras_col,
+            chimeras_max=args.chimeras_max,
+            contamination_col=args.contamination_col,
+            contamination_max=args.contamination_max,
+            batch_col_name=args.batch_col_name,
+            sampleqc_sd_threshold=args.sampleqc_sd_threshold,
+            pheno_col=args.pheno_col
+        )
+
+        mt = mt.checkpoint(qc_path, overwrite=False)
+    else:
+        logging.info("Detected samples QC run.")
+        mt = hl.read_matrix_table(qc_path)
+
+    return mt
+
+
 def main():
     hl.init()
 
@@ -368,8 +438,8 @@ def main():
     mt = annotate_variants(mt, args)
     mt = impute_sex(mt, args, "low_pass")
 
-
     mt = run_samples_qc(mt, args)
+    mt = run_variant_qc(mt, args, "final")
 
     mt.write(os.path.join(args.out_dir, "final_qc.mt"), overwrite=True)
     utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
@@ -383,78 +453,6 @@ if __name__ == "__main__":
 if __name__ == "__main__":
 
 
-
-
-
-    ##############
-    # Samples QC #
-    ##############
-    if (not utils.check_exists(samples_qcd)) or args.force:
-        logging.info("Running sample QC")
-        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
-
-        mt = hl.read_matrix_table(sex_imputed)
-
-        # Filter failing variants and genotypes, and pop outlier samples
-        logging.info("Filtering out failing genotypes and variants.")
-        mt_filtered = sq.filter_failing(
-            mt, samples_qcd, prefix='low_pass', entries=True, variants=True, samples=False, unfilter_entries=False,
-            pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
-            min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
-        )
-        utils.remove_secondary(args.cluster_name, args.region)
-
-        # Run samples QC
-        mt = sq.samples_qc(
-            mt_filtered, mt, samples_qcd, count_failing=args.count_failing, sample_call_rate=args.sample_call_rate,
-            chimeras_col=args.chimeras_col, chimeras_max=args.chimeras_max, contamination_col=args.contamination_col,
-            contamination_max=args.contamination_max, batch_col_name=args.batch_col_name,
-            sampleqc_sd_threshold=args.sampleqc_sd_threshold, pheno_col=args.pheno_col
-        )
-
-        logging.info(f"Writing checkpoint {stepcount}: sample QC")
-        mt = mt.checkpoint(samples_qcd, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-    else:
-        logging.info("Detected samples QC completed, skipping this step.")
-
-    stepcount += 1
-    variant_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_variant_qcd{args.test_str}.mt/")
-
-    ##############
-    # Variant QC #
-    ##############
-    if (not utils.check_exists(variant_qcd)) or args.force:
-        logging.info("Running final variant QC")
-        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
-
-        mt = hl.read_matrix_table(samples_qcd)
-
-        # Run variant QC
-        mt = vq.variant_quality_control(
-            mt, variant_qcd, annotation_prefix="final", min_dp=args.min_dp, min_gq=args.min_gq,
-            max_het_ref_reads=args.max_het_ref_reads, min_het_ref_reads=args.min_het_ref_reads,
-            min_hom_ref_ref_reads=args.min_hom_ref_ref_reads, max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
-            call_rate=args.final_min_call_rate, p_hwe=args.final_p_hwe, snp_qd=args.snp_qd, indel_qd=args.indel_qd,
-            ab_allowed_dev_het=args.ab_allowed_dev_het,
-            count_failing=args.count_failing, sex_aware_call_rate=True, pheno_col=args.pheno_col,
-            samples_qc=True, force=args.force
-        )
-
-        # Run case status-specific variant QC
-        if args.pheno_col is not None:
-            logging.info("Running case-status specific variant QC")
-            mt = vq.find_variants_failing_by_pheno(mt, ab_allowed_dev_het=args.ab_allowed_dev_het,
-                                                   pheno_call_rate=args.pheno_call_rate, prefix = "final")
-        else:
-            logging.info("Phenotype column not given, skipping filtering variants by phenotype.")
-
-        logging.info(f"Writing checkpoint {stepcount}: variant QC")
-        mt = mt.checkpoint(variant_qcd, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-    else:
-        logging.info("Detected that final variant QC has been run. Skipping this step.")
 
     stepcount += 1
     pcs_calculated = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_final_with_PCs{args.test_str}.mt/")
