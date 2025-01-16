@@ -98,33 +98,50 @@ def verify_annotations(args):
             logging.error(e)
             exit(1)
 
-def run_variant_qc(mt, args):
+
+def run_variant_qc(mt, args, qc_type):
     """Performs variant quality control."""
-    qc_path = os.path.join(args.out_dir, "variant_qc.mt")
+    qc_path = os.path.join(args.out_dir, f"{qc_type}_variant_qc.mt")
 
     if not utils.check_exists(qc_path) or args.force:
+        logging.info(f"Running {qc_type} variant and genotype QC.")
+        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
         mt = vq.variant_quality_control(
             mt,
             qc_path,
-            annotation_prefix="low_pass",
+            annotation_prefix=qc_type,
             min_dp=args.min_dp,
             min_gq=args.min_gq,
             max_het_ref_reads=args.max_het_ref_reads,
             min_het_ref_reads=args.min_het_ref_reads,
+            min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
             call_rate=args.low_pass_min_call_rate,
             p_hwe=args.low_pass_p_hwe,
             snp_qd=args.snp_qd,
             indel_qd=args.indel_qd,
             ab_allowed_dev_het=args.ab_allowed_dev_het,
-            count_failing=args.count_failing
+            count_failing=args.count_failing,
+            pheno_col=args.pheno_col,
+            force=args.force
         )
     else:
+        logging.info(f"Detected {qc_type} variant and genotype QC already performed.")
         mt = hl.read_matrix_table(qc_path)
 
     return mt
 
 
+def plot_variant_stats(mt, args, qc_type):
+    output_file(f"{qc_type}_mean_het_ab_hist.html")
+    ab_hist = mt.aggregate_rows(hl.agg.hist(mt[f"{qc_type}_het_ab_stats"].mean, 0, 1, 50))
+    p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
+    save(p)
 
+    output_file(f"{qc_type}_initial_call_rate.html")
+    cr_hist_1 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_initial_call_rate, 0, 1, 50))
+    p1 = hl.plot.histogram(cr_hist_1, legend='call rate', title="variant call rate, before GT filters")
+    save(p1)
 
 
 def main():
@@ -135,10 +152,12 @@ def main():
     verify_inputs(args)
 
     mt = load_and_annotate_samples(args)
-    mt = run_variant_qc(mt, args)
+    mt = run_variant_qc(mt, args, "low_pass")
+    plot_variant_stats(mt, args, "low_pass")
     mt = run_samples_qc(mt, args)
 
     mt.write(os.path.join(args.out_dir, "final_qc.mt"), overwrite=True)
+    utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
 if __name__ == "__main__":
     main()
@@ -151,46 +170,6 @@ from bokeh.io import output_file, save
 if __name__ == "__main__":
 
 
-
-
-
-    low_pass_qcd = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_low_pass_qcd{args.test_str}.mt/")
-
-    #######################
-    # low-pass variant QC #
-    #######################
-    if (not utils.check_exists(low_pass_qcd)) or args.force:
-        logging.info("Running low-pass variant QC and genotype QC before samples QC.")
-
-        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
-        mt = hl.read_matrix_table(samples_cleaned)
-
-        mt = vq.variant_quality_control(
-            mt, low_pass_qcd, annotation_prefix="low_pass", min_dp=args.min_dp, min_gq=args.min_gq,
-            max_het_ref_reads=args.max_het_ref_reads, min_het_ref_reads=args.min_het_ref_reads,
-            min_hom_ref_ref_reads=args.min_hom_ref_ref_reads, max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
-            call_rate=args.low_pass_min_call_rate, p_hwe=args.low_pass_p_hwe, snp_qd=args.snp_qd, indel_qd=args.indel_qd,
-            ab_allowed_dev_het=args.ab_allowed_dev_het,count_failing=args.count_failing, sex_aware_call_rate=False,
-            pheno_col=args.pheno_col, samples_qc=False, force=args.force
-        )
-
-        mt = mt.checkpoint(low_pass_qcd, overwrite=True)
-
-        output_file(f"low_pass_mean_het_ab_hist.html")
-        ab_hist = mt.aggregate_rows(hl.agg.hist(mt.low_pass_het_ab_stats.mean, 0, 1, 50))
-        p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
-        save(p)
-
-        output_file(f"low_pass_initial_call_rate.html")
-        cr_hist_1 = mt.aggregate_rows(hl.agg.hist(mt.low_pass_initial_call_rate, 0, 1, 50))
-        p1 = hl.plot.histogram(cr_hist_1, legend='call rate', title="variant call rate, before GT filters")
-        save(p1)
-
-        logging.info(f"Writing checkpoint {stepcount}: low pass variant QC")
-
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-    else:
-        logging.info("Detected low-pass variant QC mt exists, skipping low-pass variant QC.")
 
     stepcount += 1
     relatedness_calculated = os.path.join(
