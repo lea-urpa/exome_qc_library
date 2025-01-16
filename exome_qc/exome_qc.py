@@ -4,9 +4,12 @@ Script for doing exome sequencing data quality control from a Hail matrix table 
 Author: Lea Urpa, August 2020
 This pipeline is dedicated to Thao and the Get Down Stay Down, whose album A Man Alive was the mojo for writing
 """
+import sys
+import time
 import logging
 import os
 import hail as hl
+from bokeh.io import output_file, save
 from parse_arguments import parse_arguments, check_inputs
 import utils
 import samples_annotation as sa
@@ -132,7 +135,7 @@ def run_variant_qc(mt, args, qc_type):
     return mt
 
 
-def plot_variant_stats(mt, args, qc_type):
+def plot_variant_stats(mt, qc_type):
     output_file(f"{qc_type}_mean_het_ab_hist.html")
     ab_hist = mt.aggregate_rows(hl.agg.hist(mt[f"{qc_type}_het_ab_stats"].mean, 0, 1, 50))
     p = hl.plot.histogram(ab_hist, legend='het ref read ratio', title='Mean het read ratio per var (passing GTs)')
@@ -144,6 +147,155 @@ def plot_variant_stats(mt, args, qc_type):
     save(p1)
 
 
+def filter_failing_variants_and_genotypes(mt, args, checkpoint_name, qc_type):
+    """Filters failing variants and genotypes, and filters out low MAF variants."""
+    if not utils.check_exists(checkpoint_name) or args.force:
+        logging.info(f"Filtering out failing variants and genotypes.")
+        mt = sq.filter_failing(
+            mt,
+            checkpoint_name,
+            prefix=qc_type,
+            entries=True,
+            variants=True,
+            samples=False,
+            unfilter_entries=True,
+            pheno_qc=False,
+            min_dp=args.min_dp,
+            min_gq=args.min_gq,
+            max_het_ref_reads=args.max_het_ref_reads,
+            min_het_ref_reads=args.min_het_ref_reads,
+            min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
+            max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
+            force=args.force
+        )
+
+        mt = mt.checkpoint(checkpoint_name, overwrite=True)
+    else:
+        mt = hl.read_matrix_table(checkpoint_name)
+
+    return mt
+
+
+def filter_maf(mt, args, checkpoint_name, qc_type):
+    """Filters variants with MAF below cutoff"""
+    if not utils.check_exists(checkpoint_name) or args.force:
+        logging.info(f"Filtering to variants with MAF < {args.ind_maf}")
+        mt = vq.maf_filter(mt, maf=args.ind_maf, varqc_annot_name=f"{qc_type}_variant_qc")
+
+        mt = mt.checkpoint(checkpoint_name, overwrite=True)
+    else:
+        mt = hl.read_matrix_table(checkpoint_name)
+
+    return mt
+
+
+def downsample(mt, args, checkpoint_name):
+    """Downsamples MT, first with ld pruning and then randomly downsampling if above target variant count."""
+    if not utils.check_exists(checkpoint_name) or args.force:
+        mt = vq.downsample_variants(
+            mt,
+            target_count=80000,
+            checkpoint_name=checkpoint_name,
+            r2=args.r2,
+            bp_window_size=args.bp_window_size,
+            ld_prune=True
+        )
+    else:
+        mt = hl.read_matrix_table(checkpoint_name)
+
+    return mt
+
+
+def filter_to_autosomes(mt, args):
+    """Filters dataset to just autosomes"""
+    if args.reference_genome == "GRCh38":
+        autosomes = ["chr" + str(i) for i in range(1, 23)]
+    else:
+        autosomes = [str(i) for i in range(1, 23)]
+
+    mt = mt.filter_rows(hl.literal(autosomes).contains(mt.locus.contig))
+
+    return mt
+
+
+def calculate_relatedness(mt, args, qc_type):
+    """Calculates relatedness and annotates the matrix table."""
+    relatedness_path = os.path.join(args.out_dir, "relatedness_annotated.mt")
+    relatedness_downsampled_path = os.path.join(args.out_dir, "relatedness_downsampled.mt")
+
+    if not utils.check_exists(relatedness_path) or args.force:
+        logging.info("Calculating relatedness")
+        downsampled_path = os.path.join(args.out_dir, "downsampled.mt")
+        filtered_failing_path = os.path.join(args.out_dir, "filtered_variants.mt")
+        maf_filtered_path = os.path.join(args.out_dir, "maf_filtered.mt")
+
+        mt_downsampled = filter_failing_variants_and_genotypes(mt, args, filtered_failing_path, qc_type)
+        mt_downsampled = filter_maf(mt_downsampled, args, maf_filtered_path, qc_type)
+        mt_downsampled = downsample(mt_downsampled, args, downsampled_path)
+        mt_downsampled = filter_to_autosomes(mt_downsampled, args)
+
+        related_to_remove, related_info_ht = sq.king_relatedness(
+            mt_downsampled, relatedness_path, kinship_threshold=args.kinship_threshold,
+            pheno_col=args.pheno_col, force=args.force,
+            cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
+            region=args.region
+        )
+
+        mt = mt.annotate_cols(
+            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False),
+            related_graph_id=related_info_ht[mt.s].related_graph_id,
+            related_num_connections=hl.or_else(related_info_ht[mt.s].related_num_connections, 0)
+        )
+
+        mt_downsampled = mt_downsampled.annotate_cols(
+            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_downsampled.s), True, False),
+            related_graph_id=related_info_ht[mt_downsampled.s].related_graph_id,
+            related_num_connections=hl.or_else(related_info_ht[mt_downsampled.s].related_num_connections, 0)
+        )
+
+        mt = mt.checkpoint(relatedness_path, overwrite=True)
+        mt_downsampled = mt_downsampled.checkpoint(relatedness_downsampled_path, overwrite=True)
+    else:
+        logging.info("Detected relatedness already calculated.")
+        mt = hl.read_matrix_table(relatedness_path)
+        mt_downsampled = hl.read_matrix_table(relatedness_downsampled_path)
+
+    return mt, mt_downsampled
+
+
+def find_population_outliers(mt, mt_downsampled, args):
+    """Identifieds population outliers using the PCA method."""
+    pop_outliers_path = os.path.join(args.out_dir, "pop_outliers_annotated.mt")
+    pop_outliers_downsampled_path = os.path.join(args.out_dir, "pop_outliers_downsampled.mt")
+
+    if not utils.check_exists(pop_outliers_downsampled_path) or args.force:
+        logging.info("Finding population outliers with PCA method.")
+        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
+        pop_outliers = sq.find_pop_outliers(
+            mt_downsampled,
+            pop_outliers_downsampled_path,
+            pop_sd_threshold=args.pop_sd_threshold,
+            plots=args.pca_plots,
+            max_iter=args.max_iter,
+            reference_genome=args.reference_genome,
+            pca_plot_annotations=args.pca_plot_annotations
+        )
+
+        mt = mt.annotate_cols(pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt.s), True, False))
+        mt_downsampled = mt_downsampled.annotate_cols(
+            pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt_downsampled.s), True, False))
+
+        mt = mt.checkpoint(pop_outliers_path, overwrite=True)
+        mt_downsampled = mt_downsampled.checkpoint(pop_outliers_downsampled_path, overwrite=True)
+    else:
+        logging.info("Detected population outliers already found.")
+        mt = hl.read_matrix_table(pop_outliers_path)
+        mt_downsampled = hl.read_matrix_table(pop_outliers_downsampled_path)
+
+    return mt, mt_downsampled
+
+
+
 def main():
     hl.init()
 
@@ -153,7 +305,10 @@ def main():
 
     mt = load_and_annotate_samples(args)
     mt = run_variant_qc(mt, args, "low_pass")
-    plot_variant_stats(mt, args, "low_pass")
+    plot_variant_stats(mt, "low_pass")
+    mt, mt_downsampled = calculate_relatedness(mt, args, "low_pass")
+    mt, mt_downsampled = find_population_outliers(mt, mt_downsampled, args)
+
     mt = run_samples_qc(mt, args)
 
     mt.write(os.path.join(args.out_dir, "final_qc.mt"), overwrite=True)
@@ -163,146 +318,12 @@ if __name__ == "__main__":
     main()
 
 
-import sys
-import time
-from bokeh.io import output_file, save
+
 
 if __name__ == "__main__":
 
 
 
-    stepcount += 1
-    relatedness_calculated = os.path.join(
-        args.out_dir, f"{stepcount}_{args.out_name}_relatedness_calculated{args.test_str}.mt/")
-
-    #########################
-    # Calculate relatedness #
-    #########################
-    ld_pruned = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned{args.test_str}.mt/")
-    ld_pruned_maffilt = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_maf_filt{args.test_str}.mt/")
-    ld_pruned_annot = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_ld_pruned_related{args.test_str}.mt/")
-
-    if (not utils.check_exists(relatedness_calculated)) or args.force:
-        logging.info("Calculating relatedness")
-        mt = hl.read_matrix_table(low_pass_qcd)
-        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
-
-        ## LD prune and checkpoint ##
-        if (not utils.check_exists(ld_pruned)) or args.force:
-            logging.debug(f"MAF distribution for variants, before MAF filtering and before filtering failing variants:"
-                          f" {mt.low_pass_variant_qc.AF[1].summarize()}")
-
-            # Filter failing samples, variants, and genotypes
-            mt_gt_filt = sq.filter_failing(
-                mt, ld_pruned, prefix='low_pass', entries=True, variants=False, samples=False, unfilter_entries=True,
-                pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
-                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force
-            )
-
-            mt_filtered = mt.filter_rows(hl.len(mt.low_pass_failing_variant_qc) == 0)
-            logging.debug(f"Number of variants in low-pass QCd matrix table: {mt_filtered.count_rows()}")
-            logging.debug(f"MAF distribution for variants, before MAF filtering but after filtering failing variants:"
-                          f" {mt_filtered.low_pass_variant_qc.AF[1].summarize()}")
-
-            # Filter out low MAF variants
-            if (not utils.check_exists(ld_pruned_maffilt)) or args.force:
-                mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, "low_pass_variant_qc")
-                mt_maffilt = mt_maffilt.checkpoint(ld_pruned_maffilt, overwrite=True)
-                logging.debug(f"Number of variants in MAF filtered {args.ind_maf} matrix table: {mt_maffilt.count_rows()}")
-            else:
-                mt_maffilt = hl.read_matrix_table(ld_pruned_maffilt)
-                logging.debug(f"Number of variants in MAF filtered {args.ind_maf} matrix table: {mt_maffilt.count_rows()}")
-
-            # LD prune if row count >80k
-            mt_ldpruned = vq.downsample_variants(
-                mt_maffilt, 80000, ld_pruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
-
-            logging.info(f"Writing checkpoint {stepcount}-1: LD pruned dataset")
-            logging.debug(f"Count of variants in downsampled matrix table: {mt_ldpruned.count_rows()}")
-            mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned, overwrite=True)
-        else:
-            logging.info("Detected LD pruned dataset written, loading that.")
-            logging.debug(f"Count of variants in downsampled matrix table: {mt_ldpruned.count_rows()}")
-            mt_ldpruned = hl.read_matrix_table(ld_pruned)
-
-        ## Calculate relatedness with King ##
-        if args.reference_genome == "GRCh38":
-            autosomes = ["chr" + str(i) for i in range(1, 23)]
-        else:
-            autosomes = [str(i) for i in range(1, 23)]
-
-        mt_autosomes = mt_ldpruned.filter_rows(hl.literal(autosomes).contains(mt_ldpruned.locus.contig))
-
-        related_to_remove, related_info_ht = sq.king_relatedness(
-            mt_autosomes, relatedness_calculated, kinship_threshold=args.kinship_threshold, pheno_col=args.pheno_col,
-            force=args.force, cluster_name=args.cluster_name, num_secondary_workers=args.num_secondary_workers,
-            region=args.region)
-
-        mt = mt.annotate_cols(
-            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt.s), True, False),
-            related_graph_id=related_info_ht[mt.s].related_graph_id,
-            related_num_connections=related_info_ht[mt.s].related_num_connections
-        )
-
-        mt = mt.annotate_cols(related_num_connections=hl.or_else(mt.related_num_connections, 0))
-
-        mt_ldpruned = mt_ldpruned.annotate_cols(
-            related_to_remove=hl.if_else(hl.literal(related_to_remove).contains(mt_ldpruned.s), True, False),
-            related_graph_id=related_info_ht[mt_ldpruned.s].related_graph_id,
-            related_num_connections=related_info_ht[mt_ldpruned.s].related_num_connections)
-
-        mt_ldpruned = mt_ldpruned.annotate_cols(related_num_connections=hl.or_else(mt_ldpruned.related_num_connections, 0))
-
-        logging.info(f"Writing checkpoint {stepcount}: relatedness annotated")
-        mt = mt.checkpoint(relatedness_calculated, overwrite=True)
-        mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_annot, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-
-    else:
-        logging.info("Detected mt with relatives annotated exists, skipping relatedness calculation.")
-
-    stepcount += 1
-    pop_outliers_found = os.path.join(
-        args.out_dir, f"{stepcount}_{args.out_name}_pop_outliers_found{args.test_str}.mt/")
-
-    ############################
-    # Find population outliers #
-    ############################
-    ld_pruned_maf = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_ld_pruned_maf_0.05{args.test_str}.mt/")
-    ld_pruned_popannot = os.path.join(args.out_dir,
-                                      f"{stepcount}-2_{args.out_name}_ld_pruned_popoutliers{args.test_str}.mt/")
-
-    if (not utils.check_exists(pop_outliers_found)) or args.force:
-        logging.info("Finding population outliers")
-        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
-
-        mt = hl.read_matrix_table(relatedness_calculated)
-        mt_ldpruned = hl.read_matrix_table(ld_pruned_annot)
-
-        maf_stats = mt_ldpruned.aggregate_rows(hl.agg.stats(mt_ldpruned.low_pass_variant_qc.AF[1]))
-
-        if maf_stats.min < 0.05:
-            logging.info("Further excluding variants with MAF < 0.05 to calculate principal components.")
-            mt_ldpruned = mt_ldpruned.filter_rows(mt_ldpruned.variant_qc.AF[1] >= 0.05, keep=True)
-            mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_maf, overwrite=True)
-
-        pop_outliers = sq.find_pop_outliers(
-            mt_ldpruned, pop_outliers_found, pop_sd_threshold=args.pop_sd_threshold,
-            plots=args.pca_plots, max_iter=args.max_iter, reference_genome=args.reference_genome,
-            pca_plot_annotations=args.pca_plot_annotations)
-
-        mt = mt.annotate_cols(pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt.s), True, False))
-        mt_ldpruned = mt_ldpruned.annotate_cols(
-            pop_outlier_sample=hl.if_else(hl.literal(pop_outliers).contains(mt_ldpruned.s), True, False))
-
-        logging.info(f"Writing checkpoint {stepcount}: population outliers annotated")
-        mt = mt.checkpoint(pop_outliers_found, overwrite=True)
-        mt_ldpruned = mt_ldpruned.checkpoint(ld_pruned_popannot, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-
-    else:
-        logging.info("Detected mt with population outliers annotated exists, skipping finding pop outliers.")
 
     stepcount += 1
     sex_imputed = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_sex_imputed{args.test_str}.mt/")
