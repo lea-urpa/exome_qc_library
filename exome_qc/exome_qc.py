@@ -175,7 +175,8 @@ def plot_variant_stats(mt, qc_type):
     save(p1)
 
 
-def filter_failing_variants_and_genotypes(mt, args, checkpoint_name, qc_type, unfilter_entries, keep_hwe):
+def filter_failing_variants_and_genotypes(mt, args, checkpoint_name, qc_type, unfilter_entries, keep_hwe,
+                                          filter_samples=False, pop_outliers=False):
     """Filters failing variants and genotypes, and filters out low MAF variants."""
     if not utils.check_exists(checkpoint_name) or args.force:
         logging.info(f"Filtering out failing variants and genotypes.")
@@ -185,7 +186,7 @@ def filter_failing_variants_and_genotypes(mt, args, checkpoint_name, qc_type, un
             prefix=qc_type,
             entries=True,
             variants=True,
-            samples=False,
+            samples=filter_samples,
             unfilter_entries=unfilter_entries,
             pheno_qc=False,
             keep_hwe=keep_hwe,
@@ -195,7 +196,8 @@ def filter_failing_variants_and_genotypes(mt, args, checkpoint_name, qc_type, un
             min_het_ref_reads=args.min_het_ref_reads,
             min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
             max_hom_alt_ref_reads=args.max_hom_alt_ref_reads,
-            force=args.force
+            force=args.force,
+            pop_outliers=pop_outliers
         )
 
         mt = mt.checkpoint(checkpoint_name, overwrite=True)
@@ -254,9 +256,9 @@ def calculate_relatedness(mt, args, qc_type):
 
     if not utils.check_exists(relatedness_path) or args.force:
         logging.info("Calculating relatedness")
-        downsampled_path = os.path.join(args.out_dir, "downsampled.mt")
         filtered_failing_path = os.path.join(args.out_dir, "filtered_variants.mt")
         maf_filtered_path = os.path.join(args.out_dir, "maf_filtered.mt")
+        downsampled_path = os.path.join(args.out_dir, "downsampled.mt")
 
         mt_downsampled = filter_failing_variants_and_genotypes(
             mt,
@@ -264,7 +266,9 @@ def calculate_relatedness(mt, args, qc_type):
             checkpoint_name=filtered_failing_path,
             qc_type=qc_type,
             unfilter_entries= True,
-            keep_hwe=False
+            keep_hwe=False,
+            filter_samples=False,
+            pop_outliers=False
         )
         mt_downsampled = filter_maf(mt_downsampled, args, maf_filtered_path, qc_type)
         mt_downsampled = downsample(mt_downsampled, args, downsampled_path)
@@ -358,7 +362,9 @@ def impute_sex(mt, args, qc_type):
             checkpoint_name=filtered_failing_keephwe_path,
             qc_type=qc_type,
             unfilter_entries=False,
-            keep_hwe=True
+            keep_hwe=True,
+            filter_samples=False,
+            pop_outliers=False
         )
 
         imputed_sex = sq.impute_sex_plot(
@@ -394,7 +400,9 @@ def run_samples_qc(mt, args):
             checkpoint_name=filtered_failing_path,
             qc_type="low_pass",
             unfilter_entries=False,
-            keep_hwe=True
+            keep_hwe=True,
+            filter_samples=False,
+            pop_outliers=False
         )
 
         utils.remove_secondary(args.cluster_name, args.region)
@@ -422,6 +430,113 @@ def run_samples_qc(mt, args):
     return mt
 
 
+def plot_pcs(mt, args):
+    """Plot principal components, with or without annotations"""
+    if args.pca_plot_annotations is not None:
+        try:
+            pca_annotations = args.pca_plot_annotations.strip().split(",")
+            label_dict = {i: mt[i] for i in pca_annotations}
+
+            output_file(f"final_pcs_plot.html")
+            p = hl.plot.scatter(mt.pc1, mt.pc2, label=label_dict, title="Final PCs", collect_all=True)
+            save(p)
+        except Exception as e:
+            logging.error(f"Error! Creating PCA plots with labels failed. Are the label categories you provided"
+                          f" really in the data? labels provided: {args.pca_plot_annotations}. Plotting without "
+                          f"labels")
+            logging.error(e)
+            output_file(f"final_pcs_plot.html")
+            p = hl.plot.scatter(mt.pc1, mt.pc2, title="Final principal components", collect_all=True)
+            save(p)
+    else:
+        output_file(f"final_pcs_plot.html")
+        p = hl.plot.scatter(mt.pc1, mt.pc2, title="Final principal components", collect_all=True)
+        save(p)
+
+
+def calculate_final_pcs(mt, args, qc_type):
+    """Calculates final principal components and projects them onto related samples."""
+    pcs_annotated_path = os.path.join(args.out_dir, "final_pcs.mt")
+
+    if not utils.check_exists(pcs_path) or args.force:
+        logging.info("Calculating principal components for passing samples with passing variants and genotypes.")
+        mt_filtered_path = os.path.join(args.out_dir, "final_filtered.mt")
+
+        filtered_failing_path = os.path.join(args.out_dir, "final_passing_variants_samples_only.mt")
+        maf_filtered_path = os.path.join(args.out_dir, "maf_filtered_pcs.mt")
+        downsampled_path = os.path.join(args.out_dir, "downsampled_pcs.mt")
+        pcs_path = os.path.join(args.out_dir, "pcs.mt/")
+
+        mt_downsampled = filter_failing_variants_and_genotypes(
+            mt,
+            args,
+            checkpoint_name=filtered_failing_path,
+            qc_type=qc_type,
+            unfilter_entries=True,
+            keep_hwe=False,
+            filter_samples=True,
+            pop_outliers=True
+        )
+        mt_downsampled = filter_maf(mt_downsampled, args, maf_filtered_path, qc_type)
+        mt_downsampled = downsample(mt_downsampled, args, downsampled_path)
+        mt_downsampled = filter_to_autosomes(mt_downsampled, args)
+
+        scores, related_scores = sq.project_pcs_relateds(
+            mt_downsampled, pcs_path, covar_pc_num=args.pc_num, reference_genome=args.reference_genome
+        )
+
+        mt = mt.annotate_cols(**{'pc' + str(k + 1): scores[mt.s].scores[k]
+                                 for k in range(args.pc_num)})
+        mt = mt.annotate_cols(**{'pc' + str(k + 1): hl.or_else(mt['pc' + str(k + 1)], related_scores[mt.s].scores[k])
+                                 for k in range(args.pc_num)})
+
+        plot_pcs(mt, args)
+
+        mt = mt.checkpoint(pcs_path, overwrite=True)
+    else:
+        logging.info("Detected matrix table with principal components annotated exists, loading that.")
+        mt = hl.read_matrix_table(pcs_path)
+
+    return mt
+
+
+def annotate_with_external_data(mt, args):
+    """Annotates variants with external datasets like CADD and gnomAD."""
+    annotated_path = os.path.join(args.out_dir, "annotated.mt")
+
+    if not utils.check_exists(annotated_path) or args.force:
+        if args.mpc_ht:
+            logging.info("Annotating variants with MPC info.")
+            mt = va.annotate_variants_mpc(mt, args.mpc_ht)
+        if args.cadd_ht:
+            logging.info("Annotating variants with CADD info.")
+            mt = va.annotate_variants_cadd(mt, args.cadd_ht)
+        if args.gnomad_ht:
+            logging.info("Annotating variants with Gnomad info.")
+            mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
+        if args.gnomad_mismatch_ht:
+            logging.info("Annotating variants with gnomad mismatch info.")
+            mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
+
+        mt = mt.checkpoint(annotated_path, overwrite=True)
+    else:
+        mt = hl.read_matrix_table(annotated_path)
+
+    return mt
+
+
+def export_rows_cols(mt, args):
+    """Export rows and columns of matrix table to text files."""
+    mtcols = mt.cols()
+    mtcols = mtcols.flatten()
+    mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv.gz'))
+
+    mtrows = mt.rows()
+    mtrows = mtrows.flatten()
+    mtrows = mtrows.key_by().drop("vep.input")
+    mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv.gz'))
+
+
 def main():
     hl.init()
 
@@ -441,143 +556,12 @@ def main():
     mt = run_samples_qc(mt, args)
     mt = run_variant_qc(mt, args, "final")
 
+    mt = calculate_final_pcs(mt, args, "final")
+    mt = annotate_with_external_data(mt, args)
+
     mt.write(os.path.join(args.out_dir, "final_qc.mt"), overwrite=True)
     utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
 
+
 if __name__ == "__main__":
     main()
-
-
-
-
-if __name__ == "__main__":
-
-
-
-    stepcount += 1
-    pcs_calculated = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_final_with_PCs{args.test_str}.mt/")
-
-    #######################
-    # Calculate final PCs #
-    #######################
-    final_filtered = os.path.join(args.out_dir, f"{stepcount}-1_{args.out_name}_filtered{args.test_str}.mt/")
-    final_maffilt = os.path.join(args.out_dir, f"{stepcount}-2_{args.out_name}_maf_filt{args.test_str}.mt/")
-    final_ldpruned = os.path.join(args.out_dir, f"{stepcount}-3_{args.out_name}_ldpruned{args.test_str}.mt/")
-
-    if (not utils.check_exists(pcs_calculated)) or args.force:
-        logging.info("Calculating final PCs")
-        utils.add_secondary(args.cluster_name, args.num_secondary_workers, args.region)
-
-        mt = hl.read_matrix_table(variant_qcd)
-
-        # Filter out failing samples, variants, genotypes for PC calculations
-        if (not utils.check_exists(final_filtered)) or args.force:
-            mt_filtered = sq.filter_failing(
-                mt, pcs_calculated, prefix='final', entries=True, variants=True, samples=True, unfilter_entries=True,
-                pheno_qc=False, min_dp=args.min_dp, min_gq=args.min_gq, max_het_ref_reads=args.max_het_ref_reads,
-                min_het_ref_reads=args.min_het_ref_reads, min_hom_ref_ref_reads=args.min_hom_ref_ref_reads,
-                max_hom_alt_ref_reads=args.max_hom_alt_ref_reads, force=args.force, pop_outliers=True
-            )
-            mt_filtered = mt_filtered.checkpoint(final_filtered, overwrite=True)
-
-        else:
-            logging.info("Detected final failing sample, variant, and genotype mt exists. Loading that.")
-            mt_filtered = hl.read_matrix_table(final_filtered)
-
-        # MAF filter
-        if (not utils.check_exists(final_maffilt)) or args.force:
-            logging.info("Filtering to common variants and LD pruning dataset.")
-            mt_maffilt = vq.maf_filter(mt_filtered, args.ind_maf, "final_variant_qc")
-            mt_maffilt = mt_maffilt.checkpoint(final_maffilt, overwrite=True)
-        else:
-            logging.info("Detected final MAF filtered mt exists. Loading that.")
-            mt_maffilt = hl.read_matrix_table(final_maffilt)
-
-        # LD prune
-        if (not utils.check_exists(final_ldpruned)) or args.force:
-            logging.info('LD pruning final dataset for PC calculation')
-            mt_ldpruned = vq.downsample_variants(
-                mt_maffilt, 80000, final_ldpruned, r2=args.r2, bp_window_size=args.bp_window_size, ld_prune=True)
-            mt_ldpruned = mt_ldpruned.checkpoint(final_ldpruned, overwrite=True)
-        else:
-            logging.info("Detected final LDpruned mt exists. Loading that.")
-            mt_ldpruned = hl.read_matrix_table(final_ldpruned)
-
-        # Calculate PCs and project to relatives, annotate to main mt, plot
-        scores, related_scores = sq.project_pcs_relateds(mt_ldpruned, pcs_calculated, args.pc_num, args.reference_genome)
-
-        mt = mt.annotate_cols(**{'pc' + str(k + 1): scores[mt.s].scores[k]
-                                 for k in range(args.pc_num)})
-        mt = mt.annotate_cols(**{'pc' + str(k + 1): hl.or_else(mt['pc' + str(k + 1)], related_scores[mt.s].scores[k])
-                                 for k in range(args.pc_num)})
-
-        if args.pca_plot_annotations is not None:
-            try:
-                pca_annotations = args.pca_plot_annotations.strip().split(",")
-                label_dict = {i: mt[i] for i in pca_annotations}
-
-                output_file(f"{datestr}_final_pcs_plot.html")
-                p = hl.plot.scatter(mt.pc1, mt.pc2, label=label_dict, title="Final PCs", collect_all=True)
-                save(p)
-            except Exception as e:
-                logging.error(f"Error! Creating PCA plots with labels failed. Are the label categories you provided"
-                              f" really in the data? labels provided: {args.pca_plot_annotations}. Plotting without "
-                              f"labels")
-                logging.error(e)
-                output_file(f"{datestr}_final_pcs_plot.html")
-                p = hl.plot.scatter(mt.pc1, mt.pc2, title="Final principal components", collect_all=True)
-                save(p)
-        else:
-            output_file(f"{datestr}_final_pcs_plot.html")
-            p = hl.plot.scatter(mt.pc1, mt.pc2, title="Final principal components", collect_all=True)
-            save(p)
-
-        mt = mt.checkpoint(pcs_calculated, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-
-    else:
-        logging.info("Detected that final PCs have been calculated. Skipping this step.")
-
-    stepcount += 1
-    variant_annotated = os.path.join(args.out_dir, f"{stepcount}_{args.out_name}_variants_annotated{args.test_str}.mt/")
-
-    ##############################
-    # Annotate with CADD, Gnomad #
-    ##############################
-    if (not utils.check_exists(variant_annotated)) or args.force:
-        mt = hl.read_matrix_table(pcs_calculated)
-
-        if args.mpc_ht is not None:
-            logging.info("Annotating variants with MPC info.")
-            mt = va.annotate_variants_mpc(mt, args.mpc_ht)
-        if args.cadd_ht is not None:
-            logging.info("Annotating variants with CADD info.")
-            mt = va.annotate_variants_cadd(mt, args.cadd_ht)
-        if args.gnomad_ht is not None:
-            logging.info("Annotating variants with Gnomad.")
-            mt = va.annotate_variants_gnomad(mt, args.gnomad_ht)
-        if args.gnomad_mismatch_ht is not None:
-            logging.info("Annotating variants with gnomad mismatch info.")
-            mt = va.annotate_variants_gnomad_mismatch(mt, args.gnomad_mismatch_ht)
-
-        mt = mt.checkpoint(variant_annotated, overwrite=True)
-        utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-    else:
-        mt = hl.read_matrix_table(variant_annotated)
-        logging.info("Detected final annotated mt exists. Skipping this step.")
-
-    # Export rows and columns
-    mtcols = mt.cols()
-    mtcols = mtcols.flatten()
-    mtcols.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_cols.tsv.gz'))
-
-    mtrows = mt.rows()
-    mtrows = mtrows.flatten()
-    mtrows = mtrows.key_by().drop("vep.input")
-    mtrows.export(os.path.join(args.out_dir, args.out_name + '_final_dataset_rows.tsv.gz'))
-
-
-    # Send logs and finish-up notice
-    logging.info('Pipeline ran successfully! Copying logs and shutting down cluster in 10 minutes.')
-    utils.copy_logs_output(args.log_dir, log_file=args.log_file, plot_dir=args.plot_folder)
-
