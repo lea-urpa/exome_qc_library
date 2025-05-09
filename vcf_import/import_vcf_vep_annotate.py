@@ -56,7 +56,7 @@ if __name__ == "__main__":
     args.vep_config = args.vep_config
 
     if (('europe' in args.region) and not("europe" in args.vep_bucket)) or \
-            (('us' in arg.region) and not ('us' in args.vep_bucket)):
+            (('us' in args.region) and not ('us' in args.vep_bucket)):
         logging.error("Error- your region settings and the VEP bucket are different. "
                       "Are you sure you want to VEP annotate with files from "
                       "another region? Network egress charges add up VERY quickly. Exiting.")
